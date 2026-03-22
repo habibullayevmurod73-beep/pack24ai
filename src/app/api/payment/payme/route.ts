@@ -1,0 +1,58 @@
+import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
+
+// ─── Payme (PayCom) to'lov integratsiyasi ───────────────────────────────────
+// Hujjatlar: https://developer.paycom.uz/
+
+const PAYME_MERCHANT_ID  = process.env.PAYME_MERCHANT_ID  ?? '';
+const PAYME_SECRET_KEY   = process.env.PAYME_SECRET_KEY   ?? '';
+const PAYME_TEST_SECRET  = process.env.PAYME_TEST_SECRET  ?? '';
+const IS_TEST = process.env.NODE_ENV !== 'production';
+
+const PAYME_URL = IS_TEST
+    ? 'https://checkout.test.paycom.uz'
+    : 'https://checkout.paycom.uz';
+
+// ─── POST /api/payment/payme — Payme checkout URL yaratish ─────────────────
+export async function POST(req: NextRequest) {
+    try {
+        const body = await req.json();
+        const { orderId, amount, description } = body;
+
+        if (!orderId || !amount) {
+            return NextResponse.json({ error: 'orderId va amount majburiy' }, { status: 400 });
+        }
+
+        // Payme amount tiyin (100x so'm)
+        const amountInTiyin = Math.round(amount * 100);
+
+        // Base64 encode: merchant_id + params
+        const params = btoa(JSON.stringify({
+            m:  PAYME_MERCHANT_ID,
+            ac: { order_id: orderId.toString() },
+            a:  amountInTiyin,
+            l:  'uz',          // til: uz | ru | en
+            ct: 7200,          // seconds to pay (2 hours)
+            cr: 'UZS',
+        }));
+
+        const payUrl = `${PAYME_URL}/${params}`;
+
+        return NextResponse.json({
+            payUrl,
+            orderId,
+            amount,
+            amountInTiyin,
+        });
+    } catch (error) {
+        console.error('[API/payment/payme]', error);
+        return NextResponse.json({ error: 'Server xatosi' }, { status: 500 });
+    }
+}
+
+// ─── POST /api/payment/payme/webhook — Payme server-to-server callback ──────
+// Bu endpoint Payme serveridan kelgan to'lov tasdiqlash/bekor qilish so'rovlarini qabul qiladi
+// Haqiqiy loyihada bu alohida route bo'lishi kerak: /api/payment/payme/webhook
+export async function GET() {
+    return NextResponse.json({ status: 'Payme payment endpoint active' });
+}

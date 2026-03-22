@@ -1,0 +1,213 @@
+import { create } from 'zustand';
+import { toast } from 'sonner';
+
+export interface Product {
+    id: number | string;
+    name: string;
+    description?: string;
+    price: number;
+    originalPrice?: number;
+    sku?: string;
+    category?: string;
+    image: string;
+    gallery?: string[];
+    inStock?: boolean;
+    rating: number;
+    reviews: number;
+    created_at?: string;
+    status: 'active' | 'draft' | 'archived';
+    dimensions?: {
+        width: number;
+        height: number;
+        length?: number;
+        thickness?: number;
+    };
+    specifications?: Record<string, string>;
+    sourceUrl?: string;
+    originalCategoryPath?: string[];
+}
+
+// ─── Typed selectors (performance) ────────────────────────────────────────
+// Usage: const products = useProductStore(selectProducts)   ← minimal re-renders
+// Usage: const loading = useProductStore(selectLoading)
+export const selectProducts = (s: ProductState) => s.products;
+export const selectLoading  = (s: ProductState) => s.loading;
+export const selectByCategory = (category: string) =>
+    (s: ProductState) => s.products.filter((p) => p.category === category);
+export const selectActiveProducts = (s: ProductState) =>
+    s.products.filter((p) => p.status === 'active');
+export const selectProductById = (id: number | string) =>
+    (s: ProductState) => s.products.find((p) => p.id === id) ?? null;
+// ─────────────────────────────────────────────────────────────────────────
+
+interface FetchFilters {
+    category?: string;
+    status?: 'active' | 'draft' | 'archived';
+    search?: string;
+}
+
+interface ImportData {
+    name: string;
+    description?: string;
+    price: number | string;
+    sku?: string;
+    category?: string;
+    image?: string;
+    gallery?: string[];
+    specifications?: Record<string, string>;
+}
+
+interface ProductState {
+    products: Product[];
+    loading: boolean;
+    fetchProducts: (filters?: FetchFilters) => Promise<void>;
+    addProduct: (product: Omit<Product, 'id' | 'created_at' | 'rating' | 'reviews'>) => Promise<void>;
+    updateProduct: (id: number | string, updates: Partial<Product>) => Promise<void>;
+    deleteProduct: (id: number | string) => Promise<void>;
+    bulkUpdatePrice: (category: string, percentage: number) => Promise<void>;
+    importProduct: (data: ImportData) => Promise<void>;
+}
+
+export const useProductStore = create<ProductState>((set, get) => ({
+    products: [],
+    loading: false,
+
+    fetchProducts: async (filters = {}) => {
+        set({ loading: true });
+        try {
+            const params = new URLSearchParams();
+            if (filters.category) params.append('category', filters.category);
+            if (filters.status) params.append('status', filters.status);
+            if (filters.search) params.append('search', filters.search);
+
+            const res = await fetch(`/api/products?${params}`);
+            if (res.ok) {
+                const data = await res.json();
+                set({ products: data });
+            }
+        } catch (error) {
+            console.error('Failed to fetch products', error);
+        } finally {
+            set({ loading: false });
+        }
+    },
+
+    addProduct: async (newProduct) => {
+        try {
+            const res = await fetch('/api/products', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newProduct)
+            });
+            if (res.ok) {
+                const product = await res.json();
+                set(state => ({ products: [product, ...state.products] }));
+                toast.success('Mahsulot qo\'shildi');
+            }
+        } catch (error) {
+            toast.error('Xatolik yuz berdi');
+        }
+    },
+
+    updateProduct: async (id, updates) => {
+        // Optimistic update
+        const originalProducts = get().products;
+        set(state => ({
+            products: state.products.map(p => p.id === id ? { ...p, ...updates } : p)
+        }));
+
+        try {
+            const res = await fetch(`/api/products/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updates)
+            });
+            if (!res.ok) throw new Error();
+        } catch (error) {
+            set({ products: originalProducts }); // Revert
+            toast.error('Yangilashda xatolik');
+        }
+    },
+
+    deleteProduct: async (id) => {
+        const originalProducts = get().products;
+        set(state => ({ products: state.products.filter(p => p.id !== id) }));
+
+        try {
+            const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error();
+            toast.success("Mahsulot o'chirildi");
+        } catch (error) {
+            set({ products: originalProducts });
+            toast.error("O'chirishda xatolik");
+        }
+    },
+
+    bulkUpdatePrice: async (category, percentage) => {
+        // This logic might need a dedicated API endpoint for efficiency, 
+        // but for now we iterate (or could send a bulk update request).
+        // Implementing client-side loop for now as per previous logic, but calling API.
+
+        const state = get();
+        const productsToUpdate = state.products.filter(p =>
+            category === 'all' || p.category === category
+        );
+
+        // Optimistic
+        set(state => ({
+            products: state.products.map(p => {
+                if (productsToUpdate.find(u => u.id === p.id)) {
+                    return { ...p, price: Math.round(p.price * (1 + percentage / 100)) };
+                }
+                return p;
+            })
+        }));
+
+        // Real update (This can be slow, ideally add /api/products/bulk-update)
+        for (const p of productsToUpdate) {
+            const newPrice = Math.round(p.price * (1 + percentage / 100));
+            await fetch(`/api/products/${p.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ price: newPrice })
+            });
+        }
+    },
+
+    importProduct: async (data: ImportData) => {
+        try {
+            // Map scraped data to Product structure
+            const mappedProduct = {
+                name: data.name,
+                description: data.description || '',
+                price: typeof data.price === 'string' ? parseFloat(data.price.replace(/[^0-9.]/g, '')) : (data.price || 0),
+                originalPrice: null,
+                sku: data.sku || '',
+                category: data.category || 'Uncategorized', // dynamic mapping might be needed
+                image: data.image || '/placeholder.png',
+                gallery: data.gallery || [],
+                status: 'draft',
+                inStock: true,
+                specifications: data.specifications || {},
+                // Handle other fields...
+            };
+
+            const res = await fetch('/api/products', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(mappedProduct)
+            });
+
+            if (res.ok) {
+                const product = await res.json();
+                set(state => ({ products: [product, ...state.products] }));
+            } else {
+                throw new Error('Import failed');
+            }
+        } catch (error) {
+            console.error('Import error:', error);
+            throw error; // Let caller handle or just log
+        }
+    }
+}));
+

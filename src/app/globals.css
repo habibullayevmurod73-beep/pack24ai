@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  padding: 0;
+  background: white;
+}
+
+/* Banner slider progress bar */
+@keyframes bannerProgress {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+.banner-progress {
+  animation: bannerProgress 3000ms linear forwards;
+}
+/* -- 3D Configurator Box -------------------- */
+.box-3d-wrapper {
+  perspective: 500px;
+  width: 120px;
+  height: 120px;
+}
+.box-3d {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  transform-style: preserve-3d;
+  animation: boxRotate 10s linear infinite;
+  transform: rotateX(-25deg) rotateY(35deg);
+}
+.box-face {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border: 1.5px solid rgba(255,255,255,0.18);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  backface-visibility: visible;
+}
+/* Front */
+.box-front  {
+  background: linear-gradient(135deg, rgba(59,130,246,.45), rgba(99,102,241,.40));
+  transform: translateZ(60px);
+}
+/* Back */
+.box-back   {
+  background: linear-gradient(135deg, rgba(30,64,175,.40), rgba(67,56,202,.35));
+  transform: rotateY(180deg) translateZ(60px);
+}
+/* Left */
+.box-left   {
+  background: linear-gradient(135deg, rgba(37,99,235,.35), rgba(79,70,229,.30));
+  transform: rotateY(-90deg) translateZ(60px);
+}
+/* Right */
+.box-right  {
+  background: linear-gradient(135deg, rgba(37,99,235,.30), rgba(67,56,202,.30));
+  transform: rotateY(90deg) translateZ(60px);
+}
+/* Top */
+.box-top    {
+  background: linear-gradient(135deg, rgba(147,197,253,.50), rgba(96,165,250,.45));
+  transform: rotateX(90deg) translateZ(60px);
+}
+/* Bottom */
+.box-bottom {
+  background: linear-gradient(135deg, rgba(30,58,138,.35), rgba(49,46,129,.30));
+  transform: rotateX(-90deg) translateZ(60px);
+}
+@keyframes boxRotate {
+  from { transform: rotateX(-25deg) rotateY(0deg); }
+  to   { transform: rotateX(-25deg) rotateY(360deg); }
+}

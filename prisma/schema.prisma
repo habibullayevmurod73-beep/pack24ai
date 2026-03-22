@@ -1,0 +1,219 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ─── Foydalanuvchi modeli ────────────────────────────────────────────────────
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  phone        String   @unique
+  passwordHash String   // bcrypt hash — hech qachon plain text saqlama!
+  role         String   @default("user") // "user" | "admin"
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+// ──────────────────────────────────────────────────────────────────────────────
+
+
+model Campaign {
+  id        Int      @id @default(autoincrement())
+  type      String   // 'telegram', 'sms', 'email'
+  content   String
+  audience  String
+  status    String   // 'sent', 'scheduled', 'draft'
+  sentAt    DateTime?
+  receivers Int      @default(0)
+  views     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TelegramConfig {
+  id             Int      @id @default(autoincrement())
+  botToken       String   @default("")
+  botUsername    String   @default("")
+  welcomeMessage String   @default("Assalomu alaykum! Xush kelibsiz.")
+  mainButton     String   @default("Katalog")
+  isActive       Boolean  @default(false)
+  updatedAt      DateTime @updatedAt
+}
+
+model Product {
+  id           Int      @id @default(autoincrement())
+  name         String
+  description  String?
+  price        Float
+  originalPrice Float?
+  sku          String?
+  category     String?
+  image        String
+  gallery      String   @default("[]") // JSON string for string[]
+  inStock      Boolean  @default(true)
+  rating       Float    @default(0)
+  reviews      Int      @default(0)
+  status       String   @default("active") // active, draft, archived
+  sourceUrl    String?
+  items        OrderItem[]
+  
+  inventory      Inventory[]
+  stockMovements StockMovement[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String
+  slug      String   @unique
+  image     String?
+  parentId  Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Order {
+  id              Int         @id @default(autoincrement())
+  telegramUserId  String?     // ID from Telegram
+  customerName    String?
+  contactPhone    String?     
+  
+  status          String      @default("draft") // draft, new, processing, shipping, delivered, cancelled
+  totalAmount     Float       @default(0)
+  
+  shippingAddress String?
+  shippingLocation String?    // JSON or "lat,long"
+  
+  paymentMethod   String?     // 'cash', 'click', 'payme'
+  paymentStatus   String      @default("pending")
+  
+  items           OrderItem[]
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   Int
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId Int
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Float   // Snapshot of price
+}
+
+model Warehouse {
+  id        Int      @id @default(autoincrement())
+  name      String
+  location  String?
+  isMain    Boolean  @default(false)
+  
+  inventory Inventory[]
+  movementsFrom StockMovement[] @relation("FromWarehouse")
+  movementsTo   StockMovement[] @relation("ToWarehouse")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Inventory {
+  id          Int       @id @default(autoincrement())
+  
+  productId   Int
+  product     Product   @relation(fields: [productId], references: [id])
+  
+  warehouseId Int
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  
+  quantity    Int       @default(0)
+  
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([productId, warehouseId])
+}
+
+model StockMovement {
+  id          Int       @id @default(autoincrement())
+  
+  type        String    // IN (Kirim), OUT (Chiqim), TRANSFER (O'tkazish)
+  
+  productId   Int
+  product     Product   @relation(fields: [productId], references: [id])
+  
+  fromWarehouseId Int?
+  fromWarehouse   Warehouse? @relation("FromWarehouse", fields: [fromWarehouseId], references: [id])
+  
+  toWarehouseId   Int?
+  toWarehouse     Warehouse? @relation("ToWarehouse", fields: [toWarehouseId], references: [id])
+  
+  quantity    Int
+  reason      String?
+  
+  createdBy   String?   // User ID or name
+  
+  createdAt   DateTime  @default(now())
+}
+
+model WorkOrder {
+  id          Int      @id @default(autoincrement())
+  orderNo     String   @unique // e.g., ORD-2024-001
+  
+  clientName  String
+  productName String
+  quantity    Int
+  deadline    DateTime
+  
+  status      String   @default("planned") // planned, in_progress, completed, paused, cancelled
+  priority    String   @default("normal") // low, normal, high, urgent
+  
+  progress    Int      @default(0) // 0-100%
+  currentStage String  @default("gofra") // gofra, pechat, yiguv, qc
+  
+  stages      WorkOrderStage[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model WorkOrderStage {
+  id          Int       @id @default(autoincrement())
+  
+  workOrderId Int
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  
+  stage       String    // gofra, pechat, yiguv, qc
+  status      String    @default("pending") // pending, in_progress, completed
+  
+  startedAt   DateTime?
+  completedAt DateTime?
+  
+  operator    String?
+  notes       String?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ─── Yangiliklar ──────────────────────────────────────────────────────────────
+model News {
+  id          Int      @id @default(autoincrement())
+  titleUz     String
+  titleRu     String
+  descUz      String   @default("")
+  descRu      String   @default("")
+  emoji       String   @default("📰")
+  badge       String   @default("Новость")
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+

@@ -1,0 +1,56 @@
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  // Image optimization — trusted domains
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: '**.cdninstagram.com' },
+      { protocol: 'https', hostname: '**.fbcdn.net' },
+      { protocol: 'https', hostname: 'pack24.uz' },
+      { protocol: 'https', hostname: 'storage.googleapis.com' },
+      { protocol: 'https', hostname: 'res.cloudinary.com' },
+      { protocol: 'http',  hostname: 'localhost' },
+    ],
+    formats: ['image/avif', 'image/webp'],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+  },
+
+  // Security & performance headers
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          { key: 'X-Frame-Options',         value: 'DENY' },
+          { key: 'X-Content-Type-Options',   value: 'nosniff' },
+          { key: 'Referrer-Policy',          value: 'strict-origin-when-cross-origin' },
+          { key: 'X-XSS-Protection',         value: '1; mode=block' },
+          { key: 'Permissions-Policy',        value: 'camera=(), microphone=(), geolocation=()' },
+        ],
+      },
+      {
+        // Cache static assets
+        source: '/static/(.*)',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
+      },
+    ];
+  },
+
+  // Compiler optimizations
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production',
+  },
+
+  // Bundle size
+  experimental: {
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
+  },
+
+  // Trailing slash consistency
+  trailingSlash: false,
+};
+
+export default nextConfig;
