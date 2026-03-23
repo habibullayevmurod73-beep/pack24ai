@@ -32,11 +32,26 @@ export async function PUT(
         const { id } = await params;
         const body = await request.json();
 
-        const data: any = { ...body };
-        if (body.gallery) {
-            data.gallery = JSON.stringify(body.gallery);
+        // Only pass fields that exist in the Prisma Product schema
+        // Omit client-only fields like 'specifications', 'rating', 'reviews', etc.
+        const allowedFields = ['name', 'description', 'price', 'originalPrice', 'sku', 'category', 'image', 'gallery', 'inStock', 'status', 'sourceUrl'];
+
+        const data: Record<string, unknown> = {};
+        for (const key of allowedFields) {
+            if (key in body) {
+                data[key] = body[key];
+            }
         }
-        if (body.price) data.price = parseFloat(body.price);
+
+        if (data.gallery) {
+            data.gallery = JSON.stringify(data.gallery);
+        }
+        if (data.price !== undefined) {
+            data.price = parseFloat(String(data.price));
+        }
+        if (data.originalPrice !== undefined && data.originalPrice !== null) {
+            data.originalPrice = parseFloat(String(data.originalPrice));
+        }
 
         const updatedProduct = await prisma.product.update({
             where: { id: parseInt(id) },
@@ -44,9 +59,10 @@ export async function PUT(
         });
 
         return NextResponse.json(updatedProduct);
-    } catch (error) {
-        console.error('Error updating product:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('Error updating product:', msg);
+        return NextResponse.json({ error: 'Server xatosi: ' + msg }, { status: 500 });
     }
 }
 

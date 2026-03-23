@@ -200,7 +200,7 @@ export default function ReviewsPage() {
     const { language } = useLanguage();
     const t = (uz: string, ru: string) => language === 'ru' ? ru : uz;
 
-    const [filter, setFilter]   = useState<'store' | 'manager' | 'all'>('all');
+    const [filter, setFilter]   = useState<'all' | 'store' | 'manager'>('all');
     const [sort, setSort]       = useState('new');
     const [page, setPage]       = useState(1);
     const [expanded, setExpanded] = useState<number[]>([]);
@@ -237,8 +237,9 @@ export default function ReviewsPage() {
                 {/* ── Tab filter ── */}
                 <div className="flex gap-2 mb-6 flex-wrap">
                     {([
-                        { key: 'all',     uz: `Do'kon haqida ${REVIEWS.length}`,    ru: `О магазине ${REVIEWS.length}` },
-                        { key: 'manager', uz: `Menejerlar haqida ${REVIEWS.filter(r=>r.category==='manager').length}`, ru: `О менеджерах ${REVIEWS.filter(r=>r.category==='manager').length}` },
+                        { key: 'all',     uz: `Barchasi (${REVIEWS.length})`,                                                                       ru: `Все (${REVIEWS.length})` },
+                        { key: 'store',   uz: `Do'kon haqida (${REVIEWS.filter(r=>r.category==='store').length})`,                                 ru: `О магазине (${REVIEWS.filter(r=>r.category==='store').length})` },
+                        { key: 'manager', uz: `Menejerlar haqida (${REVIEWS.filter(r=>r.category==='manager').length})`,                           ru: `О менеджерах (${REVIEWS.filter(r=>r.category==='manager').length})` },
                     ] as const).map(tab => (
                         <button
                             key={tab.key}

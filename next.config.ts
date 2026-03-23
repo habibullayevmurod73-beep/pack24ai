@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: '**.cdninstagram.com' },
       { protocol: 'https', hostname: '**.fbcdn.net' },
       { protocol: 'https', hostname: 'pack24.uz' },
+      { protocol: 'https', hostname: 'pack24.ru' },
+      { protocol: 'https', hostname: '**.pack24.ru' },
       { protocol: 'https', hostname: 'storage.googleapis.com' },
       { protocol: 'https', hostname: 'res.cloudinary.com' },
       { protocol: 'http',  hostname: 'localhost' },

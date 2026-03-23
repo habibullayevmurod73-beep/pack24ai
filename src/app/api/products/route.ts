@@ -46,17 +46,27 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
 
+        // Validate required fields
+        if (!body.name || typeof body.name !== 'string' || !body.name.trim()) {
+            return NextResponse.json({ error: 'Mahsulot nomi majburiy' }, { status: 400 });
+        }
+        const price = parseFloat(body.price);
+        if (isNaN(price) || price < 0) {
+            return NextResponse.json({ error: 'Narx noto\'g\'ri' }, { status: 400 });
+        }
+
         const gallery = body.gallery ? JSON.stringify(body.gallery) : "[]";
 
+        // NOTE: 'specifications' is NOT in the Prisma Product model — do not pass it to prisma.create
         const newProduct = await prisma.product.create({
             data: {
-                name: body.name,
+                name: body.name.trim(),
                 description: body.description || '',
-                price: parseFloat(body.price),
+                price: price,
                 originalPrice: body.originalPrice ? parseFloat(body.originalPrice) : null,
-                sku: body.sku,
-                category: body.category,
-                image: body.image,
+                sku: body.sku || null,
+                category: body.category || null,
+                image: body.image || '/placeholder.png',
                 gallery: gallery,
                 status: body.status || 'draft',
                 inStock: body.inStock !== false,
@@ -64,8 +74,9 @@ export async function POST(request: Request) {
         });
 
         return NextResponse.json(newProduct);
-    } catch (error) {
-        console.error('Error creating product:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('Error creating product:', msg);
+        return NextResponse.json({ error: 'Server xatosi: ' + msg }, { status: 500 });
     }
 }

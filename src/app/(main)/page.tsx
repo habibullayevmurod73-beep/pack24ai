@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useLanguage } from '@/lib/contexts/LanguageContext';
 import { useCategoryStore } from '@/lib/store/useCategoryStore';
 import { useProductStore } from '@/lib/store/useProductStore';
@@ -125,11 +126,12 @@ function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product)
         <div className="group bg-white border border-gray-100 rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col">
             <div className="relative h-48 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4 overflow-hidden">
                 {product.image ? (
-                    <img
+                    <Image
                         src={product.image}
                         alt={product.name}
-                        className="h-full w-full object-contain mix-blend-multiply group-hover:scale-105 transition-transform duration-300"
-                        onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.png'; }}
+                        fill
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                        className="object-contain mix-blend-multiply group-hover:scale-105 transition-transform duration-300"
                     />
                 ) : (
                     <Package size={48} className="text-gray-300" />
@@ -229,9 +231,9 @@ export default function Home() {
     const t = (uz: string, ru: string, en?: string): string =>
         language === 'uz' ? uz : language === 'en' ? (en ?? ru) : ru;
 
-    // DB dan mahsulotlarni yuklash
+    // DB dan mahsulotlarni yuklash (barcha active mahsulotlar)
     useEffect(() => {
-        fetchProducts({ status: 'active' });
+        fetchProducts();
     }, [fetchProducts]);
 
     const handleAddToCart = (product: Product) => {
@@ -621,7 +623,186 @@ export default function Home() {
                 </div>
             </section>
 
+            {/* ── MAHSULOTLAR BO'LIMI ──────────────────────────── */}
+            <section className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-10">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 className="text-2xl font-extrabold text-gray-900">
+                            {t("Mashhur Mahsulotlar", "Популярные товары")}
+                        </h2>
+                        <p className="text-sm text-gray-500 mt-1">
+                            {t("Eng ko'p sotilayotgan qadoqlash materiallari", "Самые продаваемые упаковочные материалы")}
+                        </p>
+                    </div>
+                    <Link
+                        href="/catalog"
+                        className="hidden sm:flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-semibold text-sm transition-colors"
+                    >
+                        {t("Barchasini ko'rish", "Смотреть все")} <ChevronRight size={16} />
+                    </Link>
+                </div>
 
+                {productsLoading ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                        {Array.from({ length: 10 }).map((_, i) => (
+                            <div key={i} className="bg-white rounded-2xl overflow-hidden border border-gray-100">
+                                <Skeleton className="h-48" />
+                                <div className="p-4 space-y-2">
+                                    <Skeleton className="h-3 w-16" />
+                                    <Skeleton className="h-4 w-full" />
+                                    <Skeleton className="h-4 w-3/4" />
+                                    <div className="flex justify-between items-center pt-2">
+                                        <Skeleton className="h-5 w-20" />
+                                        <Skeleton className="h-8 w-16 rounded-xl" />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : products.length === 0 ? (
+                    <div className="text-center py-16 text-gray-400">
+                        <Package size={48} className="mx-auto mb-3 opacity-30" />
+                        <p className="text-sm">{t("Mahsulotlar topilmadi", "Товары не найдены")}</p>
+                    </div>
+                ) : (
+                    <>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                            {products.slice(0, 10).map((product) => (
+                                <ProductCard key={product.id} product={product} onAdd={handleAddToCart} />
+                            ))}
+                        </div>
+                        <div className="mt-6 text-center sm:hidden">
+                            <Link
+                                href="/catalog"
+                                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors"
+                            >
+                                {t("Barchasini ko'rish", "Смотреть все")} <ArrowRight size={15} />
+                            </Link>
+                        </div>
+                    </>
+                )}
+            </section>
+
+            {/* ── STATISTIKA BO'LIMI ────────────────────────────── */}
+            <section className="bg-gradient-to-r from-[#0c2340] to-[#1a4a7c] py-14">
+                <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="text-center mb-10">
+                        <h2 className="text-2xl lg:text-3xl font-extrabold text-white mb-2">
+                            {t("Pack24 raqamlarda", "Pack24 в цифрах")}
+                        </h2>
+                        <p className="text-blue-200/70 text-sm">
+                            {t("Bizning yutuqlarimiz sizning ishonchingiz", "Наши достижения — ваше доверие")}
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-center">
+                        <StatCard target={5000}  suffix="+"  label={t("Faol mijoz",        "Активных клиентов")} />
+                        <StatCard target={40}    suffix="+"  label={t("Mahsulot kategoriyasi", "Категорий товаров")} />
+                        <StatCard target={1500}  suffix="+"  label={t("Mahsulot turi",      "Видов продуктов")} />
+                        <StatCard target={98}    suffix="%"  label={t("Mijoz qoniqishi",    "Удовлетворённость")} />
+                    </div>
+                </div>
+            </section>
+
+            {/* ── SHARHLAR BO'LIMI ─────────────────────────────── */}
+            <section className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-14">
+                <div className="flex items-center justify-between mb-8">
+                    <div>
+                        <h2 className="text-2xl font-extrabold text-gray-900">
+                            {t("Mijozlar sharhlari", "Отзывы клиентов")}
+                        </h2>
+                        <p className="text-sm text-gray-500 mt-1">
+                            {t("Haqiqiy mijozlarning fikrlari", "Мнения реальных покупателей")}
+                        </p>
+                    </div>
+                    <Link
+                        href="/reviews"
+                        className="hidden sm:flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-semibold text-sm transition-colors"
+                    >
+                        {t("Barcha sharhlar", "Все отзывы")} <ChevronRight size={16} />
+                    </Link>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {REVIEWS.slice(0, 3).map((review, i) => (
+                        <div
+                            key={i}
+                            className="bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-lg transition-shadow duration-300 flex flex-col"
+                        >
+                            {/* Stars */}
+                            <div className="flex gap-0.5 mb-4">
+                                {[1,2,3,4,5].map(s => (
+                                    <Star
+                                        key={s}
+                                        size={16}
+                                        className={s <= review.rating ? 'fill-yellow-400 text-yellow-400' : 'fill-gray-200 text-gray-200'}
+                                    />
+                                ))}
+                            </div>
+
+                            {/* Quote */}
+                            <div className="relative flex-1">
+                                <Quote size={32} className="text-blue-100 absolute -top-1 -left-1 pointer-events-none" />
+                                <p className="text-sm text-gray-700 leading-relaxed relative z-10">
+                                    {language === 'ru' ? review.text.ru : review.text.uz}
+                                </p>
+                            </div>
+
+                            {/* Author */}
+                            <div className="flex items-center gap-3 mt-5 pt-4 border-t border-gray-50">
+                                <div className={`w-10 h-10 rounded-full ${review.color} flex items-center justify-center text-white font-bold text-sm shrink-0`}>
+                                    {review.avatar}
+                                </div>
+                                <div>
+                                    <p className="font-bold text-gray-900 text-sm">
+                                        {language === 'ru' ? review.name.ru : review.name.uz}
+                                    </p>
+                                    <p className="text-xs text-gray-400">
+                                        {language === 'ru' ? review.role.ru : review.role.uz}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="mt-8 text-center">
+                    <Link
+                        href="/reviews"
+                        className="inline-flex items-center gap-2 bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white font-bold px-8 py-3 rounded-xl text-sm transition-all duration-200"
+                    >
+                        {t("Barcha sharhlarni ko'rish", "Смотреть все отзывы")} <ArrowRight size={15} />
+                    </Link>
+                </div>
+            </section>
+
+            {/* ── CTA BANNER ───────────────────────────────────── */}
+            <section className="bg-gradient-to-r from-emerald-500 to-teal-600 py-12">
+                <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                    <h2 className="text-2xl lg:text-3xl font-extrabold text-white mb-3">
+                        {t("Buyurtma berishga tayyormisiz?", "Готовы сделать заказ?")}
+                    </h2>
+                    <p className="text-emerald-100 text-sm mb-6 max-w-xl mx-auto">
+                        {t(
+                            "1000+ mahsulot orasidan tanlang. Optom buyurtmalarda maxsus narxlar.",
+                            "Выбирайте из 1000+ товаров. Спеццены при оптовых заказах."
+                        )}
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                        <Link
+                            href="/catalog"
+                            className="inline-flex items-center justify-center gap-2 bg-white text-emerald-700 font-bold px-8 py-3 rounded-xl text-sm hover:bg-emerald-50 transition-colors shadow-lg"
+                        >
+                            {t("Katalogga o'tish", "Перейти в каталог")} <ArrowRight size={15} />
+                        </Link>
+                        <a
+                            href="tel:+998712005683"
+                            className="inline-flex items-center justify-center gap-2 bg-emerald-600/30 hover:bg-emerald-600/50 border border-white/30 text-white font-semibold px-8 py-3 rounded-xl text-sm transition-colors"
+                        >
+                            <Phone size={15} /> +998 71 200 56 83
+                        </a>
+                    </div>
+                </div>
+            </section>
 
         </div>
     );
