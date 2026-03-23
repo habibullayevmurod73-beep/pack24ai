@@ -144,33 +144,30 @@ export const useProductStore = create<ProductState>((set, get) => ({
     },
 
     bulkUpdatePrice: async (category, percentage) => {
-        // This logic might need a dedicated API endpoint for efficiency, 
-        // but for now we iterate (or could send a bulk update request).
-        // Implementing client-side loop for now as per previous logic, but calling API.
-
-        const state = get();
-        const productsToUpdate = state.products.filter(p =>
-            category === 'all' || p.category === category
-        );
-
-        // Optimistic
+        // Optimistic update (UI darhol ko'rinishi uchun)
         set(state => ({
             products: state.products.map(p => {
-                if (productsToUpdate.find(u => u.id === p.id)) {
-                    return { ...p, price: Math.round(p.price * (1 + percentage / 100)) };
+                if (category === 'all' || p.category === category) {
+                    return { ...p, price: Math.max(0, Math.round(p.price * (1 + percentage / 100))) };
                 }
                 return p;
             })
         }));
 
-        // Real update (This can be slow, ideally add /api/products/bulk-update)
-        for (const p of productsToUpdate) {
-            const newPrice = Math.round(p.price * (1 + percentage / 100));
-            await fetch(`/api/products/${p.id}`, {
-                method: 'PUT',
+        // Bitta API call — server tomonda $transaction ishlatadi
+        try {
+            const res = await fetch('/api/products/bulk-update', {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ price: newPrice })
+                body: JSON.stringify({ category, percentage }),
             });
+            if (!res.ok) throw new Error('Bulk update failed');
+            toast.success(`${category === 'all' ? 'Barcha' : category} mahsulotlar narxi yangilandi`);
+        } catch {
+            // Xato bo'lsa qayta fetch qilamiz (rollback uchun)
+            const { fetchProducts } = get() as ProductState;
+            await fetchProducts();
+            toast.error('Narx yangilashda xatolik');
         }
     },
 
