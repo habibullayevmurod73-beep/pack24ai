@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, X, TrendingUp, Package, Tag } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useProductStore } from '@/lib/store/useProductStore';
 import { useCategoryStore } from '@/lib/store/useCategoryStore';
 import { useCurrencySafe } from '@/lib/contexts/CurrencyContext';
 import { useLanguage } from '@/lib/contexts/LanguageContext';
@@ -12,61 +11,71 @@ import { CategoryIcon } from '@/components/CategoryIcon';
 
 // ─── Popular searches ──────────────────────────────────────────────────────
 const POPULAR_SEARCHES = [
-    { uz: 'Karton qutichalar', ru: 'Картонные коробки', q: 'Картонные коробки' },
-    { uz: 'Kuryer paketlar',   ru: 'Курьерские пакеты', q: 'Курьерские пакеты' },
-    { uz: 'Polietilen paketlar', ru: 'Полиэтиленовые пакеты', q: 'Полиэтиленовые пакеты' },
-    { uz: 'Kraft paketlar',    ru: 'Крафт пакеты',      q: 'Крафт пакеты' },
+    { uz: 'Karton qutichalar', ru: 'Картонные коробки' },
+    { uz: 'Kuryer paketlar',   ru: 'Курьерские пакеты' },
+    { uz: 'Polietilen paketlar', ru: 'Полиэтиленовые пакеты' },
+    { uz: 'Kraft paketlar',    ru: 'Крафт пакеты' },
 ];
+
+interface SearchProduct {
+    id: number | string;
+    name: string;
+    price: number;
+    category?: string;
+    image: string;
+}
 
 export function SmartSearch() {
     const router = useRouter();
     const { language } = useLanguage();
     const { format } = useCurrencySafe();
 
-    const [query, setQuery]       = useState('');
+    const [query, setQuery]           = useState('');
     const [debouncedQ, setDebouncedQ] = useState('');
-    const [isOpen, setIsOpen]     = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const wrapperRef              = useRef<HTMLDivElement>(null);
-    const inputRef                = useRef<HTMLInputElement>(null);
+    const [isOpen, setIsOpen]         = useState(false);
+    const [isLoading, setIsLoading]   = useState(false);
+    const [results, setResults]       = useState<SearchProduct[]>([]);
+    const wrapperRef                  = useRef<HTMLDivElement>(null);
+    const inputRef                    = useRef<HTMLInputElement>(null);
 
-    const products   = useProductStore(s => s.products);
     const categories = useCategoryStore(s => s.categories);
-
     const t = (uz: string, ru: string) => language === 'ru' ? ru : uz;
 
     // ── Debounce (300ms) ──────────────────────────────────────────────────
     useEffect(() => {
-        setIsLoading(true);
-        const timer = setTimeout(() => {
-            setDebouncedQ(query);
-            setIsLoading(false);
-        }, 300);
+        const timer = setTimeout(() => setDebouncedQ(query), 300);
         return () => clearTimeout(timer);
     }, [query]);
 
-    // ── Filterlash ────────────────────────────────────────────────────────
-    const filteredProducts = debouncedQ.length > 1
-        ? products
-            .filter(p => p.name.toLowerCase().includes(debouncedQ.toLowerCase()) || p.category?.toLowerCase().includes(debouncedQ.toLowerCase()))
-            .slice(0, 6)
-        : [];
+    // ── Server-side API qidiruv ───────────────────────────────────────────
+    useEffect(() => {
+        if (debouncedQ.length < 2) { setResults([]); setIsLoading(false); return; }
+        setIsLoading(true);
+        fetch(`/api/products?search=${encodeURIComponent(debouncedQ)}&status=active`)
+            .then(r => r.ok ? r.json() : [])
+            .then((data: SearchProduct[]) => setResults(data.slice(0, 6)))
+            .catch(() => setResults([]))
+            .finally(() => setIsLoading(false));
+    }, [debouncedQ]);
 
+    // ── Kategoriya filter (client-side, kam ma'lumot) ─────────────────────
     const filteredCats = debouncedQ.length > 1
         ? categories.filter(c => {
-            const n = c.name as any;
+            const n = c.name as unknown as { ru?: string; uz?: string } | string;
             const nameRu = typeof n === 'object' ? (n.ru ?? '') : String(n);
             const nameUz = typeof n === 'object' ? (n.uz ?? '') : '';
-            return nameRu.toLowerCase().includes(debouncedQ.toLowerCase()) || nameUz.toLowerCase().includes(debouncedQ.toLowerCase());
+            return nameRu.toLowerCase().includes(debouncedQ.toLowerCase())
+                || nameUz.toLowerCase().includes(debouncedQ.toLowerCase());
         }).slice(0, 3)
         : [];
 
-    const hasResults = filteredProducts.length > 0 || filteredCats.length > 0;
+    const hasResults = results.length > 0 || filteredCats.length > 0;
 
     // ── Click outside ─────────────────────────────────────────────────────
     useEffect(() => {
         const handler = (e: MouseEvent) => {
-            if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setIsOpen(false);
+            if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node))
+                setIsOpen(false);
         };
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
@@ -79,9 +88,12 @@ export function SmartSearch() {
         }
     }, [query, router]);
 
-    const getCatName = (cat: any): string => {
+    const getCatName = (cat: { name: unknown; [key: string]: unknown }): string => {
         const n = cat.name;
-        if (typeof n === 'object') return language === 'uz' ? (n.uz || n.ru || '') : (n.ru || n.uz || '');
+        if (typeof n === 'object' && n !== null) {
+            const obj = n as { uz?: string; ru?: string };
+            return language === 'uz' ? (obj.uz || obj.ru || '') : (obj.ru || obj.uz || '');
+        }
         return String(n ?? '');
     };
 
@@ -108,7 +120,7 @@ export function SmartSearch() {
                 {query && (
                     <button
                         type="button"
-                        onClick={() => { setQuery(''); setDebouncedQ(''); inputRef.current?.focus(); }}
+                        onClick={() => { setQuery(''); setDebouncedQ(''); setResults([]); inputRef.current?.focus(); }}
                         className="absolute inset-y-0 right-24 flex items-center pr-2 text-gray-400 hover:text-gray-600"
                         aria-label="Tozalash"
                     >
@@ -137,9 +149,14 @@ export function SmartSearch() {
                             <div className="flex flex-wrap gap-2">
                                 {POPULAR_SEARCHES.map(s => (
                                     <button
-                                        key={s.q}
+                                        key={s.uz}
                                         type="button"
-                                        onClick={() => { setQuery(language === 'uz' ? s.uz : s.ru); setDebouncedQ(language === 'uz' ? s.uz : s.ru); }}
+                                        onClick={() => {
+                                            const q = language === 'uz' ? s.uz : s.ru;
+                                            setQuery(q);
+                                            setDebouncedQ(q);
+                                            setIsOpen(true);
+                                        }}
                                         className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full font-medium transition-colors"
                                     >
                                         {language === 'uz' ? s.uz : s.ru}
@@ -150,14 +167,14 @@ export function SmartSearch() {
                     )}
 
                     {/* Loading state */}
-                    {isLoading && debouncedQ.length < 1 && query.length > 1 && (
+                    {isLoading && (
                         <div className="p-6 text-center">
                             <div className="h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
                         </div>
                     )}
 
                     {/* Results */}
-                    {debouncedQ.length > 1 && (
+                    {debouncedQ.length > 1 && !isLoading && (
                         <>
                             {/* Categories */}
                             {filteredCats.length > 0 && (
@@ -168,26 +185,26 @@ export function SmartSearch() {
                                     {filteredCats.map(cat => (
                                         <Link
                                             key={cat.id}
-                                            href={`/catalog?category=${encodeURIComponent(getCatName({ name: cat.name }))}`}
+                                            href={`/catalog?category=${encodeURIComponent(getCatName(cat as { name: unknown; [key: string]: unknown }))}`}
                                             onClick={() => setIsOpen(false)}
                                             className="flex items-center gap-3 px-3 py-2 hover:bg-white hover:shadow-sm rounded-xl transition-all text-gray-700 font-semibold text-sm"
                                         >
                                             <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
-                                                <CategoryIcon name={(cat as any).icon} className="w-4 h-4 text-blue-500" />
+                                                <CategoryIcon name={(cat as { icon?: string }).icon} className="w-4 h-4 text-blue-500" />
                                             </div>
-                                            <span>{getCatName(cat)}</span>
+                                            <span>{getCatName(cat as { name: unknown; [key: string]: unknown })}</span>
                                         </Link>
                                     ))}
                                 </div>
                             )}
 
                             {/* Products */}
-                            {filteredProducts.length > 0 && (
+                            {results.length > 0 && (
                                 <div className="p-3">
                                     <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5 px-1">
                                         <Package size={11} /> {t("Mahsulotlar", "Товары")}
                                     </p>
-                                    {filteredProducts.map(product => (
+                                    {results.map(product => (
                                         <Link
                                             key={product.id}
                                             href={`/product/${product.id}`}
@@ -212,7 +229,7 @@ export function SmartSearch() {
                             )}
 
                             {/* No results */}
-                            {!hasResults && !isLoading && (
+                            {!hasResults && (
                                 <div className="p-8 text-center">
                                     <p className="text-4xl mb-2">🔍</p>
                                     <p className="text-sm text-gray-500 font-medium">
@@ -229,7 +246,7 @@ export function SmartSearch() {
                                         onClick={handleSearch}
                                         className="text-sm text-blue-600 font-semibold hover:underline"
                                     >
-                                        {t("Barcha natijalarni ko'rish", "Смотреть все результаты")} ({filteredProducts.length + filteredCats.length})
+                                        {t("Barcha natijalarni ko'rish", "Смотреть все результаты")} ({results.length + filteredCats.length})
                                     </button>
                                 </div>
                             )}

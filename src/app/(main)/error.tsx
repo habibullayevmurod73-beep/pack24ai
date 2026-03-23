@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { AlertTriangle, RefreshCcw, Home } from 'lucide-react';
 import Link from 'next/link';
+import { useLanguage } from '@/lib/contexts/LanguageContext';
 
 export default function Error({
   error,
@@ -11,6 +12,9 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const { language } = useLanguage();
+  const t = (uz: string, ru: string) => language === 'ru' ? ru : uz;
+
   useEffect(() => {
     console.error('[Pack24 Error]:', error);
   }, [error]);
@@ -27,14 +31,17 @@ export default function Error({
 
         {/* Text */}
         <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Xatolik yuz berdi
+          {t('Xatolik yuz berdi', 'Произошла ошибка')}
         </h1>
         <p className="text-gray-500 mb-2 text-sm">
-          Sahifani yuklashda muammo bo'ldi. Qayta urinib ko'ring.
+          {t(
+            "Sahifani yuklashda muammo bo'ldi. Qayta urinib ko'ring.",
+            'При загрузке страницы возникла проблема. Попробуйте ещё раз.'
+          )}
         </p>
         {error?.digest && (
           <p className="text-xs text-gray-400 mb-6 font-mono bg-gray-50 rounded-lg px-3 py-2 inline-block">
-            Xato kodi: {error.digest}
+            {t('Xato kodi', 'Код ошибки')}: {error.digest}
           </p>
         )}
 
@@ -45,14 +52,14 @@ export default function Error({
             className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors"
           >
             <RefreshCcw size={16} />
-            Qayta urinish
+            {t('Qayta urinish', 'Повторить попытку')}
           </button>
           <Link
             href="/"
             className="flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-6 py-2.5 rounded-xl transition-colors"
           >
             <Home size={16} />
-            Bosh sahifa
+            {t('Bosh sahifa', 'Главная')}
           </Link>
         </div>
       </div>
