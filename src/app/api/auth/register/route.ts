@@ -3,9 +3,10 @@ import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 
 function hashPassword(password: string): string {
+    // MUHIM: qavs operator precedence uchun zarur
     return crypto
         .createHash('sha256')
-        .update(password + (process.env.AUTH_SECRET || 'pack24-secret-key'))
+        .update(password + (process.env.AUTH_SECRET ?? ''))
         .digest('hex');
 }
 
@@ -30,9 +31,11 @@ export async function POST(request: Request) {
             );
         }
 
-        if (phone.replace(/\D/g, '').length < 9) {
+        const cleanPhone = phone.replace(/\s/g, '');
+        const phoneRegex = /^\+998[0-9]{9}$/;
+        if (!phoneRegex.test(cleanPhone)) {
             return NextResponse.json(
-                { error: "Telefon raqam noto'g'ri formatda" },
+                { error: "Telefon formati: +998901234567" },
                 { status: 400 }
             );
         }
@@ -44,10 +47,9 @@ export async function POST(request: Request) {
             );
         }
 
-        const cleanPhone = phone.replace(/\s/g, '');
 
         // Bunday telefon allaqachon bormi?
-        const existing = await (prisma as any).user.findUnique({
+        const existing = await prisma.user.findUnique({
             where: { phone: cleanPhone },
         });
 
@@ -59,7 +61,7 @@ export async function POST(request: Request) {
         }
 
         // Yangi foydalanuvchi yaratish
-        const newUser = await (prisma as any).user.create({
+        const newUser = await prisma.user.create({
             data: {
                 name: name.trim(),
                 phone: cleanPhone,

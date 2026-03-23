@@ -4,9 +4,10 @@ import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 
 function hashPassword(password: string): string {
+    // MUHIM: qavs operator precedence uchun zarur
     return crypto
         .createHash('sha256')
-        .update(password + (process.env.AUTH_SECRET || 'pack24-secret-key'))
+        .update(password + (process.env.AUTH_SECRET ?? ''))
         .digest('hex');
 }
 
@@ -23,7 +24,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     return null;
                 }
 
-                const user = await (prisma as any).user.findUnique({
+                const user = await prisma.user.findUnique({
                     where: { phone: credentials.phone as string },
                 });
 
@@ -66,5 +67,5 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         strategy: 'jwt',
         maxAge: 30 * 24 * 60 * 60, // 30 kun
     },
-    secret: process.env.AUTH_SECRET || 'pack24-secret-key',
+    secret: process.env.AUTH_SECRET,
 });

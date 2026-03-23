@@ -91,7 +91,9 @@ model Order {
   
   shippingAddress String?
   shippingLocation String?    // JSON or "lat,long"
-  
+  comment         String?     // Buyurtma izohi (checkout izoh maydoni)
+  deliveryMethod  String?     // 'courier', 'pickup'
+
   paymentMethod   String?     // 'cash', 'click', 'payme'
   paymentStatus   String      @default("pending")
   

@@ -5,9 +5,10 @@ import crypto from 'crypto';
 // Oddiy hash (bcrypt o'rniga — bcrypt server-side ma'qul, lekin serverless da bazan muammo)
 // Production da: npm install bcryptjs va shu bilan almashtiring
 function hashPassword(password: string): string {
+    // MUHIM: qavs operator precedence uchun zarur
     return crypto
         .createHash('sha256')
-        .update(password + process.env.AUTH_SECRET || 'pack24-secret-key')
+        .update(password + (process.env.AUTH_SECRET ?? ''))
         .digest('hex');
 }
 
@@ -29,16 +30,18 @@ export async function POST(request: Request) {
             );
         }
 
-        if (phone.length < 9) {
+        const cleanPhone = phone.replace(/\s/g, '');
+        const phoneRegex = /^\+998[0-9]{9}$/;
+        if (!phoneRegex.test(cleanPhone)) {
             return NextResponse.json(
-                { error: "Telefon raqam noto'g'ri" },
+                { error: "Telefon formati: +998901234567" },
                 { status: 400 }
             );
         }
 
         // Foydalanuvchini topish
-        const user = await (prisma as any).user.findUnique({
-            where: { phone: phone.replace(/\s/g, '') },
+        const user = await prisma.user.findUnique({
+            where: { phone: cleanPhone },
         });
 
         if (!user) {

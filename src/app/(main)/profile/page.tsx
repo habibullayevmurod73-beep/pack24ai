@@ -267,11 +267,27 @@ export default function ProfilePage() {
                                     <button
                                         onClick={async () => {
                                             setSaving(true);
-                                            await new Promise(r => setTimeout(r, 600));
-                                            setSaving(false);
-                                            toast.success(t("Saqlandi ✓", "Сохранено ✓"));
+                                            try {
+                                                const res = await fetch('/api/auth/me', {
+                                                    method: 'PATCH',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ phone: user.phone, name: editName.trim() }),
+                                                });
+                                                if (!res.ok) {
+                                                    const err = await res.json();
+                                                    toast.error(err.error || t("Saqlab bo'lmadi", "Не удалось сохранить"));
+                                                } else {
+                                                    const { user: updated } = await res.json();
+                                                    useAuthStore.getState().updateUser({ name: updated.name });
+                                                    toast.success(t("Saqlandi ✓", "Сохранено ✓"));
+                                                }
+                                            } catch {
+                                                toast.error(t("Xatolik yuz berdi", "Произошла ошибка"));
+                                            } finally {
+                                                setSaving(false);
+                                            }
                                         }}
-                                        disabled={saving || editName === user.name}
+                                        disabled={saving || editName.trim() === user.name}
                                         className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-colors"
                                     >
                                         {saving ? t("Saqlanmoqda...", "Сохраняется...") : t("Saqlash", "Сохранить")}
