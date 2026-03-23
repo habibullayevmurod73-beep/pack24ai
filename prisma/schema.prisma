@@ -55,11 +55,14 @@ model Product {
   sku          String?
   category     String?
   image        String
-  gallery      String   @default("[]") // JSON string for string[]
+  gallery      String   @default("[]")      // JSON string — String[] (SQLite JSON cheklovi)
+  specifications String @default("{}")      // JSON string — key:value texnik ko'rsatkichlar
+  tags         String   @default("[]")      // JSON string — String[] qidiruv teglari
+  minQuantity  Int      @default(1)         // Minimal buyurtma miqdori
   inStock      Boolean  @default(true)
   rating       Float    @default(0)
   reviews      Int      @default(0)
-  status       String   @default("active") // active, draft, archived
+  status       String   @default("active")  // active, draft, archived
   sourceUrl    String?
   items        OrderItem[]
   
