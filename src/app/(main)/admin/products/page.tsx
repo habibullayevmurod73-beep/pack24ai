@@ -5,18 +5,31 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { Switch } from '@/components/ui/Switch';
-import { Search, Plus, Download, Pencil, Trash2, Filter, Save, AlertCircle } from 'lucide-react';
+import { Search, Plus, Download, Pencil, Trash2, Filter, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useProductStore } from '@/lib/store/useProductStore';
+import { useCategoryStore } from '@/lib/store/useCategoryStore';
 import ImportProductModal from '@/components/admin/ImportProductModal';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils'; // Make sure this exists or define utility
+import { cn } from '@/lib/utils';
 
 export default function ProductsPage() {
     const { products, loading, fetchProducts, updateProduct, deleteProduct, bulkUpdatePrice } = useProductStore();
+    const allCategories = useCategoryStore(s => s.categories);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'draft'>('all');
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+    // Slug yoki nom bo'yicha kategoriya display nomini topish
+    const getCategoryDisplay = (slug?: string | null): string => {
+        if (!slug) return '-';
+        for (const cat of allCategories) {
+            if (cat.slug === slug) return cat.name.uz || cat.name.ru;
+            const sub = cat.children?.find(s => s.slug === slug);
+            if (sub) return `${cat.name.uz} › ${sub.name.uz}`;
+        }
+        return slug; // fallback: slug as is
+    };
 
     // Quick Edit State
     const [editingPriceId, setEditingPriceId] = useState<number | string | null>(null);
@@ -185,7 +198,7 @@ export default function ProductsPage() {
                                         )}
                                     </td>
                                     <td className="py-3 px-4 text-gray-500 text-xs">
-                                        {product.category || '-'}
+                                        {getCategoryDisplay(product.category)}
                                     </td>
                                     <td className="py-3 px-4 text-xs">
                                         {product.originalPrice ? (

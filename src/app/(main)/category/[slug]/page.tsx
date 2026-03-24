@@ -57,28 +57,30 @@ export default function CategoryPage() {
             : String(category.name))
         : slug.replace(/-/g, ' ');
 
-    // Normalizatsiya: apostrof va maxsus belgilarni olib tashlash
-    const normalize = (s: string) =>
-        s.toLowerCase().trim()
-         .replace(/[''`'ʻʼ]/g, '') // apostrof variantlarini olib tashlash
-         .replace(/\s+/g, ' ')
-         .trim();
+    // Apostrof va maxsus belgilarni normalizatsiya qilish
+    const norm = (s: string) =>
+        s.toLowerCase().trim().replace(/[''`'ʻʼ]/g, '').trim();
 
-    // Mahsulotlarni filtrlash — faqat active, kategoriya slug yoki nomi mos keladi
+    // Mahsulotlarni filtrlash — 3 ta aniq holat
     const filtered = products.filter(p => {
         if (p.status !== 'active') return false;
         if (!p.category) return false;
-        const pCat = normalize(p.category);
-        const pCatDashed = pCat.replace(/\s+/g, '-');
+        const pCat = p.category.toLowerCase().trim();
         const slugLower = slug.toLowerCase();
+
+        // 1. To'g'ridan slug moslik (yangi mahsulotlar: "tort-klapanli" === "tort-klapanli")
+        if (pCat === slugLower) return true;
+
+        // 2. Nom → slug (apostrof tozalab, bo'shliq → defis): "To'rt klapanli" → "tort-klapanli"
+        const pCatAsSlug = norm(pCat).replace(/\s+/g, '-');
+        if (pCatAsSlug === slugLower) return true;
+
+        // 3. Nom so'zlari moslik: "tort klapanli" === "tort klapanli"
         const slugAsWords = slugLower.replace(/-/g, ' ');
-        const slugNorm = normalize(slugLower.replace(/-/g, ' '));
-        return (
-            pCat === slugNorm ||
-            pCatDashed === slugLower ||
-            pCat.includes(slugNorm) ||
-            slugNorm.includes(pCat)
-        );
+        const pCatNorm = norm(pCat);
+        if (pCatNorm === slugAsWords) return true;
+
+        return false;
     });
 
     // Tartiblash

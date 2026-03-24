@@ -56,12 +56,12 @@ export default function NewProductPage() {
         if (!finalPrice) { toast.error("Narxni kiriting!"); return; }
         if (!selectedCategory) { toast.error("Kategoriyani tanlang!"); return; }
 
-        // Category name resolution
+        // Category slug resolution (nom emas, slug saqlaymiz — URL bilan mos keladi)
         const selectedCatObj = categories.find(c => c.id === selectedCategory);
-        let categoryName = selectedCatObj ? (selectedCatObj.name.uz || selectedCatObj.name.ru || '') : selectedCategory;
+        let categorySlug = selectedCatObj ? selectedCatObj.slug : selectedCategory;
         if (selectedSubCategory && selectedCatObj?.children) {
             const sub = selectedCatObj.children.find(s => s.id === selectedSubCategory);
-            if (sub) categoryName = sub.name.uz || sub.name.ru || categoryName;
+            if (sub) categorySlug = sub.slug;
         }
 
         const payload = {
@@ -70,7 +70,7 @@ export default function NewProductPage() {
             price: finalPrice,
             originalPrice: parseFloat(cost) > 0 ? parseFloat(cost) : null,
             image: uploadedImage || '/placeholder.png',
-            category: categoryName,
+            category: categorySlug,
             status: 'active',
             inStock: true,
             gallery: [],

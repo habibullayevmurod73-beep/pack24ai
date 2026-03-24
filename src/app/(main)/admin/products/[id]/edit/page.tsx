@@ -59,15 +59,32 @@ export default function EditProductPage() {
                 setInStock(product.inStock !== false);
                 setUploadedImage(product.image || null);
 
-                // Kategoriyani topish
+                // Kategoriyani slug bo'yicha topish
                 if (product.category) {
-                    const matchedCat = categories.find(c =>
-                        c.name.uz === product.category ||
-                        c.name.ru === product.category ||
-                        c.slug === product.category?.toLowerCase().replace(/\s+/g, '-')
-                    );
+                    // Avval slug bo'yicha topamiz
+                    let matchedCat = categories.find(c => c.slug === product.category);
+                    let matchedSub: typeof categories[0] | undefined;
+
+                    // Bolalar (subkategoriyalar) ichida ham qidirish
+                    if (!matchedCat) {
+                        for (const cat of categories) {
+                            const sub = cat.children?.find(s => s.slug === product.category);
+                            if (sub) { matchedCat = cat; matchedSub = sub; break; }
+                        }
+                    }
+
+                    // Slug topilmasa, nom bo'yicha ham qidirish (eski ma'lumotlar uchun)
+                    if (!matchedCat) {
+                        const norm = (s: string) => s.toLowerCase().replace(/[''`'ʻʼ]/g, '').trim();
+                        matchedCat = categories.find(c =>
+                            norm(c.name.uz) === norm(product.category) ||
+                            norm(c.name.ru) === norm(product.category)
+                        );
+                    }
+
                     if (matchedCat) {
                         setSelectedCategory(matchedCat.id);
+                        if (matchedSub) setSelectedSubCategory(matchedSub.id);
                     }
                 }
 
@@ -95,12 +112,12 @@ export default function EditProductPage() {
         const priceNum = parseFloat(price);
         if (isNaN(priceNum) || priceNum < 0) { toast.error("Narxni to'g'ri kiriting!"); return; }
 
-        // Category name
+        // Category slug resolution (nom emas, slug saqlaymiz)
         const selCatObj = categories.find(c => c.id === selectedCategory);
-        let categoryName = selCatObj ? (selCatObj.name.uz || selCatObj.name.ru || '') : '';
+        let categorySlug = selCatObj ? selCatObj.slug : '';
         if (selectedSubCategory && selCatObj?.children) {
             const sub = selCatObj.children.find(s => s.id === selectedSubCategory);
-            if (sub) categoryName = sub.name.uz || sub.name.ru || categoryName;
+            if (sub) categorySlug = sub.slug;
         }
 
         const payload = {
@@ -109,7 +126,7 @@ export default function EditProductPage() {
             price: priceNum,
             originalPrice: parseFloat(originalPrice) > 0 ? parseFloat(originalPrice) : null,
             sku,
-            category: categoryName || undefined,
+            category: categorySlug || undefined,
             image: uploadedImage || '/placeholder.png',
             status,
             inStock,
