@@ -64,6 +64,7 @@ model Product {
   rating       Float    @default(0)
   reviews      Int      @default(0)
   status       String   @default("active")  // active, draft, archived
+  isFeatured   Boolean  @default(false)     // Kategoriya namuna mahsuloti
   sourceUrl    String?
   items        OrderItem[]
   

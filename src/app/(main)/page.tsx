@@ -265,34 +265,80 @@ export default function Home() {
                             <HeroBannerSlider />
                         </div>
 
-                        {/* Promo Banners 2-col */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Link href="/catalog?filter=new" className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 p-6 text-white hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-                                <div className="absolute top-0 right-0 w-36 h-36 bg-white/5 rounded-full translate-x-1/3 -translate-y-1/3" />
-                                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full -translate-x-1/2 translate-y-1/2" />
-                                <div className="relative z-10">
-                                    <span className="text-xs font-bold uppercase tracking-widest text-blue-200">{t("Yangilik", "Новинки")}</span>
-                                    <h3 className="text-xl font-extrabold mt-1.5 mb-2">{t("2026 yangi kolleksiya", "Новая коллекция 2026")}</h3>
-                                    <p className="text-blue-100 text-xs mb-4">{t("Eng zamonaviy dizayndagi qadoqlar", "Самые современные дизайнерские упаковки")}</p>
-                                    <span className="inline-flex items-center gap-1.5 bg-white/15 hover:bg-white/25 border border-white/20 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors">
-                                        {t("Ko'rish", "Смотреть")} <ArrowRight size={12} />
-                                    </span>
-                                </div>
-                            </Link>
 
-                            <Link href="/special-offers" className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 p-6 text-white hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-                                <div className="absolute top-0 right-0 w-36 h-36 bg-white/5 rounded-full translate-x-1/3 -translate-y-1/3" />
-                                <div className="relative z-10">
-                                    <span className="text-xs font-bold uppercase tracking-widest text-emerald-200">{t("Maxsus taklif", "Спецпредложение")}</span>
-                                    <h3 className="text-xl font-extrabold mt-1.5 mb-1">{t("Optom buyurtma", "Оптовый заказ")}</h3>
-                                    <div className="text-4xl font-black my-2 text-white">-15%</div>
-                                    <p className="text-emerald-100 text-xs mb-4">{t("100 ta va undan ko'p buyurtma uchun", "При заказе от 100 единиц")}</p>
-                                    <span className="inline-flex items-center gap-1.5 bg-white/15 hover:bg-white/25 border border-white/20 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors">
-                                        {t("Batafsil", "Подробнее")} <ArrowRight size={12} />
-                                    </span>
+                        {/* ── Category Showcase ── */}
+                        {(() => {
+                            // Har kategory uchun featured yoki birinchi mahsulotni topamiz
+                            const categoryCards = activeCategories
+                                .map(cat => {
+                                    // Shu kategoriyaga tegishli mahsulotlar (slug yoki bolalar sluglari bo'yicha)
+                                    const catSlugs = new Set([
+                                        cat.slug,
+                                        ...(cat.children?.map(c => c.slug) ?? []),
+                                    ]);
+                                    const catProducts = products.filter(p =>
+                                        p.status === 'active' && p.category && catSlugs.has(p.category)
+                                    );
+                                    if (catProducts.length === 0) return null;
+                                    const rep = catProducts.find(p => p.isFeatured) ?? catProducts[0];
+                                    return { cat, rep, count: catProducts.length };
+                                })
+                                .filter(Boolean) as { cat: typeof activeCategories[0]; rep: typeof products[0]; count: number }[];
+
+                            if (categoryCards.length === 0) return null;
+
+                            return (
+                                <div className="mt-3">
+                                    <div className="flex items-center justify-between mb-2 px-0.5">
+                                        <h2 className="text-sm font-bold text-gray-700 uppercase tracking-widest">
+                                            {t('Kategoriyalar', 'Категории')}
+                                        </h2>
+                                        <Link href="/catalog" className="text-xs text-blue-600 hover:underline font-medium">
+                                            {t("Barchasi →", "Все →")}
+                                        </Link>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2">
+                                        {categoryCards.map(({ cat, rep, count }) => (
+                                            <Link
+                                                key={cat.id}
+                                                href={`/category/${cat.slug}`}
+                                                className="group relative rounded-xl overflow-hidden border border-gray-100 hover:border-blue-200 hover:shadow-md transition-all duration-200 bg-white"
+                                            >
+                                                {/* Mahsulot rasmi */}
+                                                <div className="h-24 bg-gray-50 flex items-center justify-center overflow-hidden">
+                                                    {rep.image && rep.image !== '/placeholder.png' ? (
+                                                        // eslint-disable-next-line @next/next/no-img-element
+                                                        <img
+                                                            src={rep.image}
+                                                            alt={rep.name}
+                                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                                        />
+                                                    ) : (
+                                                        <CategoryIcon name={cat.icon} className="w-10 h-10 text-gray-300" />
+                                                    )}
+                                                </div>
+                                                {/* Kategoriya nomi */}
+                                                <div className="p-2">
+                                                    <p className="text-xs font-semibold text-gray-800 line-clamp-1">
+                                                        {cat.name[language as keyof typeof cat.name] ?? cat.name.uz}
+                                                    </p>
+                                                    <p className="text-[10px] text-gray-400 mt-0.5">
+                                                        {count} {t('ta mahsulot', 'товаров')}
+                                                    </p>
+                                                </div>
+                                                {/* Featured badge */}
+                                                {rep.isFeatured && (
+                                                    <div className="absolute top-1.5 right-1.5 bg-amber-400 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5">
+                                                        ⭐
+                                                    </div>
+                                                )}
+                                            </Link>
+                                        ))}
+                                    </div>
                                 </div>
-                            </Link>
-                        </div>
+                            );
+                        })()}
+
                     </div>
                 </div>
             </div>

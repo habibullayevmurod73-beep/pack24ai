@@ -156,6 +156,7 @@ export default function ProductsPage() {
                                 <th className="py-4 px-4 font-medium">Kategoriya</th>
                                 <th className="py-4 px-4 font-medium">Import Info</th>
                                 <th className="py-4 px-4 font-medium">Holat</th>
+                                <th className="py-4 px-2 font-medium text-center w-8" title="Namuna mahsulot">⭐</th>
                                 <th className="py-4 px-4 font-medium text-center">Amallar</th>
                             </tr>
                         </thead>
@@ -218,6 +219,23 @@ export default function ProductsPage() {
                                                 />
                                             )}
                                         </div>
+                                    </td>
+                                    <td className="py-3 px-2 text-center">
+                                        <button
+                                            title={product.isFeatured ? "Namuna belgi olib tashlash" : "Kategoriya namunasi sifatida belgilash"}
+                                            onClick={async () => {
+                                                await fetch(`/api/products/${product.id}`, {
+                                                    method: 'PUT',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ isFeatured: !product.isFeatured }),
+                                                });
+                                                fetchProducts();
+                                                toast.success(product.isFeatured ? 'Namuna belgisi olib tashlandi' : '⭐ Namuna mahsulot belgilandi!');
+                                            }}
+                                            className={`text-lg transition-all hover:scale-125 ${product.isFeatured ? 'opacity-100' : 'opacity-20 hover:opacity-60'}`}
+                                        >
+                                            ⭐
+                                        </button>
                                     </td>
                                     <td className="py-3 px-4">
                                         <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

@@ -25,6 +25,7 @@ export interface Product {
     specifications?: Record<string, string>;
     sourceUrl?: string;
     originalCategoryPath?: string[];
+    isFeatured?: boolean;
 }
 
 // ─── Typed selectors (performance) ────────────────────────────────────────
