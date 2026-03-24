@@ -220,6 +220,11 @@ export default function ProductsPage() {
                                                     Publish
                                                 </Button>
                                             )}
+                                            <Link href={`/admin/products/${product.id}/edit`}>
+                                                <Button variant="secondary" size="icon" className="h-8 w-8 text-blue-600 border-blue-100 bg-blue-50 hover:bg-blue-100">
+                                                    <Pencil className="w-3 h-3" />
+                                                </Button>
+                                            </Link>
                                             <Button variant="secondary" size="icon" className="h-8 w-8 text-red-600 border-red-100 bg-red-50 hover:bg-red-100" onClick={() => deleteProduct(product.id)}>
                                                 <Trash2 className="w-3 h-3" />
                                             </Button>

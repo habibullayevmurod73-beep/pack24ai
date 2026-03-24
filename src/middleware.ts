@@ -9,9 +9,9 @@ const PUBLIC_ADMIN_PATHS = ['/admin/login'];
 // Token tekshiruvchi — admin_<timestamp>_<hash> formatini kutamiz
 function isValidAdminToken(token: string): boolean {
     if (!token.startsWith('admin_')) return false;
+    // "admin_TIMESTAMP" formatini qabul qiladi — ikki qism yetarli
     const parts = token.split('_');
-    // Minimal: "admin_" + qo'shimcha ma'lumot (< 3 qism bo'lsa — qabul qilinmaydi)
-    if (parts.length < 3) return false;
+    if (parts.length < 2) return false;
     return true;
 }
 
