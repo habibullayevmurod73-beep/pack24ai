@@ -57,18 +57,27 @@ export default function CategoryPage() {
             : String(category.name))
         : slug.replace(/-/g, ' ');
 
+    // Normalizatsiya: apostrof va maxsus belgilarni olib tashlash
+    const normalize = (s: string) =>
+        s.toLowerCase().trim()
+         .replace(/[''`'ʻʼ]/g, '') // apostrof variantlarini olib tashlash
+         .replace(/\s+/g, ' ')
+         .trim();
+
     // Mahsulotlarni filtrlash — faqat active, kategoriya slug yoki nomi mos keladi
     const filtered = products.filter(p => {
         if (p.status !== 'active') return false;
         if (!p.category) return false;
-        const pCat = p.category.toLowerCase().trim();
+        const pCat = normalize(p.category);
+        const pCatDashed = pCat.replace(/\s+/g, '-');
         const slugLower = slug.toLowerCase();
         const slugAsWords = slugLower.replace(/-/g, ' ');
+        const slugNorm = normalize(slugLower.replace(/-/g, ' '));
         return (
-            pCat === slugLower ||
-            pCat === slugAsWords ||
-            pCat.replace(/\s+/g, '-') === slugLower ||
-            pCat.includes(slugAsWords)
+            pCat === slugNorm ||
+            pCatDashed === slugLower ||
+            pCat.includes(slugNorm) ||
+            slugNorm.includes(pCat)
         );
     });
 
