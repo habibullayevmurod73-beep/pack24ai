@@ -71,5 +71,7 @@ export async function generateMetadata(
     }
 }
 
-// Re-export the client page component
-export { default } from './_page';
+// Default layout — App Router da layout.tsx children render qiladi
+export default function ProductLayout({ children }: { children: React.ReactNode }) {
+    return <>{children}</>;
+}

@@ -38,7 +38,8 @@ import {
     ChevronDown,
     LogOut,
     ExternalLink,
-    Newspaper
+    Newspaper,
+    type LucideIcon
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
@@ -49,7 +50,7 @@ import { useHasMounted } from '@/lib/hooks/useHasMounted';
 interface NavItem {
     name: string;
     href: string;
-    icon: any;
+    icon: LucideIcon;
     badge?: string;
     subItems?: { name: string; href: string; badge?: string }[];
     hasDropdown?: boolean;
@@ -80,10 +81,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     // ── Real-time polling: yangi buyurtmalar har 30 sekundda ────────────
     useEffect(() => {
+        let active = true;
         const poll = async () => {
             try {
                 const res = await fetch(`/api/admin/notifications?since=${lastChecked}`);
-                if (!res.ok) return;
+                if (!res.ok || !active) return;
                 const data = await res.json();
                 if (data.newOrdersCount > newOrdersCount) {
                     toast(`🔔 ${data.newOrdersCount - newOrdersCount} ta yangi buyurtma!`, { duration: 4000 });
@@ -94,8 +96,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         };
         poll(); // initial
         const interval = setInterval(poll, 30_000);
-        return () => clearInterval(interval);
-    }, []); // eslint-disable-line
+        return () => { active = false; clearInterval(interval); };
+    // newOrdersCount va lastChecked intentionally excluded — polling ref'siz pattern
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     if (!hasMounted) {
         return (

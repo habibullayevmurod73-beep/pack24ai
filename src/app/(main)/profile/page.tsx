@@ -10,7 +10,7 @@ import Link from 'next/link';
 import {
     LogOut, Package, User as UserIcon, Settings, Heart,
     ShoppingCart, ChevronRight, MapPin, Star,
-    Phone, Shield, Bell, Gift, TrendingUp
+    Phone, Shield, Bell, Gift, TrendingUp, type LucideIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
@@ -60,7 +60,7 @@ export default function ProfilePage() {
     const totalSpent = orders.reduce((acc, o) => acc + (o.totalAmount ?? 0), 0);
     const cartTotal  = cartItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
 
-    const TABS: { key: TabKey; label: string; icon: React.ElementType; badge?: number }[] = [
+    const TABS: { key: TabKey; label: string; icon: LucideIcon; badge?: number }[] = [
         { key: 'orders',   label: t("Buyurtmalar", "Заказы"),   icon: Package,      badge: orders.length },
         { key: 'cart',     label: t("Savat", "Корзина"),        icon: ShoppingCart, badge: cartItems.length },
         { key: 'settings', label: t("Sozlamalar", "Настройки"), icon: Settings },

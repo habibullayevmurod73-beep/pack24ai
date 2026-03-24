@@ -11,6 +11,7 @@ import {
     AreaChart, Area, BarChart, Bar, XAxis, YAxis,
     CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from 'recharts';
+import Image from 'next/image';
 import Link from 'next/link';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -167,9 +168,9 @@ export default function ReportsPage() {
             color: STATUS_MAP[o.status]?.color ?? '#9ca3af',
         }));
 
-    // Trend: yangi buyurtmalar soni > umumiy ortacha bo'lsa up
-    const convTrend = s
-        ? s.conversionRate >= 50 ? 'up' : 'down'
+    // Trend: konversiya 50% dan yuqori bo'lsa up
+    const convTrend: 'up' | 'down' | null = s
+        ? (s.conversionRate >= 50 ? 'up' : 'down')
         : null;
 
     return (
@@ -246,7 +247,7 @@ export default function ReportsPage() {
                     icon={TrendingUp}
                     color="bg-purple-500"
                     loading={loading}
-                    trend={convTrend as 'up' | 'down' | null}
+                    trend={convTrend}
                 />
                 <StatCard
                     label="Jami daromad"
@@ -322,8 +323,8 @@ export default function ReportsPage() {
                                     paddingAngle={3}
                                     dataKey="value"
                                 >
-                                    {pieData.map((entry, i) => (
-                                        <Cell key={i} fill={entry.color} />
+                                    {pieData.map((entry) => (
+                                        <Cell key={entry.name} fill={entry.color} />
                                     ))}
                                 </Pie>
                                 <Tooltip contentStyle={{ borderRadius: 10, fontSize: 12 }} />
@@ -391,8 +392,7 @@ export default function ReportsPage() {
                                     </span>
                                     <div className="w-9 h-9 rounded-xl bg-gray-50 border border-gray-100 overflow-hidden shrink-0 flex items-center justify-center">
                                         {p.image
-                                            /* eslint-disable-next-line @next/next/no-img-element */
-                                            ? <img src={p.image} alt={p.name} className="w-full h-full object-contain" />
+                                            ? <Image src={p.image} alt={p.name} width={36} height={36} className="w-full h-full object-contain" unoptimized={p.image.startsWith('http')} />
                                             : <Box size={14} className="text-gray-300" />
                                         }
                                     </div>

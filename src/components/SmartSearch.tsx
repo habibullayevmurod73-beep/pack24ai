@@ -88,11 +88,10 @@ export function SmartSearch() {
         }
     }, [query, router]);
 
-    const getCatName = (cat: { name: unknown; [key: string]: unknown }): string => {
+    const getCatName = (cat: { name: { uz?: string; ru?: string; en?: string } | string }): string => {
         const n = cat.name;
         if (typeof n === 'object' && n !== null) {
-            const obj = n as { uz?: string; ru?: string };
-            return language === 'uz' ? (obj.uz || obj.ru || '') : (obj.ru || obj.uz || '');
+            return language === 'uz' ? (n.uz || n.ru || '') : (n.ru || n.uz || '');
         }
         return String(n ?? '');
     };
@@ -185,14 +184,14 @@ export function SmartSearch() {
                                     {filteredCats.map(cat => (
                                         <Link
                                             key={cat.id}
-                                            href={`/catalog?category=${encodeURIComponent(getCatName(cat as { name: unknown; [key: string]: unknown }))}`}
+                                            href={`/catalog?category=${encodeURIComponent(getCatName(cat))}`}
                                             onClick={() => setIsOpen(false)}
                                             className="flex items-center gap-3 px-3 py-2 hover:bg-white hover:shadow-sm rounded-xl transition-all text-gray-700 font-semibold text-sm"
                                         >
                                             <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
-                                                <CategoryIcon name={(cat as { icon?: string }).icon} className="w-4 h-4 text-blue-500" />
+                                                <CategoryIcon name={cat.icon} className="w-4 h-4 text-blue-500" />
                                             </div>
-                                            <span>{getCatName(cat as { name: unknown; [key: string]: unknown })}</span>
+                                            <span>{getCatName(cat)}</span>
                                         </Link>
                                     ))}
                                 </div>

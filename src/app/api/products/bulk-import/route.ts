@@ -20,34 +20,34 @@ export async function POST(req: NextRequest) {
         for (let i = 0; i < products.length; i++) {
             const row = products[i];
             try {
-                const { name, sku, price, minPrice, categorySlug, description, image, status } = row;
+                const { name, sku, price, originalPrice, categorySlug, description, image, status } = row;
 
                 if (!name || !price) {
                     results.errors.push({ row: i + 1, error: 'name va price majburiy' });
                     continue;
                 }
 
-                // Find category
-                let categoryId: number | undefined;
+                // Find category name by slug
+                let categoryName: string | undefined;
                 if (categorySlug) {
-                    const cat = await prisma.category.findFirst({ where: { slug: categorySlug } });
-                    if (cat) categoryId = cat.id;
+                    const cat = await prisma.category.findFirst({ where: { slug: String(categorySlug) } });
+                    if (cat) categoryName = cat.name;
                 }
 
                 // Upsert by SKU if provided, else create
                 if (sku) {
-                    const existing = await prisma.product.findFirst({ where: { sku } });
+                    const existing = await prisma.product.findFirst({ where: { sku: String(sku) } });
                     if (existing) {
                         await prisma.product.update({
                             where: { id: existing.id },
                             data: {
-                                name: String(name),
-                                price: Number(price),
-                                minPrice: minPrice ? Number(minPrice) : undefined,
-                                description: description ? String(description) : undefined,
-                                image: image ? String(image) : undefined,
-                                status: status ? String(status) : undefined,
-                                categoryId,
+                                name:          String(name),
+                                price:         Number(price),
+                                originalPrice: originalPrice ? Number(originalPrice) : undefined,
+                                description:   description   ? String(description)   : undefined,
+                                image:         image         ? String(image)         : undefined,
+                                status:        status        ? String(status)        : undefined,
+                                category:      categoryName,
                             },
                         });
                         results.updated++;
@@ -57,14 +57,14 @@ export async function POST(req: NextRequest) {
 
                 await prisma.product.create({
                     data: {
-                        name: String(name),
-                        sku: sku ? String(sku) : undefined,
-                        price: Number(price),
-                        minPrice: minPrice ? Number(minPrice) : undefined,
-                        description: description ? String(description) : '',
-                        image: image ? String(image) : null,
-                        status: status ? String(status) : 'active',
-                        categoryId,
+                        name:          String(name),
+                        sku:           sku           ? String(sku)           : undefined,
+                        price:         Number(price),
+                        originalPrice: originalPrice ? Number(originalPrice) : undefined,
+                        description:   description   ? String(description)   : '',
+                        image:         image         ? String(image)         : '/placeholder.png',
+                        status:        status        ? String(status)        : 'active',
+                        category:      categoryName,
                     },
                 });
                 results.created++;
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
 // ─── GET /api/products/bulk-import — Namunaviy CSV template yuklash ──────────
 export async function GET() {
     const csv = [
-        'name,sku,price,minPrice,categorySlug,description,image,status',
+        'name,sku,price,originalPrice,categorySlug,description,image,status',
         'Polietilen paket 30x40,PKT-001,1500,5000,polietilen-paketlar,30x40 sm polietilen paket,,active',
         'Kraft paket 20x30,KFT-002,2500,10000,kraft-paketlar,Kraft qogoz paket,,active',
     ].join('\n');
