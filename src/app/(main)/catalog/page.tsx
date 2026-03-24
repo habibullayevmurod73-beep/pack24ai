@@ -7,15 +7,21 @@ import { useProductStore } from '@/lib/store/useProductStore';
 import { useHasMounted } from '@/lib/hooks/useHasMounted';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ArrowRight, Package, Tag, TrendingUp, LayoutGrid } from 'lucide-react';
+import { useEffect } from 'react';
 
 export default function CatalogIndexPage() {
     const { language } = useLanguage();
     const categories = useCategoryStore((s) => s.categories);
-    const products = useProductStore((s) => s.products);
+    const { products, fetchProducts } = useProductStore();
     const hasMounted = useHasMounted();
 
     const t = (uz: string, ru: string, en?: string) =>
         language === 'uz' ? uz : language === 'en' ? (en ?? ru) : ru;
+
+    // DB dan active mahsulotlarni yuklash
+    useEffect(() => {
+        fetchProducts({ status: 'active' });
+    }, [fetchProducts]);
 
     const activeCategories = categories.filter((c) => c.isActive).slice(0, 12);
     const totalProducts = products.length;

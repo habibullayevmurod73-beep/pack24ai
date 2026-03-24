@@ -37,7 +37,8 @@ export default function CategoryPage() {
     const t = (uz: string, ru: string) => language === 'ru' ? ru : uz;
 
     useEffect(() => {
-        if (products.length === 0) fetchProducts();
+        // Har doim active mahsulotlarni yuklaymiz
+        fetchProducts({ status: 'active' });
     }, []);
 
     // Kategoriyani topish (slug yoki name bilan)
@@ -56,12 +57,19 @@ export default function CategoryPage() {
             : String(category.name))
         : slug.replace(/-/g, ' ');
 
-    // Mahsulotlarni filtrlash
+    // Mahsulotlarni filtrlash — faqat active, kategoriya slug yoki nomi mos keladi
     const filtered = products.filter(p => {
+        if (p.status !== 'active') return false;
         if (!p.category) return false;
-        const pCat = p.category.toLowerCase();
+        const pCat = p.category.toLowerCase().trim();
         const slugLower = slug.toLowerCase();
-        return pCat === slugLower || pCat.replace(/\s+/g, '-') === slugLower || pCat.includes(slugLower.replace(/-/g, ' '));
+        const slugAsWords = slugLower.replace(/-/g, ' ');
+        return (
+            pCat === slugLower ||
+            pCat === slugAsWords ||
+            pCat.replace(/\s+/g, '-') === slugLower ||
+            pCat.includes(slugAsWords)
+        );
     });
 
     // Tartiblash
