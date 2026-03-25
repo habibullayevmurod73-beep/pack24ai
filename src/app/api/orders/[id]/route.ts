@@ -23,19 +23,8 @@ export async function GET(
             return NextResponse.json({ error: 'Not Found' }, { status: 404 });
         }
 
-        // Parse gallery for products in items
-        const parsedOrder = {
-            ...order,
-            items: order.items.map((item: any) => ({
-                ...item,
-                product: {
-                    ...item.product,
-                    gallery: item.product.gallery ? JSON.parse(item.product.gallery) : []
-                }
-            }))
-        };
-
-        return NextResponse.json(parsedOrder);
+        // gallery endi Prisma Json tipida — parse kerak emas
+        return NextResponse.json(order);
     } catch (error) {
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }

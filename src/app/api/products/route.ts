@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { parseProduct, stringifyGallery, stringifySpecifications, stringifyTags } from '@/lib/product-utils';
+import { parseProduct } from '@/lib/product-utils';
 
 // ─── Prisma Product filter type ───────────────────────────────────────────────
 interface ProductWhere {
     category?: string;
     status?: string;
-    name?: { contains: string };
+    name?: { contains: string; mode: 'insensitive' };
 }
 
 export async function GET(request: Request) {
@@ -20,14 +20,14 @@ export async function GET(request: Request) {
 
         if (category && category !== 'all') where.category = category;
         if (status   && status   !== 'all') where.status   = status;
-        if (search)                          where.name     = { contains: search };
+        if (search)                          where.name     = { contains: search, mode: 'insensitive' };
 
         const products = await prisma.product.findMany({
             where,
             orderBy: { createdAt: 'desc' },
         });
 
-        // Type-safe JSON parse (gallery, specifications, tags)
+        // Type-safe JSON parse (gallery, specifications, tags — Prisma Json tipidan)
         return NextResponse.json(products.map(parseProduct));
     } catch (error) {
         console.error('[GET /api/products]', error);
@@ -50,19 +50,19 @@ export async function POST(request: Request) {
 
         const newProduct = await prisma.product.create({
             data: {
-                name:          body.name.trim(),
-                description:   body.description   || '',
+                name:           body.name.trim(),
+                description:    body.description   || '',
                 price,
-                originalPrice: body.originalPrice ? parseFloat(body.originalPrice) : null,
-                sku:           body.sku            || null,
-                category:      body.category       || null,
-                image:         body.image          || '/placeholder.png',
-                gallery:       stringifyGallery(Array.isArray(body.gallery) ? body.gallery : []),
-                specifications: stringifySpecifications(body.specifications ?? {}),
-                tags:          stringifyTags(Array.isArray(body.tags) ? body.tags : []),
-                minQuantity:   body.minQuantity    ? parseInt(body.minQuantity) : 1,
-                status:        body.status         || 'draft',
-                inStock:       body.inStock        !== false,
+                originalPrice:  body.originalPrice ? parseFloat(body.originalPrice) : null,
+                sku:            body.sku            || null,
+                category:       body.category       || null,
+                image:          body.image          || '/placeholder.png',
+                gallery:        Array.isArray(body.gallery) ? body.gallery : [],
+                specifications: body.specifications ?? {},
+                tags:           Array.isArray(body.tags) ? body.tags : [],
+                minQuantity:    body.minQuantity    ? parseInt(body.minQuantity) : 1,
+                status:         body.status         || 'draft',
+                inStock:        body.inStock        !== false,
             },
         });
 

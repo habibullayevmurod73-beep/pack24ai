@@ -1,6 +1,8 @@
 /**
  * Product JSON maydonlari uchun type-safe utility funksiyalar.
- * SQLite JSON string larini parse/stringify qiladi.
+ * 
+ * PostgreSQL Json tipidan foydalanilgandan so'ng, Prisma o'zi
+ * serialize/deserialize qiladi — JSON.parse/stringify kerak emas.
  */
 
 export interface ProductSpecification {
@@ -8,65 +10,51 @@ export interface ProductSpecification {
     value: string;
 }
 
-// ─── Parse funksiyalari ──────────────────────────────────────────────────────
+// ─── Type-safe getters ────────────────────────────────────────────────────────
 
-/** gallery JSON string → string[] */
-export function parseGallery(raw: string | null | undefined): string[] {
+/** gallery (Json) → string[] */
+export function parseGallery(raw: unknown): string[] {
     if (!raw) return [];
-    try { return JSON.parse(raw) as string[]; } catch { return []; }
+    if (Array.isArray(raw)) return raw as string[];
+    return [];
 }
 
-/** specifications JSON string → ProductSpecification[] */
-export function parseSpecifications(raw: string | null | undefined): ProductSpecification[] {
-    if (!raw || raw === '{}') return [];
-    try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed as ProductSpecification[];
-        // object formatini ham qo'llab-quvvatlash: { "Material": "Karton", ... }
-        return Object.entries(parsed).map(([key, value]) => ({ key, value: String(value) }));
-    } catch { return []; }
-}
-
-/** tags JSON string → string[] */
-export function parseTags(raw: string | null | undefined): string[] {
+/** specifications (Json) → Record<string, string> | ProductSpecification[] */
+export function parseSpecifications(raw: unknown): ProductSpecification[] {
     if (!raw) return [];
-    try { return JSON.parse(raw) as string[]; } catch { return []; }
+    if (Array.isArray(raw)) return raw as ProductSpecification[];
+    if (typeof raw === 'object') {
+        return Object.entries(raw as Record<string, string>).map(([key, value]) => ({
+            key,
+            value: String(value),
+        }));
+    }
+    return [];
 }
 
-// ─── Stringify funksiyalari ──────────────────────────────────────────────────
-
-/** string[] → gallery JSON string */
-export function stringifyGallery(gallery: string[]): string {
-    return JSON.stringify(gallery);
-}
-
-/** ProductSpecification[] yoki Record<string,string> → specifications JSON string */
-export function stringifySpecifications(
-    specs: ProductSpecification[] | Record<string, string>
-): string {
-    return JSON.stringify(specs);
-}
-
-/** string[] → tags JSON string */
-export function stringifyTags(tags: string[]): string {
-    return JSON.stringify(tags);
+/** tags (Json) → string[] */
+export function parseTags(raw: unknown): string[] {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw as string[];
+    return [];
 }
 
 // ─── Product parse helper ────────────────────────────────────────────────────
 
 /**
- * Prisma dan kelgan xom Product ni parse qilib,
- * gallery, specifications, tags ni array/object ga o'tkazadi.
+ * Prisma dan kelgan Product ni type-safe qiladi.
+ * gallery, specifications, tags endi Prisma tomonidan
+ * avtomatik parse qilinadi — faqat type assertion kerak.
  */
 export function parseProduct<T extends {
-    gallery?: string;
-    specifications?: string;
-    tags?: string;
+    gallery?: unknown;
+    specifications?: unknown;
+    tags?: unknown;
 }>(raw: T) {
     return {
         ...raw,
-        gallery: parseGallery(raw.gallery),
+        gallery:        parseGallery(raw.gallery),
         specifications: parseSpecifications(raw.specifications),
-        tags: parseTags(raw.tags),
+        tags:           parseTags(raw.tags),
     };
 }
