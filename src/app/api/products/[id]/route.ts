@@ -32,7 +32,7 @@ export async function PUT(
         const scalarFields = [
             'name', 'description', 'price', 'originalPrice',
             'sku', 'category', 'image', 'inStock', 'status',
-            'sourceUrl', 'minQuantity', 'rating', 'reviews', 'isFeatured',
+            'sourceUrl', 'minQuantity', 'rating', 'reviews', 'isFeatured', 'videoUrl',
         ] as const;
 
         for (const key of scalarFields) {

@@ -6,12 +6,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { LogIn, Eye, EyeOff } from 'lucide-react';
 import { Suspense } from 'react';
 
-// Admin credentials (kelajakda DB dan o'qilishi kerak)
-const ADMIN_CREDENTIALS = {
-    username: 'admin',
-    password: 'pack24',
-};
-
 function AdminLoginForm() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -27,22 +21,23 @@ function AdminLoginForm() {
         setError('');
         setLoading(true);
 
-        // Simulate network delay
-        await new Promise(r => setTimeout(r, 500));
+        try {
+            const res = await fetch('/api/admin/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password }),
+            });
 
-        if (
-            username === ADMIN_CREDENTIALS.username &&
-            password === ADMIN_CREDENTIALS.password
-        ) {
-            // Cookie yozish — middleware server-side tekshiradi
-            // maxAge: 8 soat = 28800 soniya
-            document.cookie = `admin_auth=admin_${Date.now()}; path=/; max-age=28800; SameSite=Strict`;
-            // Legacy localStorage ham saqlash (eski kod bilan mos kelish uchun)
-            localStorage.setItem('admin_auth', 'true');
-            router.push(redirectTo);
-            router.refresh();
-        } else {
-            setError('Login yoki parol noto\'g\'ri');
+            if (res.ok) {
+                router.push(redirectTo);
+                router.refresh();
+            } else {
+                const data = await res.json();
+                setError(data.error || "Login yoki parol noto'g'ri");
+            }
+        } catch {
+            setError("Tarmoq xatosi. Qayta urinib ko'ring.");
+        } finally {
             setLoading(false);
         }
     };
@@ -93,7 +88,7 @@ function AdminLoginForm() {
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                                aria-label={showPassword ? 'Parolni yashirish' : 'Parolni ko\'rsatish'}
+                                aria-label={showPassword ? 'Parolni yashirish' : "Parolni ko'rsatish"}
                             >
                                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                             </button>

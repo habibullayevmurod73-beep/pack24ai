@@ -57,6 +57,7 @@ model Product {
   category     String?
   image        String
   gallery        Json     @default("[]")
+  videoUrl       String?
   specifications Json     @default("{}")
   tags           Json     @default("[]")
   minQuantity    Int      @default(1)

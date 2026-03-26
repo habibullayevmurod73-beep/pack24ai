@@ -1,18 +1,33 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import CatalogSidebar from '@/components/CatalogSidebar';
 import HeroBannerSlider from '@/components/HeroBannerSlider';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { useCategoryStore } from '@/lib/store/useCategoryStore';
 import { useProductStore } from '@/lib/store/useProductStore';
 import { useLanguage } from '@/lib/contexts/LanguageContext';
+import type { Product } from '@/lib/store/useProductStore';
 
-export default function HomeHero() {
+interface Props {
+    initialProducts?: Product[];
+}
+
+export default function HomeHero({ initialProducts }: Props) {
     const { language } = useLanguage();
     const categories = useCategoryStore((state) => state.categories);
     const products = useProductStore((state) => state.products);
+
+    // SSR dan kelgan mahsulotlar bilan store ni darhol to'ldirish
+    useEffect(() => {
+        if (initialProducts && initialProducts.length > 0) {
+            useProductStore.setState({ products: initialProducts, loading: false });
+        } else if (products.length === 0) {
+            useProductStore.getState().fetchProducts();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const activeCategories = categories.filter((c) => c.isActive);
     const t = (uz: string, ru: string) => language === 'uz' ? uz : ru;

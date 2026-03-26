@@ -1,9 +1,3 @@
-'use client';
-
-import { useEffect } from 'react';
-import { useProductStore } from '@/lib/store/useProductStore';
-import { useHasMounted } from '@/lib/hooks/useHasMounted';
-
 import HomeHero from '@/components/home/HomeHero';
 import MobileCategoryStrip from '@/components/home/MobileCategoryStrip';
 import FeatureCards from '@/components/home/FeatureCards';
@@ -12,21 +6,49 @@ import ProductsSection from '@/components/home/ProductsSection';
 import StatsSection from '@/components/home/StatsSection';
 import ReviewsSection from '@/components/home/ReviewsSection';
 import CTABanner from '@/components/home/CTABanner';
+import { prisma } from '@/lib/prisma';
+import type { Product } from '@/lib/store/useProductStore';
 
-export default function Home() {
-    const { fetchProducts } = useProductStore();
-    const hasMounted = useHasMounted();
+// Server Component: mahsulotlar SSR paytida DB dan o'qiladi
+async function getInitialProducts(): Promise<Product[]> {
+    try {
+        const rows = await prisma.product.findMany({
+            where: { status: 'active' },
+            orderBy: { createdAt: 'desc' },
+            take: 50, // HomeHero ham ishlatadi, shuning uchun ko'proq olish
+        });
+        return rows.map((p) => ({
+            id: p.id,
+            name: p.name,
+            description: p.description ?? undefined,
+            price: p.price,
+            originalPrice: p.originalPrice ?? undefined,
+            sku: p.sku ?? undefined,
+            category: p.category ?? undefined,
+            image: p.image,
+            gallery: Array.isArray(p.gallery) ? (p.gallery as string[]) : [],
+            inStock: p.inStock,
+            rating: p.rating,
+            reviews: p.reviews,
+            status: p.status as 'active' | 'draft' | 'archived',
+            isFeatured: p.isFeatured,
+            sourceUrl: p.sourceUrl ?? undefined,
+        }));
+    } catch {
+        // DB ulanishi bo'lmasa, client-side fetch ishlaydi
+        return [];
+    }
+}
 
-    useEffect(() => {
-        fetchProducts();
-    }, [fetchProducts]);
-
-    if (!hasMounted) return null;
+export default async function Home() {
+    const initialProducts = await getInitialProducts();
 
     return (
         <div className="min-h-screen bg-[#f5f6fa]">
-            {/* Slider + Category Showcase */}
-            <HomeHero />
+            {/* Slider + Category Showcase
+                initialProducts → Zustand store ni birinchi render da seed qiladi
+                shuning uchun kategoriya kartalari darhol ko'rinadi */}
+            <HomeHero initialProducts={initialProducts} />
 
             {/* Mobil kategoriyalar */}
             <MobileCategoryStrip />
@@ -37,7 +59,7 @@ export default function Home() {
             {/* 3D konfigurator + B2B */}
             <ConfiguratorSection />
 
-            {/* Mashhur mahsulotlar */}
+            {/* Mashhur mahsulotlar — store allaqachon HomeHero tomonidan seed qilingan */}
             <ProductsSection />
 
             {/* Statistika */}

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { Package, ChevronRight, ArrowRight } from 'lucide-react';
 import { useProductStore } from '@/lib/store/useProductStore';
@@ -15,8 +16,16 @@ function Skeleton({ className = '' }: { className?: string }) {
 
 export default function ProductsSection() {
     const { language } = useLanguage();
-    const { products, loading } = useProductStore();
+    const { products, loading, fetchProducts } = useProductStore();
     const { addToCart } = useCartStore();
+
+    useEffect(() => {
+        // Faqat store bo'sh bo'lsa fetch qilamiz (HomeHero allaqachon seed qilgan bo'lishi mumkin)
+        if (products.length === 0) {
+            fetchProducts();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const t = (uz: string, ru: string) => language === 'uz' ? uz : ru;
 

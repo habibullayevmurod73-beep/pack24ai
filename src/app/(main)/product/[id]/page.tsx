@@ -7,7 +7,7 @@ import { useCurrencySafe } from '@/lib/contexts/CurrencyContext';
 import {
     ArrowLeft, Star, ShoppingCart, Truck, ShieldCheck, Minus, Plus,
     Heart, ChevronRight, Box, Check, ZoomIn, ChevronLeft, Package,
-    Phone, Share2, MessageSquare, Send, ThumbsUp
+    Phone, Share2, MessageSquare, Send, ThumbsUp, Film
 } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -405,9 +405,10 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
     const discount = isOnSale ? Math.round((1 - product.price / product.originalPrice!) * 100) : 0;
     const related = products.filter(p => p.category === product.category && p.id !== product.id).slice(0, 8);
 
+    // Gallery: asosiy rasm + qo'shimcha rasmlar (gallery field)
     const galleryImages = [
         product.image,
-        ...((product as any).images ?? []),
+        ...(Array.isArray((product as any).gallery) ? (product as any).gallery : []),
     ].filter((img): img is string => Boolean(img) && img !== '/placeholder.png');
 
     // ── "Buy" panel (shared between inline mobile + sticky desktop) ──
@@ -518,6 +519,24 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                                     images={galleryImages.length > 0 ? galleryImages : [product.image ?? '']}
                                     name={product.name}
                                 />
+
+                                {/* Video bo'limi */}
+                                {(product as any).videoUrl && (
+                                    <div className="mt-5 rounded-2xl overflow-hidden border border-purple-100 bg-purple-50/30">
+                                        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-purple-100">
+                                            <Film size={14} className="text-purple-500" />
+                                            <span className="text-xs font-semibold text-purple-700">
+                                                {language === 'ru' ? 'Видео о товаре' : 'Mahsulot videosi'}
+                                            </span>
+                                        </div>
+                                        <video
+                                            src={(product as any).videoUrl}
+                                            controls
+                                            className="w-full max-h-72 object-contain bg-black"
+                                            playsInline
+                                        />
+                                    </div>
+                                )}
                             </div>
                         </div>
 

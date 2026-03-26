@@ -58,6 +58,7 @@ export async function POST(request: Request) {
                 category:       body.category       || null,
                 image:          body.image          || '/placeholder.png',
                 gallery:        Array.isArray(body.gallery) ? body.gallery : [],
+                videoUrl:       body.videoUrl       || null,
                 specifications: body.specifications ?? {},
                 tags:           Array.isArray(body.tags) ? body.tags : [],
                 minQuantity:    body.minQuantity    ? parseInt(body.minQuantity) : 1,
