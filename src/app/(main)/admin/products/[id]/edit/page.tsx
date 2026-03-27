@@ -26,12 +26,12 @@ function ImageSlot({
     const ref = useRef<HTMLInputElement>(null);
     return (
         <div
-            className="relative rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 overflow-hidden transition-all hover:border-blue-300 group"
-            style={{ aspectRatio: '4/3' }}
+            className="relative rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 overflow-hidden transition-all hover:border-blue-300 group aspect-[4/3]"
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) onFile(index, f); }}
         >
             <input ref={ref} type="file" accept="image/*" className="hidden"
+                aria-label={index === 0 ? 'Asosiy rasmni yuklash' : `Rasm ${index + 1} ni yuklash`}
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(index, f); }} />
             {url ? (
                 <>
@@ -43,6 +43,7 @@ function ImageSlot({
                         </button>
                     </div>
                     <button type="button" onClick={() => onRemove(index)}
+                        title="Rasmni o'chirish" aria-label="Rasmni o'chirish"
                         className="absolute top-2 right-2 w-6 h-6 bg-white/90 rounded-full flex items-center justify-center text-red-500 hover:bg-white shadow-sm">
                         <X size={12} />
                     </button>
@@ -79,6 +80,7 @@ function VideoSlot({ url, uploading, onFile, onRemove }: {
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) onFile(f); }}>
             <input ref={ref} type="file" accept="video/*" className="hidden"
+                aria-label="Mahsulot videosini yuklash"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }} />
             {url ? (
                 <div className="p-3">

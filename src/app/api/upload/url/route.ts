@@ -1,59 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { uploadBufferToSupabase } from '@/lib/supabase-storage';
 
+const MIME_TO_EXT: Record<string, string> = {
+    'image/jpeg': '.jpg',
+    'image/jpg':  '.jpg',
+    'image/png':  '.png',
+    'image/webp': '.webp',
+    'image/gif':  '.gif',
+    'image/avif': '.avif',
+};
+
+/**
+ * POST /api/upload/url
+ * Body: { url: "https://..." }
+ * Rasmni URL dan yuklab olib, Supabase Storage ga saqlaydi.
+ * Qaytaradi: { success: true, url: "https://supabase.../..." }
+ */
 export async function POST(req: NextRequest) {
     try {
         const { url } = await req.json();
 
-        if (!url) {
-            return NextResponse.json({ error: 'URL is required' }, { status: 400 });
+        if (!url || typeof url !== 'string') {
+            return NextResponse.json({ error: 'URL kiritilmadi' }, { status: 400 });
         }
 
-        // Fetch the image with browser-like headers
+        // Rasmni olib kelish
         const response = await fetch(url, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-                'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-                'Referer': 'https://pack24.ru/',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+                Accept: 'image/webp,image/apng,image/*,*/*;q=0.8',
+                'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8',
+                Referer: 'https://pack24.ru/',
             },
         });
+
         if (!response.ok) {
-            return NextResponse.json({ error: `Failed to fetch image: ${response.statusText}` }, { status: 422 });
+            return NextResponse.json(
+                { error: `Rasm yuklab bo'lmadi: ${response.statusText}` },
+                { status: 422 }
+            );
         }
 
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.startsWith('image/')) {
-            return NextResponse.json({ error: 'URL does not point to a valid image' }, { status: 400 });
+        const contentType = response.headers.get('content-type') ?? '';
+        if (!contentType.startsWith('image/')) {
+            return NextResponse.json(
+                { error: 'URL rasm emas' },
+                { status: 400 }
+            );
         }
 
-        // Determine extension
-        let extension = '.jpg';
-        if (contentType.includes('png')) extension = '.png';
-        if (contentType.includes('webp')) extension = '.webp';
-        if (contentType.includes('gif')) extension = '.gif';
-        if (contentType.includes('jpeg')) extension = '.jpg';
+        const extension = MIME_TO_EXT[contentType.split(';')[0].trim()] ?? '.jpg';
+        const filename = `${uuidv4()}${extension}`;
 
         const buffer = Buffer.from(await response.arrayBuffer());
-        const filename = `${uuidv4()}${extension}`;
-        const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'products');
-
-        // Ensure directory exists
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-
-        const filepath = path.join(uploadDir, filename);
-        fs.writeFileSync(filepath, buffer);
-
-        const publicUrl = `/uploads/products/${filename}`;
+        const publicUrl = await uploadBufferToSupabase(buffer, filename, contentType);
 
         return NextResponse.json({ success: true, url: publicUrl });
 
-    } catch (error: any) {
-        console.error('Image upload error:', error);
-        return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Server xatosi';
+        console.error('[upload/url]', message);
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

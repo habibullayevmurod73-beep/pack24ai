@@ -1,5 +1,9 @@
-import { handlers } from '@/lib/auth';
+/**
+ * NextAuth v4 API route handler
+ * GET & POST /api/auth/[...nextauth]
+ */
+import NextAuth from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
-// NextAuth API route handler
-// GET & POST /api/auth/[...nextauth]
-export const { GET, POST } = handlers;
+const handler = NextAuth(authOptions);
+export { handler as GET, handler as POST };

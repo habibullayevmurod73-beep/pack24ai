@@ -14,6 +14,7 @@ datasource db {
 model User {
   id           Int      @id @default(autoincrement())
   name         String
+  email        String?  @unique  // Opsional email (unique)
   phone        String   @unique
   passwordHash String   // bcrypt hash — hech qachon plain text saqlama!
   role         String   @default("user") // "user" | "admin"

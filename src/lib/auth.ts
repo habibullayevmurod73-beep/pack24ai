@@ -1,19 +1,23 @@
+/**
+ * NextAuth v4 konfiguratsiyasi
+ * Foydalanuvchi telefon raqami orqali kiradi.
+ */
 import NextAuth from 'next-auth';
-import Credentials from 'next-auth/providers/credentials';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import type { NextAuthOptions } from 'next-auth';
 import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 
 function hashPassword(password: string): string {
-    // MUHIM: qavs operator precedence uchun zarur
     return crypto
         .createHash('sha256')
         .update(password + (process.env.AUTH_SECRET ?? ''))
         .digest('hex');
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const authOptions: NextAuthOptions = {
     providers: [
-        Credentials({
+        CredentialsProvider({
             name: 'credentials',
             credentials: {
                 phone: { label: 'Telefon', type: 'text' },
@@ -25,36 +29,39 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 }
 
                 const user = await prisma.user.findUnique({
-                    where: { phone: credentials.phone as string },
+                    where: { phone: credentials.phone },
                 });
 
                 if (!user || !user.isActive) return null;
 
-                const isValid = hashPassword(credentials.password as string) === user.passwordHash;
+                const isValid = hashPassword(credentials.password) === user.passwordHash;
                 if (!isValid) return null;
 
                 return {
                     id: String(user.id),
                     name: user.name,
-                    email: user.phone, // NextAuth email o'rniga phone
-                    role: user.role,
+                    email: user.email ?? user.phone, // real email yoki phone fallback
                 };
             },
         }),
     ],
     callbacks: {
-        jwt({ token, user }) {
+        async jwt({ token, user }) {
             if (user) {
-                token.role = (user as any).role;
-                token.phone = user.email; // phone ni email o'rniga saqladik
+                const dbUser = await prisma.user.findUnique({
+                    where: { id: Number(user.id) },
+                    select: { role: true, phone: true },
+                });
+                token.role = dbUser?.role ?? 'user';
+                token.phone = dbUser?.phone ?? '';
             }
             return token;
         },
-        session({ session, token }) {
+        async session({ session, token }) {
             if (session.user) {
-                (session.user as any).role = token.role;
-                (session.user as any).phone = token.phone;
-                (session.user as any).id = token.sub;
+                (session.user as Record<string, unknown>).role = token.role;
+                (session.user as Record<string, unknown>).phone = token.phone;
+                (session.user as Record<string, unknown>).id = token.sub;
             }
             return session;
         },
@@ -68,4 +75,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         maxAge: 30 * 24 * 60 * 60, // 30 kun
     },
     secret: process.env.AUTH_SECRET,
-});
+};
+
+export default NextAuth(authOptions);

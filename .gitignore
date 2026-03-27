@@ -35,8 +35,13 @@ yarn-error.log*
 !.env.example
 
 # Prisma SQLite local DB (production da ishlatilmaydi)
+dev.db
+*.db
 prisma/dev.db
 prisma/*.db-journal
+
+# Backup fayllar
+*.bak
 
 # vercel
 .vercel

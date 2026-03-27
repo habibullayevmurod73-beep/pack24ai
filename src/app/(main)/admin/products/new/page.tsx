@@ -50,8 +50,7 @@ function ImageSlot({
 
     return (
         <div
-            className="relative rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 overflow-hidden transition-all hover:border-blue-300 group"
-            style={{ aspectRatio: '4/3' }}
+        className="relative rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 overflow-hidden transition-all hover:border-blue-300 group aspect-[4/3]"
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
         >
@@ -60,6 +59,7 @@ function ImageSlot({
                 type="file"
                 accept="image/*"
                 className="hidden"
+                aria-label={index === 0 ? 'Asosiy rasmni yuklash' : `Rasm ${index + 1} ni yuklash`}
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(index, f); }}
             />
 
@@ -79,6 +79,8 @@ function ImageSlot({
                     {/* Remove btn */}
                     <button
                         type="button"
+                        title="Rasmni o'chirish"
+                        aria-label="Rasmni o'chirish"
                         onClick={() => onRemove(index)}
                         className="absolute top-2 right-2 w-6 h-6 bg-white/90 rounded-full flex items-center justify-center text-red-500 hover:bg-white hover:text-red-600 transition-colors shadow-sm"
                     >
@@ -145,6 +147,7 @@ function VideoSlot({
                 type="file"
                 accept="video/*"
                 className="hidden"
+                aria-label="Mahsulot videosini yuklash"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }}
             />
 
