@@ -69,6 +69,11 @@ export default function CheckoutPage() {
     const subtotal    = items.reduce((acc, i) => acc + i.price * i.quantity, 0);
     const total       = subtotal + deliveryFee;
 
+    // Real-time telefon validatsiya
+    const phoneRegexRT = /^\+998[0-9]{9}$/;
+    const isPhoneValid = phone.trim() === '' || phoneRegexRT.test(phone.replace(/\s/g, ''));
+    const isPhoneFull  = phoneRegexRT.test(phone.replace(/\s/g, ''));
+
     useEffect(() => {
         if (items.length === 0 && step === 'form') {
             router.push('/catalog');
@@ -99,9 +104,10 @@ export default function CheckoutPage() {
                     shippingAddress: address,
                     comment,
                     deliveryMethod:  delivery,
+                    paymentMethod:   payMethod,
                     status:          'new',
                     totalAmount:     total,
-                items: items.map(i => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
+                    items: items.map(i => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
                 }),
             });
 
@@ -238,18 +244,32 @@ export default function CheckoutPage() {
                                     </div>
                                 </div>
                                 <div>
-                                    <label htmlFor="checkout-phone" className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">{t("Telefon", "Телефон")} *</label>
+                                    <label htmlFor="checkout-phone" className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">
+                                        {t("Telefon", "Телефон")} *
+                                        {isPhoneFull && <span className="ml-2 text-emerald-500">✓</span>}
+                                    </label>
                                     <div className="relative">
-                                        <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <Phone size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${isPhoneValid ? 'text-gray-400' : 'text-red-400'}`} />
                                         <input
                                             id="checkout-phone"
                                             value={phone}
                                             onChange={e => setPhone(e.target.value)}
                                             type="tel"
-                                            className="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-blue-400"
+                                            className={`w-full border rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none transition-colors ${
+                                                !isPhoneValid
+                                                    ? 'border-red-300 focus:border-red-400 bg-red-50/30'
+                                                    : isPhoneFull
+                                                    ? 'border-emerald-300 focus:border-emerald-400'
+                                                    : 'border-gray-200 focus:border-blue-400'
+                                            }`}
                                             placeholder="+998901234567"
                                         />
                                     </div>
+                                    {!isPhoneValid && phone.length > 4 && (
+                                        <p className="text-[11px] text-red-500 mt-1 flex items-center gap-1">
+                                            ⚠ {t("+998XXXXXXXXX formatida kiriting", "Формат: +998XXXXXXXXX")}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </div>

@@ -28,15 +28,16 @@ export default function CategoryPage() {
     const categories = useCategoryStore(s => s.categories);
     const products = useProductStore(s => s.products);
     const fetchProducts = useProductStore(s => s.fetchProducts);
-    const hasMounted = useProductStore(s => !s.loading);
 
     const [view, setView] = useState<'grid' | 'list'>('grid');
     const [sort, setSort] = useState<'default' | 'price_asc' | 'price_desc' | 'rating'>('default');
     const [showFilters, setShowFilters] = useState(false);
+    const [hasMounted, setHasMounted] = useState(false);
 
     const t = (uz: string, ru: string) => language === 'ru' ? ru : uz;
 
     useEffect(() => {
+        setHasMounted(true);
         // Har doim active mahsulotlarni yuklaymiz
         fetchProducts({ status: 'active' });
     }, []);

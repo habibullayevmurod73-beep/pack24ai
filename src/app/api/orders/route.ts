@@ -9,11 +9,16 @@ async function sendTelegramNotification(order: {
     shippingAddress: string | null;
     totalAmount: number | null;
     status: string;
+    paymentMethod?: string | null;
+    deliveryMethod?: string | null;
     items: { quantity: number; price: number; product: { name: string } | null }[];
 }) {
     const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
     const CHAT_ID   = process.env.TELEGRAM_ADMIN_CHAT_ID;
     if (!BOT_TOKEN || !CHAT_ID) return;
+
+    const paymentLabel: Record<string, string> = { click: '🔵 Click', payme: '🟢 Payme', cash: '💵 Naqd pul' };
+    const deliveryLabel: Record<string, string> = { courier: '🚚 Kuryer', pickup: '📦 Olib ketish' };
 
     const itemLines = order.items
         .map(i => `  • ${i.product?.name ?? 'Mahsulot'} × ${i.quantity} = ${(i.price * i.quantity).toLocaleString()} so'm`)
@@ -25,6 +30,8 @@ async function sendTelegramNotification(order: {
         `👤 <b>Mijoz:</b> ${order.customerName ?? 'Noma\'lum'}`,
         `📞 <b>Tel:</b> ${order.contactPhone ?? '-'}`,
         `📍 <b>Manzil:</b> ${order.shippingAddress ?? '-'}`,
+        `🚀 <b>Yetkazish:</b> ${deliveryLabel[order.deliveryMethod ?? ''] ?? (order.deliveryMethod ?? '-')}`,
+        `💳 <b>To'lov:</b> ${paymentLabel[order.paymentMethod ?? ''] ?? (order.paymentMethod ?? '-')}`,
         '',
         `<b>Mahsulotlar:</b>`,
         itemLines,
@@ -57,6 +64,7 @@ export async function POST(req: NextRequest) {
             shippingAddress,
             comment,
             deliveryMethod,
+            paymentMethod,
             status = 'new',
             totalAmount,
             items,
@@ -107,6 +115,8 @@ export async function POST(req: NextRequest) {
                 shippingAddress: shippingAddress ?? null,
                 comment:         comment ?? null,
                 deliveryMethod:  deliveryMethod ?? 'courier',
+                paymentMethod:   paymentMethod ?? 'cash',
+                paymentStatus:   (paymentMethod === 'cash' || !paymentMethod) ? 'pending' : 'awaiting',
                 status,
                 totalAmount: computedTotal,
                 items: { create: orderItems },
@@ -122,6 +132,8 @@ export async function POST(req: NextRequest) {
             shippingAddress: order.shippingAddress,
             totalAmount:     order.totalAmount,
             status:          order.status,
+            paymentMethod:   order.paymentMethod,
+            deliveryMethod:  order.deliveryMethod,
             items:           (order.items as any[]).map(i => ({ quantity: i.quantity, price: i.price, product: i.product })),
         }).catch(console.error);
 

@@ -11,11 +11,20 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: '**.pack24.ru' },
       { protocol: 'https', hostname: 'storage.googleapis.com' },
       { protocol: 'https', hostname: 'res.cloudinary.com' },
+      // Supabase Storage
+      { protocol: 'https', hostname: '**.supabase.co' },
+      { protocol: 'https', hostname: '**.supabase.in' },
+      // Telegram CDN
+      { protocol: 'https', hostname: 'api.telegram.org' },
+      { protocol: 'https', hostname: '**.telegram.org' },
+      // Local dev
       { protocol: 'http',  hostname: 'localhost' },
     ],
     formats: ['image/avif', 'image/webp'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    dangerouslyAllowSVG: true,
+    contentDispositionType: 'attachment',
   },
 
   // Security & performance headers

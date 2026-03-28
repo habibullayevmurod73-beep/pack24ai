@@ -57,6 +57,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import GlobalAIWrapper from "@/components/GlobalAIWrapper";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
+import { Toaster } from "sonner";
 
 export default function RootLayout({
   children,
@@ -80,6 +81,7 @@ export default function RootLayout({
             <Footer />
           </CurrencyProvider>
         </LanguageProvider>
+        <Toaster richColors position="bottom-right" closeButton duration={3000} />
       </body>
     </html>
   );
