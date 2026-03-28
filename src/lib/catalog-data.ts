@@ -4,7 +4,7 @@ import { Language } from './translations';
 export interface Category {
     id: string;
     slug: string;
-    name: Record<Language, string>;
+    name: Partial<Record<Language, string>>;
     icon?: string; // We can add icons later
 }
 

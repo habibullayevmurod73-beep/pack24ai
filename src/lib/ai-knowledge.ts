@@ -4,8 +4,8 @@ export type Intent = 'price' | 'delivery' | 'contact' | 'material' | 'model_info
 
 export interface KnowledgeArticle {
     id: Intent;
-    keywords: Record<Language, string[]>;
-    responses: Record<Language, string>;
+    keywords: Partial<Record<Language, string[]>>;
+    responses: Partial<Record<Language, string>>;
 }
 
 export const KNOWLEDGE_BASE: KnowledgeArticle[] = [
@@ -296,7 +296,7 @@ export const KNOWLEDGE_BASE: KnowledgeArticle[] = [
     }
 ];
 
-export const FALLBACK_RESPONSES: Record<Language, string> = {
+export const FALLBACK_RESPONSES: Partial<Record<Language, string>> = {
     uz: "Uzr, savolingizni tushunmadim. Iltimos, boshqacharoq so'rang yoki 'narx', 'yetkazib berish' haqida so'rang.",
     ru: "Извините, я не понял вопрос. Спросите про 'цену' или 'доставку'.",
     en: "Sorry, I didn't understand. Please ask about 'price' or 'delivery'.",

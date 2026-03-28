@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useCartStore } from '@/lib/store/useCartStore';
+import { useWishlistStore } from '@/lib/store/useWishlistStore';
 import { useHasMounted } from '@/lib/hooks/useHasMounted';
 import { useLanguage } from '@/lib/contexts/LanguageContext';
 import { useCurrencySafe, CURRENCY_CONFIG, CurrencyCode } from '@/lib/contexts/CurrencyContext';
@@ -18,6 +19,7 @@ export default function NavUserActions() {
     const cartCount = useCartStore(
         (state) => state.items.reduce((sum, item) => sum + item.quantity, 0)
     );
+    const wishlistCount = useWishlistStore((state) => state.items.length);
     const { currency, setCurrency } = useCurrencySafe();
     const [currencyOpen, setCurrencyOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -121,19 +123,26 @@ export default function NavUserActions() {
             )}
 
             {/* Favorites */}
-            <button
+            <Link
+                href="/wishlist"
                 className="flex flex-col items-center group relative"
                 aria-label="Sevimlilar"
             >
                 <Heart
                     size={24}
                     strokeWidth={1.5}
-                    className="group-hover:text-[#e33326] transition-colors"
+                    className={`transition-colors ${
+                        hasMounted && wishlistCount > 0
+                            ? 'text-[#e33326] fill-[#e33326]'
+                            : 'group-hover:text-[#e33326]'
+                    }`}
                 />
-                <span className="absolute -top-1.5 -right-1.5 bg-[#e33326] text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full font-bold">
-                    0
-                </span>
-            </button>
+                {hasMounted && wishlistCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-[#e33326] text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full font-bold animate-in zoom-in">
+                        {wishlistCount}
+                    </span>
+                )}
+            </Link>
 
             {/* Cart */}
             <Link

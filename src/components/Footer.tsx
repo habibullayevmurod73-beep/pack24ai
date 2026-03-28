@@ -103,7 +103,7 @@ export default function Footer() {
     const [subscribed, setSubscribed] = useState(false);
 
     const ui = (key: string) => UI[key]?.[language] ?? UI[key]?.['en'] ?? UI[key]?.['ru'] ?? key;
-    const lbl = (l: L) => l[language] ?? l['en'] ?? l['ru'] ?? l['uz'];
+    const lbl = (l: Partial<Record<Language, string>>) => l[language] ?? l['en'] ?? l['ru'] ?? l['uz'];
 
     const handleSubscribe = (e: React.FormEvent) => {
         e.preventDefault();
@@ -188,7 +188,8 @@ export default function Footer() {
                         <div className="mt-5 grid grid-cols-2 gap-2">
                             {STATS.map(({ icon: Icon, label }, i) => (
                                 <div key={i} className="flex items-center gap-1.5 text-blue-200/60 text-xs">
-                                    <Icon size={12} className="text-blue-400 shrink-0" />
+                                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                    {(Icon as any)({ size: 12, className: 'text-blue-400 shrink-0' })}
                                     <span>{lbl(label)}</span>
                                 </div>
                             ))}

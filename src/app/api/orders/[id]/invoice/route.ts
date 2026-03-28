@@ -7,10 +7,11 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const orderId = parseInt(params.id);
+        const { id } = await params;
+        const orderId = parseInt(id);
         if (isNaN(orderId)) {
             return NextResponse.json({ error: "Noto'g'ri ID" }, { status: 400 });
         }

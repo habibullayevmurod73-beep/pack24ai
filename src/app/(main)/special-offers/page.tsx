@@ -6,7 +6,7 @@ import { useLanguage } from '@/lib/contexts/LanguageContext';
 export default function SpecialOffersPage() {
     const { language } = useLanguage();
 
-    const title = { uz: "Maxsus Takliflar", ru: 'Спецпредложения', en: 'Special Offers', qr: 'Arnawlı usınıslar', zh: '特别优惠', tr: 'Özel Teklifler' };
+    const title: Partial<Record<string, string>> = { uz: "Maxsus Takliflar", ru: 'Спецпредложения', en: 'Special Offers', qr: 'Arnawlı usınıslar', zh: '特别优惠', tr: 'Özel Teklifler' };
 
     return (
         <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">

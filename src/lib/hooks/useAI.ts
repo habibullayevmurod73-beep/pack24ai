@@ -47,7 +47,7 @@ export function useAI() {
         let maxScore = 0;
 
         for (const article of KNOWLEDGE_BASE) {
-            const keywords = article.keywords[lang] || article.keywords['en'];
+            const keywords = article.keywords[lang] ?? article.keywords['en'] ?? [];
             let score = 0;
 
             for (const kw of keywords) {
@@ -167,11 +167,11 @@ export function useAI() {
 
             default:
                 if (intent === 'unknown') {
-                    responseTemplate = FALLBACK_RESPONSES[context.language] || FALLBACK_RESPONSES['en'];
+                    responseTemplate = FALLBACK_RESPONSES[context.language] ?? FALLBACK_RESPONSES['en'] ?? '';
                 } else {
                     const article = KNOWLEDGE_BASE.find(a => a.id === intent);
                     if (article) {
-                        responseTemplate = article.responses[context.language] || article.responses['en'];
+                        responseTemplate = article.responses[context.language] ?? article.responses['en'] ?? '';
                     }
                 }
                 break;
