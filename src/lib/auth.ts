@@ -40,7 +40,7 @@ export const authOptions: NextAuthOptions = {
                 return {
                     id: String(user.id),
                     name: user.name,
-                    email: user.phone, // email maydoni yo'q, phone ishlatiladi
+                    email: user.email ?? user.phone, // email optional field, fallback to phone
                 };
             },
         }),

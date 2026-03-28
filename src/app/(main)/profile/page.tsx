@@ -5,11 +5,11 @@ import { useCartStore } from '@/lib/store/useCartStore';
 import { useLanguage } from '@/lib/contexts/LanguageContext';
 import { useCurrencySafe } from '@/lib/contexts/CurrencyContext';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
     LogOut, Package, User as UserIcon, Settings, Heart,
-    ShoppingCart, ChevronRight, MapPin, Star,
+    ShoppingCart, ChevronRight, MapPin, Star, Loader2, Clock,
     Phone, Shield, Bell, Gift, TrendingUp, type LucideIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -57,7 +57,7 @@ export default function ProfilePage() {
         </div>
     );
 
-    const totalSpent = orders.reduce((acc, o) => acc + (o.totalAmount ?? 0), 0);
+    const totalSpent = 0; // Will be calculated from DB orders
     const cartTotal  = cartItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
 
     const TABS: { key: TabKey; label: string; icon: LucideIcon; badge?: number }[] = [
@@ -131,56 +131,7 @@ export default function ProfilePage() {
                     {/* ── Tab: Buyurtmalar ─────────────────────────────── */}
                     {tab === 'orders' && (
                         <div className="space-y-3">
-                            {orders.length === 0 ? (
-                                <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center">
-                                    <Package size={48} className="mx-auto text-gray-200 mb-4" />
-                                    <p className="text-gray-500 font-semibold">{t("Buyurtmalar yo'q", "Нет заказов")}</p>
-                                    <Link href="/catalog" className="mt-4 inline-flex items-center gap-1 text-blue-600 font-bold text-sm hover:underline">
-                                        {t("Xarid qilish", "Начать покупки")} <ChevronRight size={14} />
-                                    </Link>
-                                </div>
-                            ) : (
-                                orders.map((order, i) => {
-                                    const s = STATUS_STYLES[order.status] ?? STATUS_STYLES.new;
-                                    return (
-                                        <div key={i} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                                            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
-                                                <div>
-                                                    <span className="font-extrabold text-gray-900 text-sm">#{i + 1}</span>
-                                                    <span className="text-xs text-gray-400 ml-2">{order.date ? new Date(order.date).toLocaleDateString('uz-UZ') : ''}</span>
-                                                </div>
-                                                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${s.bg} ${s.text}`}>{s.label}</span>
-                                            </div>
-                                            <div className="px-5 py-3">
-                                                {(order.items ?? []).slice(0, 2).map((item: any, j: number) => (
-                                                    <div key={j} className="flex items-center gap-3 py-2">
-                                                        <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center overflow-hidden shrink-0">
-                                                            {item.product?.image ? <img src={item.product.image} alt="" className="w-full h-full object-contain" /> : <Package size={14} className="text-gray-300" />}
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className="text-sm font-semibold text-gray-800 truncate">{item.product?.name ?? item.name ?? 'Mahsulot'}</p>
-                                                            <p className="text-xs text-gray-400">{item.quantity} {t("dona", "шт.")}</p>
-                                                        </div>
-                                                        <p className="font-bold text-gray-900 text-sm shrink-0">{format(item.price * item.quantity)}</p>
-                                                    </div>
-                                                ))}
-                                                {(order.items ?? []).length > 2 && (
-                                                    <p className="text-xs text-gray-400 pb-2">+{(order.items ?? []).length - 2} {t("ta mahsulot", "товара")}</p>
-                                                )}
-                                            </div>
-                                            <div className="flex items-center justify-between px-5 py-3 bg-gray-50">
-                                                <div>
-                                                    <p className="text-xs text-gray-400">{t("Jami", "Итого")}</p>
-                                                    <p className="font-extrabold text-gray-900">{format(order.totalAmount ?? 0)}</p>
-                                                </div>
-                                                <Link href={`/orders/${order.id}`} className="text-sm text-blue-600 font-bold hover:underline flex items-center gap-1">
-                                                    {t("Batafsil", "Подробнее")} <ChevronRight size={14} />
-                                                </Link>
-                                            </div>
-                                        </div>
-                                    );
-                                })
-                            )}
+                            <ProfileOrdersList user={user} language={language} format={format} t={t} />
                         </div>
                     )}
 
@@ -334,5 +285,104 @@ export default function ProfilePage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+// ── Profile Orders Sub-component — DB'dan fetch qiladi ──────────
+function ProfileOrdersList({ user, language, format, t }: {
+    user: { phone: string };
+    language: string;
+    format: (n: number) => string;
+    t: (uz: string, ru: string) => string;
+}) {
+    const [dbOrders, setDbOrders] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchOrders = useCallback(async () => {
+        setLoading(true);
+        try {
+            const res = await fetch(`/api/orders?contactPhone=${encodeURIComponent(user.phone)}`);
+            if (res.ok) {
+                const data = await res.json();
+                setDbOrders(data);
+            }
+        } catch (e) {
+            console.error('Failed to fetch orders', e);
+        } finally {
+            setLoading(false);
+        }
+    }, [user.phone]);
+
+    useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center py-12">
+                <Loader2 size={24} className="animate-spin text-blue-500" />
+            </div>
+        );
+    }
+
+    if (dbOrders.length === 0) {
+        return (
+            <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center">
+                <Package size={48} className="mx-auto text-gray-200 mb-4" />
+                <p className="text-gray-500 font-semibold">{t("Buyurtmalar yo'q", "Нет заказов")}</p>
+                <Link href="/catalog" className="mt-4 inline-flex items-center gap-1 text-blue-600 font-bold text-sm hover:underline">
+                    {t("Xarid qilish", "Начать покупки")} <ChevronRight size={14} />
+                </Link>
+            </div>
+        );
+    }
+
+    return (
+        <>
+            {dbOrders.slice(0, 5).map((order: any) => {
+                const s = STATUS_STYLES[order.status] ?? STATUS_STYLES.new;
+                const date = new Date(order.createdAt);
+                return (
+                    <Link key={order.id} href={`/orders/${order.id}`} className="block bg-white rounded-2xl border border-gray-100 overflow-hidden hover:border-blue-200 hover:shadow-md transition-all">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
+                            <div>
+                                <span className="font-extrabold text-gray-900 text-sm">#{order.id}</span>
+                                <span className="text-xs text-gray-400 ml-2 inline-flex items-center gap-1">
+                                    <Clock size={10} />
+                                    {date.toLocaleDateString('uz-UZ', { day: 'numeric', month: 'short' })}
+                                </span>
+                            </div>
+                            <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${s.bg} ${s.text}`}>{s.label}</span>
+                        </div>
+                        <div className="px-5 py-3">
+                            {(order.items ?? []).slice(0, 2).map((item: any, j: number) => (
+                                <div key={j} className="flex items-center gap-3 py-1.5">
+                                    <div className="w-9 h-9 rounded-xl bg-gray-50 border border-gray-100 overflow-hidden shrink-0">
+                                        {item.product?.image ? <img src={item.product.image} alt="" className="w-full h-full object-contain" /> : <Package size={12} className="m-auto mt-2 text-gray-300" />}
+                                    </div>
+                                    <p className="text-sm text-gray-700 truncate flex-1">{item.product?.name ?? 'Mahsulot'}</p>
+                                    <p className="text-xs font-bold text-gray-900 shrink-0">{format(item.price * item.quantity)}</p>
+                                </div>
+                            ))}
+                            {(order.items ?? []).length > 2 && (
+                                <p className="text-xs text-gray-400">+{(order.items ?? []).length - 2} {t("ta mahsulot", "товара")}</p>
+                            )}
+                        </div>
+                        <div className="flex items-center justify-between px-5 py-3 bg-gray-50">
+                            <p className="font-extrabold text-gray-900">{format(order.totalAmount ?? 0)}</p>
+                            <span className="text-xs text-blue-600 font-bold flex items-center gap-1">
+                                {t("Batafsil", "Подробнее")} <ChevronRight size={12} />
+                            </span>
+                        </div>
+                    </Link>
+                );
+            })}
+            {dbOrders.length > 5 && (
+                <Link href="/my-orders" className="block text-center py-4 bg-white rounded-2xl border border-gray-100 text-blue-600 font-bold text-sm hover:bg-blue-50 transition-colors">
+                    {t("Barcha buyurtmalarni ko'rish", "Посмотреть все заказы")} ({dbOrders.length}) →
+                </Link>
+            )}
+            <Link href="/my-orders" className="block text-center py-3 text-blue-600 font-semibold text-sm hover:underline">
+                {t("Buyurtmalar tarixi", "История заказов")} →
+            </Link>
+        </>
     );
 }

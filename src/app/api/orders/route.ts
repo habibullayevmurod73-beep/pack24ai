@@ -7,6 +7,7 @@ async function sendTelegramNotification(order: {
     customerName: string | null;
     contactPhone: string | null;
     shippingAddress: string | null;
+    shippingLocation?: string | null;
     totalAmount: number | null;
     status: string;
     paymentMethod?: string | null;
@@ -30,6 +31,7 @@ async function sendTelegramNotification(order: {
         `👤 <b>Mijoz:</b> ${order.customerName ?? 'Noma\'lum'}`,
         `📞 <b>Tel:</b> ${order.contactPhone ?? '-'}`,
         `📍 <b>Manzil:</b> ${order.shippingAddress ?? '-'}`,
+        order.shippingLocation ? `🗺️ <b>Xarita:</b> <a href="https://www.google.com/maps?q=${order.shippingLocation}">Lokatsiyani ko'rish</a>` : '',
         `🚀 <b>Yetkazish:</b> ${deliveryLabel[order.deliveryMethod ?? ''] ?? (order.deliveryMethod ?? '-')}`,
         `💳 <b>To'lov:</b> ${paymentLabel[order.paymentMethod ?? ''] ?? (order.paymentMethod ?? '-')}`,
         '',
@@ -62,6 +64,7 @@ export async function POST(req: NextRequest) {
             customerName,
             contactPhone,
             shippingAddress,
+            shippingLocation,
             comment,
             deliveryMethod,
             paymentMethod,
@@ -113,6 +116,7 @@ export async function POST(req: NextRequest) {
                 customerName:    customerName ?? null,
                 contactPhone:    contactPhone ?? null,
                 shippingAddress: shippingAddress ?? null,
+                shippingLocation: shippingLocation ?? null,
                 comment:         comment ?? null,
                 deliveryMethod:  deliveryMethod ?? 'courier',
                 paymentMethod:   paymentMethod ?? 'cash',
@@ -130,6 +134,7 @@ export async function POST(req: NextRequest) {
             customerName:    order.customerName,
             contactPhone:    order.contactPhone,
             shippingAddress: order.shippingAddress,
+            shippingLocation: order.shippingLocation,
             totalAmount:     order.totalAmount,
             status:          order.status,
             paymentMethod:   order.paymentMethod,
@@ -149,8 +154,15 @@ export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const telegramUserId = searchParams.get('telegramUserId');
+        const contactPhone   = searchParams.get('contactPhone');
         const where: Record<string, unknown> = {};
         if (telegramUserId) where.telegramUserId = telegramUserId;
+        if (contactPhone)   where.contactPhone = contactPhone;
+
+        // Draft buyurtmalarni ko'rsatmaslik
+        if (!telegramUserId) {
+            where.status = { not: 'draft' };
+        }
 
         const orders = await prisma.order.findMany({
             where,
