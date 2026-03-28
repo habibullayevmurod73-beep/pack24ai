@@ -6,7 +6,7 @@ import { useLanguage } from '@/lib/contexts/LanguageContext';
 export default function ContactsPage() {
     const { language } = useLanguage();
 
-    const title = { uz: "Kontaktlar", ru: 'Контакты', en: 'Contacts', qr: 'Kontaktlar', zh: '联系方式', tr: 'İletişim' };
+    const title = { uz: "Kontaktlar", ru: 'Контакты', en: 'Contacts', qr: 'Kontaktlar', zh: '联系方式', tr: 'İletişim', tg: 'Тамос', kk: 'Байланыс', tk: 'Habarlaşmak', fa: 'تماس با ما' };
 
     return (
         <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -35,8 +35,8 @@ export default function ContactsPage() {
                                 <div className="text-2xl mr-4">📞</div>
                                 <div>
                                     <h4 className="font-medium text-gray-900">Telefon (Phone)</h4>
-                                    <p className="text-gray-500">+998 71 200-00-00</p>
-                                    <p className="text-gray-500">+998 90 123-45-67</p>
+                                    <a href="tel:+998880557888" className="text-gray-500 hover:text-red-600 transition-colors block">+998 88 055-78-88</a>
+                                    <a href="tel:+998951050052" className="text-gray-500 hover:text-red-600 transition-colors block">+998 95 105-00-52</a>
                                 </div>
                             </div>
 

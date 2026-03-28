@@ -3,16 +3,32 @@
 import Link from 'next/link';
 import { useLanguage } from '@/lib/contexts/LanguageContext';
 import { FlagIcon } from '@/components/FlagIcon';
-import { Language } from '@/lib/translations';
+import { Language, LANGUAGE_NAMES } from '@/lib/translations';
 import { useState, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 const TOP_BAR_DATA = {
-    location: { uz: 'Toshkent', ru: 'Ташкент', en: 'Tashkent', qr: 'Tashkent', zh: '塔什干', tr: 'Taşkent' },
-    schedule: { uz: 'Har kuni 8 dan 21 gacha', ru: 'Ежедневно с 8 до 21', en: 'Daily 8am – 9pm' },
-    callback: { uz: "Menga qo'ng'iroq qiling", ru: 'Перезвоните мне', en: 'Call me back' },
+    location: {
+        uz: 'Toshkent', ru: 'Ташкент', en: 'Tashkent', qr: 'Tashkent',
+        zh: '塔什干', tr: 'Taşkent', tg: 'Тошканд', kk: 'Ташкент',
+        tk: 'Taşkent', fa: 'تاشکند',
+    },
+    schedule: {
+        uz: 'Har kuni 8 dan 21 gacha', ru: 'Ежедневно с 8 до 21',
+        en: 'Daily 8am – 9pm', qr: 'Kúnde 8-den 21-ge',
+        zh: '每天 8:00–21:00', tr: 'Her gün 08:00–21:00',
+        tg: 'Ҳар рӯз аз 8 то 21', kk: 'Күнде 8-ден 21-ге',
+        tk: 'Her gün 8-den 21-e', fa: 'هر روز ۸ تا ۲۱',
+    },
+    callback: {
+        uz: "Menga qo'ng'iroq qiling", ru: 'Перезвоните мне',
+        en: 'Call me back', qr: 'Qayta jasaw',
+        zh: '回电话给我', tr: 'Beni arayın',
+        tg: 'Ба ман занг занед', kk: 'Маған қоңырау шалыңыз',
+        tk: 'Maňa jaň ediň', fa: 'با من تماس بگیرید',
+    },
     email: 'sales@pack24.uz',
-    phone: '+998 71 200-56-83',
+    phone: '+998 88 055-78-88',
 } as const;
 
 const CURRENCIES = [
@@ -103,21 +119,21 @@ export default function NavTopBar() {
                             aria-label="Tilni o'zgartirish"
                         >
                             <FlagIcon lang={language} />
-                            <span className="uppercase font-semibold">{language}</span>
+                            <span className="uppercase font-semibold hidden sm:inline">{language}</span>
                             <ChevronDown size={10} className={`transition-transform ${langOpen ? 'rotate-180' : ''}`} />
                         </button>
                         {langOpen && (
-                            <div className="absolute right-0 top-full mt-1 w-24 bg-white shadow-lg border border-gray-100 z-50 py-1 rounded-lg">
-                                {(['uz', 'ru', 'en', 'qr', 'zh', 'tr'] as Language[]).map((ln) => (
+                            <div className="absolute right-0 top-full mt-1 w-40 bg-white shadow-xl border border-gray-100 z-50 py-1 rounded-lg max-h-80 overflow-y-auto">
+                                {(Object.keys(LANGUAGE_NAMES) as Language[]).map((ln) => (
                                     <button
                                         key={ln}
                                         onClick={() => { setLanguage(ln); setLangOpen(false); }}
-                                        className={`w-full text-left px-3 py-1.5 hover:bg-gray-50 flex items-center space-x-2 text-xs ${
-                                            language === ln ? 'text-blue-600 font-bold' : ''
+                                        className={`w-full text-left px-3 py-1.5 hover:bg-gray-50 flex items-center gap-2 text-xs ${
+                                            language === ln ? 'text-blue-600 font-bold bg-blue-50' : 'text-gray-700'
                                         }`}
                                     >
                                         <FlagIcon lang={ln} />
-                                        <span>{ln.toUpperCase()}</span>
+                                        <span>{LANGUAGE_NAMES[ln]}</span>
                                     </button>
                                 ))}
                             </div>

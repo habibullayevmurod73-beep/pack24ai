@@ -10,9 +10,19 @@ export default function NavSearchBar() {
     const router = useRouter();
     const [query, setQuery] = useState('');
 
-    const placeholder =
-        language === 'uz' ? "Sayt bo'ylab qidiruv" :
-        language === 'ru' ? 'Поиск по сайту' : 'Search products...';
+    const PLACEHOLDERS: Record<string, string> = {
+        uz: "Sayt bo'ylab qidiruv",
+        ru: 'Поиск по сайту',
+        en: 'Search products...',
+        qr: "Qidiraw...",
+        zh: '搜索产品…',
+        tr: 'Ürün ara…',
+        tg: 'ҷустӳҷӯи чизҳо',
+        kk: 'Өнімдер іздеу',
+        tk: 'Haryt gözle…',
+        fa: 'جستجوی محصول…',
+    };
+    const placeholder = PLACEHOLDERS[language] ?? PLACEHOLDERS.uz;
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();

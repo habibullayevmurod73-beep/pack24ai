@@ -8,34 +8,35 @@ import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Menu, X } from 'lucide-react';
 
-
 // Sub-komponentlar
 import NavTopBar from './layout/NavTopBar';
 import NavCatalogDropdown from './layout/NavCatalogDropdown';
 import NavSearchBar from './layout/NavSearchBar';
 import NavUserActions from './layout/NavUserActions';
 
+// t() kalitlari orqali barcha 10 til avtomatik qo'llanadi
 const NAV_LINKS = [
-    { href: '/',                 label: { uz: 'BOSH SAHIFA',     ru: 'ГЛАВНАЯ',          en: 'HOME' } },
-    { href: '/delivery',         label: { uz: 'YETKAZISH',       ru: 'ДОСТАВКА',         en: 'DELIVERY' } },
-    { href: '/payment',          label: { uz: "TO'LOV",          ru: 'ОПЛАТА',           en: 'PAYMENT' } },
-    { href: '/discounts',        label: { uz: 'CHEGIRMA',        ru: 'СКИДКИ',           en: 'DISCOUNTS' } },
-    { href: '/special-offers',   label: { uz: 'MAXSUS',          ru: 'СПЕЦПРЕДЛОЖЕНИЯ',  en: 'SPECIAL OFFERS' } },
-    { href: '/recycling',        label: { uz: '♻️ QAYTA ISHLASH', ru: '♻️ ПЕРЕРАБОТКА',   en: '♻️ RECYCLING' } },
-    { href: '/reviews',          label: { uz: 'SHARHLAR',        ru: 'ОТЗЫВЫ',           en: 'REVIEWS' } },
-    { href: '/faq',              label: { uz: 'SAVOLLAR',        ru: 'ВОПРОСЫ',          en: 'FAQ' } },
-    { href: '/active-vacancies', label: { uz: 'VAKANSIYALAR',    ru: 'ВАКАНСИИ',         en: 'VACANCIES' } },
-    { href: '/contacts',         label: { uz: 'KONTAKTLAR',      ru: 'КОНТАКТЫ',         en: 'CONTACTS' } },
+    { href: '/',                 key: 'nav.home' },
+    { href: '/delivery',         key: 'nav.delivery' },
+    { href: '/payment',          key: 'nav.payment' },
+    { href: '/discounts',        key: 'nav.discounts' },
+    { href: '/special-offers',   key: 'nav.special' },
+    { href: '/recycling',        key: 'nav.recycling' },
+    { href: '/reviews',          key: 'nav.reviews' },
+    { href: '/faq',              key: 'nav.faq' },
+    { href: '/active-vacancies', key: 'nav.vacancies' },
+    { href: '/contacts',         key: 'nav.contacts' },
 ] as const;
 
 
 
 
 export default function Navbar() {
-    const { language } = useLanguage();
+    const { language, t } = useLanguage();
     const hasMounted = useHasMounted();
     const pathname = usePathname();
     const [mobileOpen, setMobileOpen] = useState(false);
+    const isRtl = language === 'fa';
 
     // SSR skeleton — hydration xatolarini oldini olish
     if (!hasMounted) {
@@ -53,7 +54,7 @@ export default function Navbar() {
     }
 
     return (
-        <header className="font-sans flex flex-col w-full text-sm sticky top-0 z-50 shadow-md">
+        <header className="font-sans flex flex-col w-full text-sm sticky top-0 z-50 shadow-md" dir={isRtl ? 'rtl' : 'ltr'}>
             {/* 1. Top info bar */}
             <NavTopBar />
 
@@ -64,9 +65,6 @@ export default function Navbar() {
                     <Link href="/" className="flex-shrink-0 flex items-center mr-2" aria-label="Pack24 bosh sahifasi">
                         <span className="text-3xl font-black text-gray-900 tracking-tighter uppercase relative">
                             PACK24 <span className="text-blue-600">AI</span>
-                            <span className="absolute -bottom-1 right-0 text-[10px] font-normal text-gray-400 tracking-normal normal-case">
-                                Hypermarket
-                            </span>
                         </span>
                     </Link>
 
@@ -82,7 +80,7 @@ export default function Navbar() {
                             href="/payment"
                             className="text-[#e33326] border border-[#e33326] px-4 py-2.5 rounded text-[13px] font-bold uppercase hover:bg-[#e33326] hover:text-white transition-colors whitespace-nowrap"
                         >
-                            {language === 'uz' ? "Onlayn To'lov" : "Онлайн-оплата"}
+                            {t('nav.onlinePayment')}
                         </Link>
                     </div>
 
@@ -116,7 +114,7 @@ export default function Navbar() {
                                             : 'text-[#102a45] hover:text-[#e33326] border-transparent'
                                     }`}
                                 >
-                                    {link.label[language as keyof typeof link.label] ?? link.label.en}
+                                    {t(link.key)}
                                 </Link>
                             );
                         })}
@@ -144,7 +142,7 @@ export default function Navbar() {
                                             isActive ? 'text-[#e33326]' : 'text-gray-700 hover:text-[#e33326]'
                                         }`}
                                     >
-                                        {link.label[language as keyof typeof link.label] ?? link.label.en}
+                                        {t(link.key)}
                                         {isActive && <span className="w-2 h-2 bg-[#e33326] rounded-full" />}
                                     </Link>
                                 </li>

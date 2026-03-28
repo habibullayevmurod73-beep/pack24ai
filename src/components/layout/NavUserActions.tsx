@@ -22,7 +22,11 @@ export default function NavUserActions() {
     const [currencyOpen, setCurrencyOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const loginLabel = language === 'uz' ? 'Kirish' : language === 'ru' ? 'Войти' : 'Login';
+    const LOGIN_LABEL: Record<string, string> = {
+        uz: 'Kirish', ru: 'Войти', en: 'Login', qr: 'Kiriw',
+        zh: '登录', tr: 'Giriş', tg: 'Варудан', kk: 'Кіру', tk: 'Girmek', fa: 'ورود',
+    };
+    const loginLabel = LOGIN_LABEL[language] ?? LOGIN_LABEL.uz;
 
     // Close dropdown on outside click
     useEffect(() => {

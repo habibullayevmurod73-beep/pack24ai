@@ -1,9 +1,6 @@
 import HomeHero from '@/components/home/HomeHero';
 import MobileCategoryStrip from '@/components/home/MobileCategoryStrip';
-import FeatureCards from '@/components/home/FeatureCards';
 import ConfiguratorSection from '@/components/home/ConfiguratorSection';
-import ProductsSection from '@/components/home/ProductsSection';
-import StatsSection from '@/components/home/StatsSection';
 import ReviewsSection from '@/components/home/ReviewsSection';
 import CTABanner from '@/components/home/CTABanner';
 import { prisma } from '@/lib/prisma';
@@ -53,17 +50,8 @@ export default async function Home() {
             {/* Mobil kategoriyalar */}
             <MobileCategoryStrip />
 
-            {/* 6 xususiyat */}
-            <FeatureCards />
-
-            {/* 3D konfigurator + B2B */}
+            {/* 3D konfigurator + B2B + Stats + Features (barchasi birlashtirildi) */}
             <ConfiguratorSection />
-
-            {/* Mashhur mahsulotlar — store allaqachon HomeHero tomonidan seed qilingan */}
-            <ProductsSection />
-
-            {/* Statistika */}
-            <StatsSection />
 
             {/* Sharhlar */}
             <ReviewsSection />

@@ -14,6 +14,7 @@ import { notFound } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { trackEvent } from '@/components/GoogleAnalytics';
+import { translateProductName, translateCategory, getProductUI } from '@/lib/product-translations';
 
 // ─── Skeleton loader ──────────────────────────────────────────────────────────
 function ProductSkeleton() {
@@ -358,7 +359,21 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
     const [tab, setTab] = useState<'desc' | 'spec' | 'delivery' | 'reviews'>('desc');
     const [cartAdded, setCartAdded] = useState(false);
 
-    const t = (uz: string, ru: string) => language === 'ru' ? ru : uz;
+    // 10 tilni qamrovchi tarjima funksiyasi
+    const t = (uz: string, ru: string, en?: string, tr?: string, zh?: string, tg?: string, kk?: string, tk?: string, fa?: string, qr?: string): string => {
+        const map: Record<string, string> = {
+            uz, ru,
+            en: en ?? uz,
+            tr: tr ?? uz,
+            zh: zh ?? uz,
+            tg: tg ?? uz,
+            kk: kk ?? uz,
+            tk: tk ?? uz,
+            fa: fa ?? uz,
+            qr: qr ?? uz,
+        };
+        return map[language] ?? uz;
+    };
 
     useEffect(() => {
         params.then(p => setId(p.id));
@@ -378,6 +393,9 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
             trackEvent('view_item', { item_name: product.name, item_id: product.id, price: product.price });
         }
     }, [product?.id]);
+
+    const translatedName = translateProductName(product?.name ?? '', language);
+    const translatedCategory = product?.category ? translateCategory(product.category, language) : '';
 
     if (!mounted || !id) return <ProductSkeleton />;
     if (!product && id && mounted) return notFound();
@@ -465,7 +483,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
 
                 {/* Phone order */}
                 <a
-                    href="tel:+998712345678"
+                    href="tel:+998880557888"
                     className="w-full flex items-center justify-center gap-2 border border-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl hover:bg-gray-50 transition-colors text-sm"
                 >
                     <Phone size={14} /> {t("Telefonda buyurtma", "Заказ по телефону")}
@@ -544,7 +562,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                         <div className="p-6 lg:p-8 border-b xl:border-b-0 xl:border-r border-gray-100">
                             <div className="flex items-start justify-between gap-2 mb-3">
                                 <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">
-                                    {product.category ?? t("Kategoriyasiz", "Без категории")}
+                                    {translatedCategory || t("Kategoriyasiz", "Без категории", "Uncategorized")}
                                 </span>
                                 <button
                                     onClick={handleShare}
@@ -556,7 +574,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                             </div>
 
                             <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 mb-3 leading-snug">
-                                {product.name}
+                                {translatedName}
                             </h1>
 
                             {product.rating > 0 && (
@@ -570,7 +588,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                                         ))}
                                     </div>
                                     <span className="text-sm text-gray-500 underline underline-offset-2">
-                                        {product.rating} ({product.reviews} {t("sharh", "отзывов")})
+                                        {product.rating} ({product.reviews} {t("sharh", "отзывов", "reviews", "yorum", "评论", "шарҳ", "пікір", "teswir", "نظر", "pikir")})
                                     </span>
                                 </button>
                             )}
@@ -592,7 +610,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                             {/* Stock */}
                             <div className="flex items-center gap-1.5 mb-5">
                                 <Check size={14} className="text-emerald-500" />
-                                <span className="text-sm font-semibold text-emerald-600">{t("Mavjud", "В наличии")}</span>
+                                <span className="text-sm font-semibold text-emerald-600">{t("Mavjud", "В наличии", "In stock", "Mevcut", "现货", "Мавҷуд", "Бар", "Bar", "موجود", "Bar")}</span>
                                 {(product as any).sku && (
                                     <span className="ml-auto text-xs text-gray-400 font-mono">SKU: {(product as any).sku}</span>
                                 )}
@@ -619,10 +637,10 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                                         tab === k ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
                                     }`}
                                 >
-                                    {k === 'desc'     ? t('Tavsif', 'Описание')
-                                    : k === 'spec'    ? t("O'lchamlar", 'Характеристики')
-                                    : k === 'delivery'? t('Yetkazish', 'Доставка')
-                                    :                   t(`Sharhlar (${DEMO_REVIEWS.length})`, `Отзывы (${DEMO_REVIEWS.length})`)}
+                                    {k === 'desc'     ? t('Tavsif', 'Описание', 'Description', 'Açıklama', '描述', 'Тавсиф', 'Сипаттама', 'Beýan', 'توضیحات', 'Tavsif')
+                                    : k === 'spec'    ? t("O'lchamlar", 'Характеристики', 'Specifications', 'Özellikler', '规格', 'Хусусиятҳо', 'Сипаттамалар', 'Häsiýetlikler', 'مشخصات', "O'lshamlar")
+                                    : k === 'delivery'? t('Yetkazish', 'Доставка', 'Delivery', 'Teslimat', '配送', 'Тавзеъ', 'Жеткізу', 'Eltip bermek', 'تحویل', 'Yetkeriwshi')
+                                    :                   t(`Sharhlar (${DEMO_REVIEWS.length})`, `Отзывы (${DEMO_REVIEWS.length})`, `Reviews (${DEMO_REVIEWS.length})`, `Yorumlar (${DEMO_REVIEWS.length})`, `评论 (${DEMO_REVIEWS.length})`, `Шарҳҳо (${DEMO_REVIEWS.length})`, `Пікірлер (${DEMO_REVIEWS.length})`, `Teswirler (${DEMO_REVIEWS.length})`, `نظرات (${DEMO_REVIEWS.length})`, `Pikirler (${DEMO_REVIEWS.length})`)}
                                 </button>
                             ))}
                         </div>
@@ -710,7 +728,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                     <div className="mt-10">
                         <div className="flex items-center justify-between mb-5">
                             <h2 className="text-xl font-bold text-gray-900">
-                                {t("O'xshash mahsulotlar", "Похожие товары")}
+                                {t("O'xshash mahsulotlar", "Похожие товары", "Related Products", "Benzer Ürünler", "相关产品", "Маҳсулоти монанд", "Ұқсас тауарлар", "Meňzeş harytlar", "محصولات مشابه", "Uqsas mahsulotlar")}
                             </h2>
                             <Link href={`/catalog?category=${product.category}`} className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1 font-semibold">
                                 {t("Barchasi", "Все")} <ChevronRight size={14} />
@@ -737,7 +755,9 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                                                 }
                                             </div>
                                             <div className="p-3 pb-2">
-                                                <p className="text-xs font-semibold text-gray-800 line-clamp-2 mb-1 leading-snug">{rp.name}</p>
+                                                <p className="text-xs font-semibold text-gray-800 line-clamp-2 mb-1 leading-snug">
+                                                    {translateProductName(rp.name, language)}
+                                                </p>
                                                 <div className="flex items-baseline gap-1.5">
                                                     <p className="text-sm font-bold text-blue-600">{format(rp.price)}</p>
                                                     {rpOnSale && <p className="text-[10px] text-gray-400 line-through">{format(rp.originalPrice!)}</p>}

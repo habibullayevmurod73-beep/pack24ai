@@ -257,8 +257,8 @@ export default function PaymentPage() {
                             "To'lov yoki rekvizitlar bo'yicha savollar bo'lsa, bizning menejerlarimizga murojaat qiling: ",
                             "По вопросам оплаты или реквизитов обращайтесь к нашим менеджерам: "
                         )}
-                        <a href="tel:+998712005683" className="font-bold underline hover:no-underline">
-                            +998 71 200-56-83
+                        <a href="tel:+998880557888" className="font-bold underline hover:no-underline">
+                            +998 88 055-78-88
                         </a>
                         {t(" yoki ", " или ")}
                         <a href="mailto:sales@pack24.uz" className="font-bold underline hover:no-underline">

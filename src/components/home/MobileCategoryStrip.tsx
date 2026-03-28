@@ -5,13 +5,21 @@ import { ChevronRight, Package } from 'lucide-react';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { useCategoryStore } from '@/lib/store/useCategoryStore';
 import { useLanguage } from '@/lib/contexts/LanguageContext';
+import { translateCategory } from '@/lib/product-translations';
 
 export default function MobileCategoryStrip() {
     const { language } = useLanguage();
     const categories = useCategoryStore((state) => state.categories);
     const activeCategories = categories.filter((c) => c.isActive);
 
-    const t = (uz: string, ru: string) => language === 'uz' ? uz : ru;
+    const ALL: Record<string, string> = {
+        uz: 'Barchasi', ru: 'Все', en: 'All', qr: 'Barlıqı',
+        zh: '全部', tr: 'Tümü', tg: 'Ҳамааш', kk: 'Барлығы', tk: 'Hemmesi', fa: 'همه',
+    };
+    const MORE: Record<string, string> = {
+        uz: "Ko'proq", ru: 'Ещё', en: 'More', qr: 'Kóbirek',
+        zh: '更多', tr: 'Daha fazla', tg: 'Бештар', kk: 'Көбірек', tk: 'Köpräk', fa: 'بیشتر',
+    };
 
     return (
         <div className="lg:hidden bg-white border-b border-gray-100 shadow-sm">
@@ -23,7 +31,7 @@ export default function MobileCategoryStrip() {
                             <ChevronRight size={18} className="text-white" />
                         </div>
                         <span className="text-[10px] font-semibold text-[#0c2340] text-center whitespace-nowrap">
-                            {t('Barchasi', 'Все')}
+                            {ALL[language] ?? ALL.uz}
                         </span>
                     </Link>
 
@@ -37,7 +45,7 @@ export default function MobileCategoryStrip() {
                                 <CategoryIcon name={cat.icon} className="w-5 h-5 text-gray-600" />
                             </div>
                             <span className="text-[10px] font-medium text-gray-600 text-center leading-tight line-clamp-2 max-w-[64px]">
-                                {cat.name[language as keyof typeof cat.name] ?? cat.name.uz}
+                                {translateCategory(cat.slug, language)}
                             </span>
                         </Link>
                     ))}
@@ -48,7 +56,7 @@ export default function MobileCategoryStrip() {
                             <Package size={18} className="text-gray-500" />
                         </div>
                         <span className="text-[10px] font-medium text-gray-500 text-center whitespace-nowrap">
-                            {t("Ko'proq", 'Ещё')}
+                            {MORE[language] ?? MORE.uz}
                         </span>
                     </Link>
                 </div>
