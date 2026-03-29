@@ -27,6 +27,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }>
 };
 
 type TabKey = 'orders' | 'cart' | 'settings';
+type OnStatsReady = (stats: { totalSpent: number; orderCount: number }) => void;
 
 export default function ProfilePage() {
     const { user, isAuthenticated, logout, orders } = useAuthStore();
@@ -36,6 +37,8 @@ export default function ProfilePage() {
     const router = useRouter();
     const [tab, setTab] = useState<TabKey>('orders');
     const [editName, setEditName] = useState('');
+    const [totalSpent, setTotalSpent] = useState(0);
+    const [orderCount, setOrderCount] = useState(0);
     const [saving, setSaving] = useState(false);
 
     const t = (uz: string, ru: string) => language === 'ru' ? ru : uz;
@@ -57,11 +60,10 @@ export default function ProfilePage() {
         </div>
     );
 
-    const totalSpent = 0; // Will be calculated from DB orders
     const cartTotal  = cartItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
 
     const TABS: { key: TabKey; label: string; icon: LucideIcon; badge?: number }[] = [
-        { key: 'orders',   label: t("Buyurtmalar", "Заказы"),   icon: Package,      badge: orders.length },
+        { key: 'orders',   label: t("Buyurtmalar", "Заказы"),   icon: Package,      badge: orderCount || orders.length },
         { key: 'cart',     label: t("Savat", "Корзина"),        icon: ShoppingCart, badge: cartItems.length },
         { key: 'settings', label: t("Sozlamalar", "Настройки"), icon: Settings },
     ];
@@ -86,7 +88,7 @@ export default function ProfilePage() {
                         </div>
                         <div className="hidden sm:grid grid-cols-2 gap-3 pb-1">
                             <div className="bg-white/10 backdrop-blur rounded-xl px-4 py-2 text-center">
-                                <p className="text-xl font-extrabold text-white">{orders.length}</p>
+                                <p className="text-xl font-extrabold text-white">{orderCount || orders.length}</p>
                                 <p className="text-blue-200 text-xs">{t("Buyurtma", "Заказов")}</p>
                             </div>
                             <div className="bg-white/10 backdrop-blur rounded-xl px-4 py-2 text-center">
@@ -131,7 +133,7 @@ export default function ProfilePage() {
                     {/* ── Tab: Buyurtmalar ─────────────────────────────── */}
                     {tab === 'orders' && (
                         <div className="space-y-3">
-                            <ProfileOrdersList user={user} language={language} format={format} t={t} />
+                            <ProfileOrdersList user={user} language={language} format={format} t={t} onStatsReady={(stats) => { setTotalSpent(stats.totalSpent); setOrderCount(stats.orderCount); }} />
                         </div>
                     )}
 
@@ -289,11 +291,12 @@ export default function ProfilePage() {
 }
 
 // ── Profile Orders Sub-component — DB'dan fetch qiladi ──────────
-function ProfileOrdersList({ user, language, format, t }: {
+function ProfileOrdersList({ user, language, format, t, onStatsReady }: {
     user: { phone: string };
     language: string;
     format: (n: number) => string;
     t: (uz: string, ru: string) => string;
+    onStatsReady?: OnStatsReady;
 }) {
     const [dbOrders, setDbOrders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -305,6 +308,11 @@ function ProfileOrdersList({ user, language, format, t }: {
             if (res.ok) {
                 const data = await res.json();
                 setDbOrders(data);
+                // Calculate totalSpent from delivered orders
+                const spent = data
+                    .filter((o: any) => o.status === 'delivered')
+                    .reduce((sum: number, o: any) => sum + (o.totalAmount ?? 0), 0);
+                onStatsReady?.({ totalSpent: spent, orderCount: data.length });
             }
         } catch (e) {
             console.error('Failed to fetch orders', e);

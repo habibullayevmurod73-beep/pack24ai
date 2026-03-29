@@ -19,6 +19,14 @@ model User {
   passwordHash String   // bcrypt hash — hech qachon plain text saqlama!
   role         String   @default("user") // "user" | "admin"
   isActive     Boolean  @default(true)
+
+  // ─── Mijoz klassifikatsiyasi ──────────────
+  customerType  String  @default("individual") // individual, corporate, wholesale, dealer
+  customerGroup String  @default("standard")   // standard, vip, new, inactive, blocked
+  companyName   String?                         // Korporativ/ulgurji uchun kompaniya nomi
+  address       String?                         // Mijoz manzili
+  notes         String?                         // Admin eslatmalari
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

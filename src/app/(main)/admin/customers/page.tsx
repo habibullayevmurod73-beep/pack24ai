@@ -1,246 +1,403 @@
 'use client';
 
-import { useState } from 'react';
-import { Search, Filter, Mail, Phone, MoreHorizontal, MessageSquare, Star, User, ChevronDown } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
+import { useState, useEffect, useCallback } from 'react';
+import {
+    Search, Users, Building2, Package, Handshake,
+    Crown, UserPlus, UserX, Ban, RefreshCw, Loader2,
+    Phone, ChevronRight, Filter,
+    TrendingUp, ShoppingCart, Calendar, ChevronDown,
+    DollarSign, AlertTriangle, UserCheck
+} from 'lucide-react';
 import CustomerDrawer from './_components/CustomerDrawer';
 
-// --- Mock Data ---
+// ── Konfiguratsiya ───────────────────────────────────────────────
+const CUSTOMER_TYPES: Record<string, { label: string; color: string; bg: string }> = {
+    individual: { label: '👤 Jismoniy', color: 'text-blue-700',    bg: 'bg-blue-50 border-blue-200' },
+    corporate:  { label: '🏢 Korporativ', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200' },
+    wholesale:  { label: '📦 Ulgurji',  color: 'text-amber-700',  bg: 'bg-amber-50 border-amber-200' },
+    dealer:     { label: '🤝 Diler',    color: 'text-emerald-700',bg: 'bg-emerald-50 border-emerald-200' },
+};
 
-const customersData = [
-    {
-        id: 1,
-        name: 'Aziz Rakhimov',
-        phone: '+998 90 123 45 67',
-        avatar: 'A',
-        totalSpent: '12,450,000',
-        lastOrder: '2 kun oldin',
-        rating: 5,
-        products: ['kombinatsiya', 'plyonka', 'karobka'],
-    },
-    {
-        id: 2,
-        name: 'Malika Karimova',
-        phone: '+998 93 987 65 43',
-        avatar: 'M',
-        totalSpent: '4,200,000',
-        lastOrder: '5 kun oldin',
-        rating: 4,
-        products: ['plyonka'],
-    },
-    {
-        id: 3,
-        name: 'Bekzod Aliyev',
-        phone: '+998 99 555 44 33',
-        avatar: 'B',
-        totalSpent: '850,000',
-        lastOrder: '1 oy oldin',
-        rating: 3,
-        products: ['paddon'],
-    },
-    {
-        id: 4,
-        name: 'Sofia Kim',
-        phone: '+998 90 777 88 99',
-        avatar: 'S',
-        totalSpent: '25,000,000',
-        lastOrder: 'Kecha',
-        rating: 5,
-        products: ['kombinatsiya', 'plyonka', 'karobka', 'paddon'],
-    },
-    {
-        id: 5,
-        name: 'Jahongir Ortikov',
-        phone: '+998 97 111 22 33',
-        avatar: 'J',
-        totalSpent: '1,500,000',
-        lastOrder: '3 kun oldin',
-        rating: 4,
-        products: ['karobka'],
-    },
-];
+const CUSTOMER_GROUPS: Record<string, { label: string; dot: string; color: string; bg: string }> = {
+    standard: { label: 'Standard',   dot: 'bg-gray-400',   color: 'text-gray-600',  bg: 'bg-gray-50 border-gray-200' },
+    vip:      { label: '💎 VIP',     dot: 'bg-amber-500',  color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
+    new:      { label: '🟢 Yangi',   dot: 'bg-green-500',  color: 'text-green-700', bg: 'bg-green-50 border-green-200' },
+    inactive: { label: '⚪ Faol emas',dot: 'bg-gray-300',  color: 'text-gray-500',  bg: 'bg-gray-50 border-gray-200' },
+    blocked:  { label: '🔴 Bloklangan',dot: 'bg-red-500',  color: 'text-red-600',   bg: 'bg-red-50 border-red-200' },
+};
+
+type TypeFilter = 'all' | 'individual' | 'corporate' | 'wholesale' | 'dealer';
+type GroupFilter = 'all' | 'standard' | 'vip' | 'new' | 'inactive' | 'blocked' | 'debtor';
+
+interface CustomerData {
+    id: number | string;
+    source: 'registered' | 'guest';
+    name: string;
+    phone: string;
+    email: string | null;
+    isActive: boolean;
+    customerType: string;
+    customerGroup: string;
+    companyName: string | null;
+    address: string | null;
+    notes: string | null;
+    createdAt: string;
+    totalOrders: number;
+    totalRevenue: number;
+    totalPaid: number;
+    totalDebit: number;
+    totalCredit: number;
+    lastOrderDate: string | null;
+    deliveredOrders: number;
+    activeOrders: number;
+    cancelledOrders: number;
+}
+
+interface Stats {
+    total: number;
+    registered: number;
+    guests: number;
+    corporate: number;
+    wholesale: number;
+    dealer: number;
+    vip: number;
+    newThisMonth: number;
+    inactive: number;
+    blocked: number;
+    totalRevenue: number;
+    totalDebit: number;
+    totalPaid: number;
+    debtors: number;
+}
+
+function formatMoney(amount: number): string {
+    if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)}M`;
+    if (amount >= 1_000) return `${(amount / 1_000).toFixed(0)}K`;
+    return amount.toLocaleString();
+}
 
 export default function CustomersPage() {
-    const [selectedFilter, setSelectedFilter] = useState<'all' | 'plyonka' | 'paddon' | 'karobka' | 'vip'>('all');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+    const [customers, setCustomers] = useState<CustomerData[]>([]);
+    const [stats, setStats] = useState<Stats | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState('');
+    const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+    const [groupFilter, setGroupFilter] = useState<GroupFilter>('all');
+    const [selectedCustomer, setSelectedCustomer] = useState<CustomerData | null>(null);
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [total, setTotal] = useState(0);
 
-    // Smart Filtering Logic
-    const filteredCustomers = customersData.filter((customer) => {
-        const matchesSearch = customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            customer.phone.includes(searchQuery);
+    const fetchCustomers = useCallback(async () => {
+        setLoading(true);
+        try {
+            const params = new URLSearchParams();
+            if (search) params.set('search', search);
+            if (typeFilter !== 'all') params.set('type', typeFilter);
+            if (groupFilter !== 'all') params.set('group', groupFilter);
+            params.set('page', page.toString());
+            params.set('limit', '30');
 
-        let matchesFilter = true;
-        if (selectedFilter === 'plyonka') matchesFilter = customer.products.includes('plyonka');
-        if (selectedFilter === 'paddon') matchesFilter = customer.products.includes('paddon');
-        if (selectedFilter === 'karobka') matchesFilter = customer.products.includes('karobka');
-        if (selectedFilter === 'vip') matchesFilter = customer.products.includes('kombinatsiya'); // Combo/VIP logic
+            const res = await fetch(`/api/admin/customers?${params.toString()}`);
+            if (res.ok) {
+                const data = await res.json();
+                setCustomers(data.customers);
+                setStats(data.stats);
+                setTotalPages(data.totalPages);
+                setTotal(data.total);
+            }
+        } catch (e) {
+            console.error('[Customers fetch]', e);
+        } finally {
+            setLoading(false);
+        }
+    }, [search, typeFilter, groupFilter, page]);
 
-        return matchesSearch && matchesFilter;
-    });
+    useEffect(() => {
+        const timer = setTimeout(() => fetchCustomers(), search ? 400 : 0);
+        return () => clearTimeout(timer);
+    }, [fetchCustomers, search]);
+
+    const openDrawer = (customer: CustomerData) => {
+        setSelectedCustomer(customer);
+        setDrawerOpen(true);
+    };
+
+    const TYPE_TABS: { key: TypeFilter; label: string; count?: number }[] = [
+        { key: 'all',        label: 'Barchasi',     count: stats?.total },
+        { key: 'individual', label: '👤 Jismoniy',  count: stats ? stats.total - (stats.corporate + stats.wholesale + stats.dealer) : undefined },
+        { key: 'corporate',  label: '🏢 Korporativ',count: stats?.corporate },
+        { key: 'wholesale',  label: '📦 Ulgurji',   count: stats?.wholesale },
+        { key: 'dealer',     label: '🤝 Diler',     count: stats?.dealer },
+    ];
+
+    const GROUP_TABS: { key: GroupFilter; label: string; count?: number }[] = [
+        { key: 'all',      label: 'Barchasi' },
+        { key: 'debtor',   label: '💰 Qarzdorlar', count: stats?.debtors },
+        { key: 'vip',      label: '💎 VIP',        count: stats?.vip },
+        { key: 'new',      label: '🟢 Yangi',      count: stats?.newThisMonth },
+        { key: 'inactive', label: '⚪ Faol emas',   count: stats?.inactive },
+        { key: 'blocked',  label: '🔴 Bloklangan',  count: stats?.blocked },
+    ];
 
     return (
         <div className="space-y-6">
-            {/* Header & Smart Segments */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-black text-slate-800 tracking-tight">Mijozlar Bazasi (CRM)</h1>
-                    <p className="text-slate-500 text-sm mt-1">Jami {customersData.length} ta aktiv mijoz</p>
+                    <h1 className="text-2xl font-extrabold text-gray-900">Mijozlar Bazasi (CRM)</h1>
+                    <p className="text-sm text-gray-400 mt-0.5">
+                        {stats ? `${stats.total} ta mijoz` : 'Yuklanmoqda...'}
+                        {stats?.guests ? ` (${stats.registered} ro'yxatdan + ${stats.guests} mehmon)` : ''}
+                    </p>
                 </div>
-                <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0">
-                    <button
-                        onClick={() => setSelectedFilter('all')}
-                        className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${selectedFilter === 'all' ? 'bg-slate-800 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-gray-50 border border-gray-200'}`}
-                    >
-                        Barchasi
-                    </button>
-                    <button
-                        onClick={() => setSelectedFilter('plyonka')}
-                        className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${selectedFilter === 'plyonka' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30' : 'bg-white text-slate-600 hover:bg-gray-50 border border-gray-200'}`}
-                    >
-                        Plyonka
-                    </button>
-                    <button
-                        onClick={() => setSelectedFilter('paddon')}
-                        className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${selectedFilter === 'paddon' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'bg-white text-slate-600 hover:bg-gray-50 border border-gray-200'}`}
-                    >
-                        Paddon
-                    </button>
-                    <button
-                        onClick={() => setSelectedFilter('karobka')}
-                        className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${selectedFilter === 'karobka' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30' : 'bg-white text-slate-600 hover:bg-gray-50 border border-gray-200'}`}
-                    >
-                        Karobka
-                    </button>
-                    <button
-                        onClick={() => setSelectedFilter('vip')}
-                        className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${selectedFilter === 'vip' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-600 ring-offset-2' : 'bg-white text-slate-600 hover:bg-gray-50 border border-gray-200'}`}
-                    >
-                        💎 VIP / Combo
-                    </button>
-                </div>
+                <button
+                    onClick={() => fetchCustomers()}
+                    disabled={loading}
+                    className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 font-semibold px-4 py-2.5 rounded-xl text-sm hover:bg-gray-50 transition-colors"
+                >
+                    <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                    Yangilash
+                </button>
             </div>
 
-            {/* Smart Toolbar */}
-            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
-                <div className="relative w-full md:w-96">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            {/* Stat Cards — Moliyaviy */}
+            {stats && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+                    <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+                        <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center mb-2">
+                            <Users size={14} className="text-white" />
+                        </div>
+                        <p className="text-xl font-extrabold text-gray-900">{stats.total}</p>
+                        <p className="text-[10px] text-gray-400">Jami mijozlar</p>
+                    </div>
+                    <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+                        <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center mb-2">
+                            <Building2 size={14} className="text-white" />
+                        </div>
+                        <p className="text-xl font-extrabold text-gray-900">{stats.corporate}</p>
+                        <p className="text-[10px] text-gray-400">Korporativ</p>
+                    </div>
+                    <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center mb-2">
+                            <DollarSign size={14} className="text-white" />
+                        </div>
+                        <p className="text-xl font-extrabold text-emerald-600">{formatMoney(stats.totalPaid)}</p>
+                        <p className="text-[10px] text-gray-400">Jami to&apos;langan</p>
+                    </div>
+                    <div className={`rounded-2xl border p-4 shadow-sm ${stats.totalDebit > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'}`}>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${stats.totalDebit > 0 ? 'bg-red-500' : 'bg-gray-400'}`}>
+                            <AlertTriangle size={14} className="text-white" />
+                        </div>
+                        <p className={`text-xl font-extrabold ${stats.totalDebit > 0 ? 'text-red-600' : 'text-gray-900'}`}>{formatMoney(stats.totalDebit)}</p>
+                        <p className="text-[10px] text-gray-400">Debitor qarzdorlik</p>
+                    </div>
+                    <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+                        <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center mb-2">
+                            <Crown size={14} className="text-white" />
+                        </div>
+                        <p className="text-xl font-extrabold text-gray-900">{stats.vip}</p>
+                        <p className="text-[10px] text-gray-400">VIP</p>
+                    </div>
+                    <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+                        <div className="w-8 h-8 rounded-lg bg-green-600 flex items-center justify-center mb-2">
+                            <UserPlus size={14} className="text-white" />
+                        </div>
+                        <p className="text-xl font-extrabold text-gray-900">{stats.newThisMonth}</p>
+                        <p className="text-[10px] text-gray-400">Bu oy yangi</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Filtrlar */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                    {TYPE_TABS.map(tab => (
+                        <button
+                            key={tab.key}
+                            onClick={() => { setTypeFilter(tab.key); setPage(1); }}
+                            className={`flex items-center gap-1.5 whitespace-nowrap px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                                typeFilter === tab.key
+                                    ? 'bg-gray-900 text-white shadow-md'
+                                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                            }`}
+                        >
+                            {tab.label}
+                            {tab.count !== undefined && tab.count > 0 && (
+                                <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-extrabold ${
+                                    typeFilter === tab.key ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-600'
+                                }`}>{tab.count}</span>
+                            )}
+                        </button>
+                    ))}
+                </div>
+                <div className="flex items-center gap-2 overflow-x-auto">
+                    <Filter size={14} className="text-gray-400 shrink-0" />
+                    {GROUP_TABS.map(tab => (
+                        <button
+                            key={tab.key}
+                            onClick={() => { setGroupFilter(tab.key); setPage(1); }}
+                            className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                                groupFilter === tab.key
+                                    ? tab.key === 'debtor' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'
+                                    : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                            }`}
+                        >
+                            {tab.label}
+                            {tab.count !== undefined && tab.count > 0 && (
+                                <span className="ml-1 opacity-70">({tab.count})</span>
+                            )}
+                        </button>
+                    ))}
+                </div>
+                <div className="relative">
+                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
                         type="text"
-                        placeholder="Ism yoki telefon orqali qidirish..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
+                        value={search}
+                        onChange={e => { setSearch(e.target.value); setPage(1); }}
+                        className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400"
+                        placeholder="Ism, telefon yoki kompaniya nomi..."
                     />
                 </div>
-                <div className="flex gap-2 w-full md:w-auto">
-                    <Button variant="outline" className="flex-1 md:flex-none">
-                        <Filter className="w-4 h-4 mr-2" />
-                        Filtrlar
-                    </Button>
-                    <Button className="flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-700 text-white">
-                        <Mail className="w-4 h-4 mr-2" />
-                        Ommaviy Rassilka
-                    </Button>
+            </div>
+
+            {/* Loading */}
+            {loading && (
+                <div className="flex items-center justify-center py-16">
+                    <Loader2 size={28} className="animate-spin text-blue-500" />
                 </div>
-            </div>
+            )}
 
-            {/* Advanced List */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <table className="w-full">
-                    <thead className="bg-gray-50/50 border-b border-gray-100">
-                        <tr>
-                            <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Mijoz</th>
-                            <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Aloqa</th>
-                            <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Xaridlar</th>
-                            <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Mahsulotlar</th>
-                            <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Reyting</th>
-                            <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Amallar</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                        {filteredCustomers.map((customer) => (
-                            <tr
-                                key={customer.id}
-                                onClick={() => setSelectedCustomer(customer)}
-                                className="hover:bg-blue-50/30 transition-colors cursor-pointer group"
-                            >
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold border-2 border-white shadow-sm group-hover:border-blue-200 transition-colors">
-                                            {customer.avatar}
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-slate-800">{customer.name}</p>
-                                            <p className="text-xs text-slate-400">ID: #{1000 + customer.id}</p>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex flex-col gap-1">
-                                        <div className="flex items-center gap-1.5 text-sm font-medium text-slate-700">
-                                            <Phone size={14} className="text-emerald-500" />
-                                            {customer.phone}
-                                        </div>
-                                        <div className="flex items-center gap-1.5 text-xs text-blue-500 hover:underline">
-                                            <MessageSquare size={12} />
-                                            Telegram
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex flex-col">
-                                        <span className="font-black text-slate-800">{customer.totalSpent}</span>
-                                        <span className="text-[10px] text-slate-400">Oxirgi: {customer.lastOrder}</span>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex flex-wrap gap-1">
-                                        {customer.products.map((prod, i) => {
-                                            if (prod === 'kombinatsiya') return null; // Logic is handled by VIP calculation usually, but showing other items
-                                            return (
-                                                <Badge
-                                                    key={i}
-                                                    variant="secondary"
-                                                    className={`text-[10px] px-1.5 py-0.5 ${prod === 'plyonka' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                                        prod === 'paddon' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                                                            'bg-orange-50 text-orange-600 border-orange-100'
-                                                        }`}
-                                                >
-                                                    {prod}
-                                                </Badge>
-                                            );
-                                        })}
-                                        {customer.products.includes('kombinatsiya') && (
-                                            <Badge className="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 border-emerald-200">
-                                                VIP
-                                            </Badge>
-                                        )}
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center gap-0.5">
-                                        <Star size={14} className="fill-amber-400 text-amber-400" />
-                                        <span className="font-bold text-slate-700 ml-1">{customer.rating}.0</span>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    <button className="p-2 text-slate-400 hover:bg-slate-100 rounded-lg transition-colors" aria-label="Amallar">
-                                        <MoreHorizontal size={18} />
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+            {/* Empty */}
+            {!loading && customers.length === 0 && (
+                <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center">
+                    <Users size={48} className="mx-auto text-gray-200 mb-4" />
+                    <p className="text-gray-500 font-semibold">Mijozlar topilmadi</p>
+                </div>
+            )}
 
-            {/* Customer Drawer */}
+            {/* Table */}
+            {!loading && customers.length > 0 && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead className="bg-gray-50/80 border-b border-gray-100">
+                                <tr>
+                                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Mijoz</th>
+                                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Turi</th>
+                                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase hidden md:table-cell">Aloqa</th>
+                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase hidden sm:table-cell">Jami</th>
+                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase hidden lg:table-cell">To&apos;langan</th>
+                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase hidden lg:table-cell">Qarz</th>
+                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase w-10"></th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {customers.map(c => {
+                                    const typeCfg = CUSTOMER_TYPES[c.customerType] ?? CUSTOMER_TYPES.individual;
+                                    const groupCfg = CUSTOMER_GROUPS[c.customerGroup] ?? CUSTOMER_GROUPS.standard;
+                                    return (
+                                        <tr
+                                            key={c.id}
+                                            onClick={() => openDrawer(c)}
+                                            className={`hover:bg-blue-50/30 transition-colors cursor-pointer group ${!c.isActive ? 'opacity-50' : ''}`}
+                                        >
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0 ${
+                                                        c.source === 'guest' ? 'bg-gray-400' : 'bg-gradient-to-br from-blue-500 to-indigo-600'
+                                                    }`}>
+                                                        {c.name.charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <p className="font-bold text-gray-800 text-sm truncate">{c.name}</p>
+                                                            {c.source === 'guest' && (
+                                                                <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-bold shrink-0">Mehmon</span>
+                                                            )}
+                                                        </div>
+                                                        {c.companyName && (
+                                                            <p className="text-[10px] text-purple-600 font-semibold flex items-center gap-0.5">
+                                                                <Building2 size={9} />{c.companyName}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex flex-col gap-1">
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border w-fit ${typeCfg.bg} ${typeCfg.color}`}>
+                                                        {typeCfg.label}
+                                                    </span>
+                                                    {c.customerGroup !== 'standard' && (
+                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border w-fit flex items-center gap-1 ${groupCfg.bg} ${groupCfg.color}`}>
+                                                            <span className={`w-1.5 h-1.5 rounded-full ${groupCfg.dot}`} />
+                                                            {groupCfg.label}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 hidden md:table-cell">
+                                                <span className="text-xs text-gray-600 flex items-center gap-1">
+                                                    <Phone size={11} className="text-gray-400" />{c.phone}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right hidden sm:table-cell">
+                                                <span className="font-extrabold text-gray-900 text-sm">{formatMoney(c.totalRevenue)}</span>
+                                                <p className="text-[10px] text-gray-400">{c.totalOrders} buyurtma</p>
+                                            </td>
+                                            <td className="px-4 py-3 text-right hidden lg:table-cell">
+                                                <span className="text-sm font-bold text-emerald-600">{formatMoney(c.totalPaid)}</span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right hidden lg:table-cell">
+                                                {c.totalDebit > 0 ? (
+                                                    <span className="text-sm font-bold text-red-600 flex items-center justify-end gap-1">
+                                                        <AlertTriangle size={12} />
+                                                        {formatMoney(c.totalDebit)}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-sm text-gray-300">—</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <ChevronRight size={14} className="text-gray-300 group-hover:text-blue-500 transition-colors" />
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {totalPages > 1 && (
+                        <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
+                            <p className="text-xs text-gray-500">{total} ta mijozdan {customers.length} ta</p>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                                    disabled={page === 1}
+                                    className="px-3 py-1.5 text-xs font-bold bg-white border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50"
+                                >← Oldingi</button>
+                                <span className="text-xs font-bold text-gray-700">{page}/{totalPages}</span>
+                                <button
+                                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={page === totalPages}
+                                    className="px-3 py-1.5 text-xs font-bold bg-white border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50"
+                                >Keyingi →</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Drawer */}
             <CustomerDrawer
-                isOpen={!!selectedCustomer}
-                onClose={() => setSelectedCustomer(null)}
+                isOpen={drawerOpen}
+                onClose={() => { setDrawerOpen(false); setSelectedCustomer(null); }}
                 customer={selectedCustomer}
+                onSaved={() => fetchCustomers()}
             />
         </div>
     );

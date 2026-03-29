@@ -2,15 +2,18 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useAuthStore } from '@/lib/store/useAuthStore';
+import { useCartStore } from '@/lib/store/useCartStore';
 import { useLanguage } from '@/lib/contexts/LanguageContext';
 import { useCurrencySafe } from '@/lib/contexts/CurrencyContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-    Package, Clock, Loader2, ChevronRight, ArrowLeft,
+    Package, Loader2, ChevronRight, ArrowLeft,
     Truck, CheckCircle, XCircle, Box, ClipboardCheck,
-    ShoppingCart, RefreshCw, Search, Filter
+    ShoppingCart, RefreshCw, Search, RotateCcw,
+    AlertTriangle, X, ShoppingBag, ChevronDown, Calendar
 } from 'lucide-react';
+import { toast } from 'sonner';
 import type { Language } from '@/lib/translations';
 
 // ── i18n ─────────────────────────────────────────────────────────
@@ -32,6 +35,17 @@ const TX: Record<string, Partial<Record<Language, string>>> = {
     cancelled:     { uz: 'Bekor qilingan', ru: 'Отменённые', en: 'Cancelled', qr: 'Biykar etilgen', zh: '已取消', tr: 'İptal edilen', tg: 'Бекоршуда', kk: 'Бас тартылған', tk: 'Ýatyrylan', fa: 'لغوشده' },
     searchHint:    { uz: "Buyurtma raqami yoki mahsulot nomi...", ru: 'Номер заказа или название товара...', en: 'Order number or product name...', qr: "Buyırtpa nomeri...", zh: '订单号或商品名...', tr: 'Sipariş no veya ürün adı...', tg: 'Рақами фармоиш ё номи маҳсулот...', kk: 'Тапсырыс нөмірі немесе тауар аты...', tk: 'Sargyt belgisi ýa-da haryt ady...', fa: 'شماره سفارش یا نام محصول...' },
     orderCount:    { uz: 'ta buyurtma', ru: 'заказов', en: 'orders', qr: 'buyırtpa', zh: '个订单', tr: 'sipariş', tg: 'фармоиш', kk: 'тапсырыс', tk: 'sargyt', fa: 'سفارش' },
+    cancel:        { uz: 'Bekor qilish', ru: 'Отменить', en: 'Cancel', qr: 'Biykar etiw', zh: '取消', tr: 'İptal et', tg: 'Бекор кардан', kk: 'Бас тарту', tk: 'Ýatyrmak', fa: 'لغو' },
+    reorder:       { uz: 'Qayta buyurtma', ru: 'Повторить заказ', en: 'Reorder', qr: 'Qayta buyırtpa', zh: '重新下单', tr: 'Tekrar sipariş', tg: 'Фармоиши такрорӣ', kk: 'Қайта тапсырыс', tk: 'Gaýtadan sargyt', fa: 'سفارش مجدد' },
+    cancelConfirm: { uz: "Buyurtmani bekor qilmoqchimisiz?", ru: 'Отменить заказ?', en: 'Cancel this order?', qr: 'Buyırtpanı biykar etesizbе?', zh: '确定取消订单？', tr: 'Siparişi iptal et?', tg: 'Фармоишро бекор мекунед?', kk: 'Тапсырысты бас тарту?', tk: 'Sargydy ýatyrmak?', fa: 'لغو سفارش؟' },
+    cancelWarning: { uz: "Bu amalni ortga qaytarib bo'lmaydi", ru: 'Это действие необратимо', en: 'This action cannot be undone', qr: 'Bu ámeldi qaytarıp bolmaydı', zh: '此操作无法撤销', tr: 'Bu işlem geri alınamaz', tg: 'Ин амал бебозгашт аст', kk: 'Бұл әрекетті кері қайтару мүмкін емес', tk: 'Bu hereket yzyna gaýtarylyp bilinmez', fa: 'این عملیات قابل بازگشت نیست' },
+    yes:           { uz: 'Ha, bekor qilish', ru: 'Да, отменить', en: 'Yes, cancel', qr: 'Áwа, biykar etiw', zh: '是的，取消', tr: 'Evet, iptal et', tg: 'Бале, бекор кунед', kk: 'Иә, бас тарту', tk: 'Hawa, ýatyrmak', fa: 'بله، لغو کن' },
+    no:            { uz: "Yo'q", ru: 'Нет', en: 'No', qr: 'Joq', zh: '不', tr: 'Hayır', tg: 'Не', kk: 'Жоқ', tk: 'Ýok', fa: 'خیر' },
+    cancelSuccess: { uz: "Buyurtma bekor qilindi", ru: 'Заказ отменён', en: 'Order cancelled', qr: 'Buyırtpa biykar etildi', zh: '订单已取消', tr: 'Sipariş iptal edildi', tg: 'Фармоиш бекор шуд', kk: 'Тапсырыс бас тартылды', tk: 'Sargyt ýatyryldy', fa: 'سفارش لغو شد' },
+    cancelError:   { uz: "Bekor qilib bo'lmadi", ru: 'Не удалось отменить', en: 'Failed to cancel', qr: 'Biykar etip bolmadı', zh: '取消失败', tr: 'İptal edilemedi', tg: 'Бекор нашуд', kk: 'Бас тарту сәтсіз', tk: 'Ýatyryp bolmady', fa: 'لغو نشد' },
+    reorderSuccess:{ uz: "Mahsulotlar savatga qo'shildi", ru: 'Товары добавлены в корзину', en: 'Items added to cart', qr: 'Mallar sawatqa qosıldı', zh: '商品已加入购物车', tr: 'Ürünler sepete eklendi', tg: 'Маҳсулот ба сабад илова шуд', kk: 'Тауарлар себетке қосылды', tk: 'Harytlar sebede goşuldy', fa: 'محصولات به سبد اضافه شد' },
+    totalSpent:    { uz: 'Jami xarid', ru: 'Всего потрачено', en: 'Total spent', qr: 'Jami xarıd', zh: '总消费', tr: 'Toplam harcama', tg: 'Ҷамъ харид', kk: 'Жалпы шығын', tk: 'Jemi çykdajy', fa: 'مجموع خرید' },
+    loadMore:      { uz: "Ko'proq ko'rsatish", ru: 'Показать ещё', en: 'Show more', qr: "Kóbirek kórsetiw", zh: '显示更多', tr: 'Daha fazla göster', tg: 'Бештар нишон диҳед', kk: 'Көбірек көрсету', tk: 'Köpräk görkez', fa: 'نمایش بیشتر' },
 };
 
 const t = (key: string, lang: Language): string =>
@@ -70,8 +84,11 @@ interface DBOrder {
     }[];
 }
 
+const ORDERS_PER_PAGE = 8;
+
 export default function MyOrdersPage() {
     const { user, isAuthenticated } = useAuthStore();
+    const addToCart = useCartStore(s => s.addToCart);
     const { language } = useLanguage();
     const { format } = useCurrencySafe();
     const router = useRouter();
@@ -80,6 +97,9 @@ export default function MyOrdersPage() {
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<FilterKey>('all');
     const [search, setSearch] = useState('');
+    const [cancelModal, setCancelModal] = useState<number | null>(null);
+    const [cancelling, setCancelling] = useState(false);
+    const [visibleCount, setVisibleCount] = useState(ORDERS_PER_PAGE);
 
     const fetchOrders = useCallback(async () => {
         if (!user?.phone) return;
@@ -104,6 +124,51 @@ export default function MyOrdersPage() {
             setLoading(false);
         }
     }, [isAuthenticated, user?.phone, fetchOrders]);
+
+    // ── Buyurtmani bekor qilish ──
+    const handleCancel = async (orderId: number) => {
+        setCancelling(true);
+        try {
+            const res = await fetch(`/api/orders/${orderId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'cancel' }),
+            });
+            if (res.ok) {
+                toast.success(t('cancelSuccess', language));
+                setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'cancelled' } : o));
+            } else {
+                const err = await res.json();
+                toast.error(err.error || t('cancelError', language));
+            }
+        } catch {
+            toast.error(t('cancelError', language));
+        } finally {
+            setCancelling(false);
+            setCancelModal(null);
+        }
+    };
+
+    // ── Qayta buyurtma berish ──
+    const handleReorder = (order: DBOrder) => {
+        let added = 0;
+        for (const item of order.items) {
+            if (item.product) {
+                addToCart({
+                    productId: item.product.id,
+                    name: item.product.name,
+                    price: item.price,
+                    image: item.product.image,
+                    quantity: item.quantity,
+                });
+                added++;
+            }
+        }
+        if (added > 0) {
+            toast.success(t('reorderSuccess', language));
+            router.push('/cart');
+        }
+    };
 
     // ── Login talab qilinadi ──
     if (!isAuthenticated || !user) {
@@ -140,8 +205,48 @@ export default function MyOrdersPage() {
         { key: 'cancelled', labelKey: 'cancelled',  count: orders.filter(o => o.status === 'cancelled').length },
     ];
 
+    const totalSpent = orders
+        .filter(o => o.status === 'delivered')
+        .reduce((sum, o) => sum + (o.totalAmount ?? 0), 0);
+
+    const visibleOrders = filtered.slice(0, visibleCount);
+    const canLoadMore = visibleCount < filtered.length;
+
     return (
         <div className="min-h-screen bg-[#f5f6fa]">
+            {/* Cancel Confirmation Modal */}
+            {cancelModal !== null && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setCancelModal(null)} />
+                    <div className="relative bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
+                        <button onClick={() => setCancelModal(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600" aria-label="Close">
+                            <X size={18} />
+                        </button>
+                        <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                            <AlertTriangle size={28} className="text-red-500" />
+                        </div>
+                        <h3 className="text-lg font-extrabold text-gray-900 text-center mb-1">{t('cancelConfirm', language)}</h3>
+                        <p className="text-sm text-gray-400 text-center mb-6">{t('cancelWarning', language)}</p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setCancelModal(null)}
+                                className="flex-1 py-3 rounded-xl border border-gray-200 font-bold text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                            >
+                                {t('no', language)}
+                            </button>
+                            <button
+                                onClick={() => handleCancel(cancelModal)}
+                                disabled={cancelling}
+                                className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-60 font-bold text-sm text-white transition-colors flex items-center justify-center gap-2"
+                            >
+                                {cancelling && <Loader2 size={14} className="animate-spin" />}
+                                {t('yes', language)}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Breadcrumb */}
             <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                 <nav className="flex items-center gap-1.5 text-xs text-gray-500">
@@ -165,15 +270,32 @@ export default function MyOrdersPage() {
                             <p className="text-xs text-gray-400">{orders.length} {t('orderCount', language)}</p>
                         </div>
                     </div>
-                    <button
-                        onClick={fetchOrders}
-                        disabled={loading}
-                        className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-xl text-sm hover:bg-gray-50 transition-colors disabled:opacity-50"
-                    >
-                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                        {t('refresh', language)}
-                    </button>
+                    <div className="flex items-center gap-3">
+                        {/* Total spent badge */}
+                        {totalSpent > 0 && (
+                            <div className="hidden sm:flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold px-4 py-2 rounded-xl text-xs">
+                                <ShoppingBag size={14} />
+                                {t('totalSpent', language)}: {format(totalSpent)}
+                            </div>
+                        )}
+                        <button
+                            onClick={fetchOrders}
+                            disabled={loading}
+                            className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-xl text-sm hover:bg-gray-50 transition-colors disabled:opacity-50"
+                        >
+                            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                            {t('refresh', language)}
+                        </button>
+                    </div>
                 </div>
+
+                {/* Total spent mobile */}
+                {totalSpent > 0 && (
+                    <div className="sm:hidden flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold px-4 py-2.5 rounded-xl text-xs mb-4">
+                        <ShoppingBag size={14} />
+                        {t('totalSpent', language)}: {format(totalSpent)}
+                    </div>
+                )}
 
                 {/* Search + Filter bar */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-5">
@@ -194,10 +316,10 @@ export default function MyOrdersPage() {
                             {FILTERS.map(f => (
                                 <button
                                     key={f.key}
-                                    onClick={() => setFilter(f.key)}
-                                    className={`flex items-center gap-1.5 whitespace-nowrap px-3.5 py-2 rounded-xl text-xs font-bold transition-colors ${
+                                    onClick={() => { setFilter(f.key); setVisibleCount(ORDERS_PER_PAGE); }}
+                                    className={`flex items-center gap-1.5 whitespace-nowrap px-3.5 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
                                         filter === f.key
-                                            ? 'bg-blue-600 text-white'
+                                            ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
                                             : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                                     }`}
                                 >
@@ -217,8 +339,9 @@ export default function MyOrdersPage() {
 
                 {/* Loading */}
                 {loading && (
-                    <div className="flex items-center justify-center py-20">
+                    <div className="flex flex-col items-center justify-center py-20 gap-3">
                         <Loader2 size={28} className="animate-spin text-blue-500" />
+                        <p className="text-sm text-gray-400">{t('loading', language)}</p>
                     </div>
                 )}
 
@@ -232,7 +355,7 @@ export default function MyOrdersPage() {
                         <p className="text-sm text-gray-400 mb-6">{t('startShopping', language)}</p>
                         <Link
                             href="/catalog"
-                            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors"
+                            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors shadow-lg shadow-blue-200"
                         >
                             {t('goToCatalog', language)}
                             <ChevronRight size={14} />
@@ -243,82 +366,122 @@ export default function MyOrdersPage() {
                 {/* Orders list */}
                 {!loading && filtered.length > 0 && (
                     <div className="space-y-4">
-                        {filtered.map(order => {
+                        {visibleOrders.map((order, idx) => {
                             const statusCfg = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.new;
                             const StatusIcon = statusCfg.icon;
                             const date = new Date(order.createdAt);
+                            const canCancel = ['new', 'processing'].includes(order.status);
+                            const canReorder = ['delivered', 'cancelled'].includes(order.status);
 
                             return (
-                                <Link
+                                <div
                                     key={order.id}
-                                    href={`/orders/${order.id}`}
-                                    className="block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md hover:border-blue-200 transition-all group"
+                                    className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md hover:border-blue-200 transition-all group"
                                 >
                                     {/* Top row */}
-                                    <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${statusCfg.bgColor} border`}>
-                                                <StatusIcon size={16} className={statusCfg.color} />
-                                            </div>
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-extrabold text-gray-900 text-sm">#{order.id}</span>
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusCfg.bgColor} ${statusCfg.color}`}>
-                                                        {statusCfg.labels[language] ?? statusCfg.labels.en}
-                                                    </span>
+                                    <Link href={`/orders/${order.id}`}>
+                                        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${statusCfg.bgColor} border`}>
+                                                    <StatusIcon size={16} className={statusCfg.color} />
                                                 </div>
-                                                <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5">
-                                                    <Clock size={10} />
-                                                    {date.toLocaleDateString('uz-UZ', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                    {' · '}
-                                                    {date.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
-                                                </p>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-extrabold text-gray-900 text-sm">#{order.id}</span>
+                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusCfg.bgColor} ${statusCfg.color}`}>
+                                                            {statusCfg.labels[language] ?? statusCfg.labels.en}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5">
+                                                        <Calendar size={10} />
+                                                        {date.toLocaleDateString('uz-UZ', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                        {' · '}
+                                                        {date.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-extrabold text-gray-900">{format(order.totalAmount ?? 0)}</p>
+                                                <p className="text-[10px] text-gray-400">{order.items.length} {t('pcs', language)}</p>
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="font-extrabold text-gray-900">{format(order.totalAmount ?? 0)}</p>
-                                            <p className="text-[10px] text-gray-400">{order.items.length} {t('pcs', language)}</p>
-                                        </div>
-                                    </div>
+                                    </Link>
 
                                     {/* Products preview */}
-                                    <div className="px-5 py-3">
-                                        <div className="flex items-center gap-2">
-                                            {/* Product thumbnails */}
-                                            <div className="flex -space-x-2">
-                                                {order.items.slice(0, 4).map((item, i) => (
-                                                    <div
-                                                        key={i}
-                                                        className="w-10 h-10 rounded-xl bg-gray-50 border-2 border-white overflow-hidden shrink-0"
-                                                        title={item.product?.name}
-                                                    >
-                                                        {item.product?.image
-                                                            ? <img src={item.product.image} alt="" className="w-full h-full object-contain" />
-                                                            : <Box size={14} className="m-auto mt-2 text-gray-300" />
-                                                        }
-                                                    </div>
-                                                ))}
-                                                {order.items.length > 4 && (
-                                                    <div className="w-10 h-10 rounded-xl bg-gray-100 border-2 border-white flex items-center justify-center shrink-0">
-                                                        <span className="text-[10px] font-bold text-gray-500">+{order.items.length - 4}</span>
-                                                    </div>
-                                                )}
-                                            </div>
+                                    <Link href={`/orders/${order.id}`}>
+                                        <div className="px-5 py-3">
+                                            <div className="flex items-center gap-2">
+                                                {/* Product thumbnails */}
+                                                <div className="flex -space-x-2">
+                                                    {order.items.slice(0, 4).map((item, i) => (
+                                                        <div
+                                                            key={i}
+                                                            className="w-10 h-10 rounded-xl bg-gray-50 border-2 border-white overflow-hidden shrink-0"
+                                                            title={item.product?.name}
+                                                        >
+                                                            {item.product?.image
+                                                                ? <img src={item.product.image} alt="" className="w-full h-full object-contain" />
+                                                                : <Box size={14} className="m-auto mt-2 text-gray-300" />
+                                                            }
+                                                        </div>
+                                                    ))}
+                                                    {order.items.length > 4 && (
+                                                        <div className="w-10 h-10 rounded-xl bg-gray-100 border-2 border-white flex items-center justify-center shrink-0">
+                                                            <span className="text-[10px] font-bold text-gray-500">+{order.items.length - 4}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
 
-                                            {/* Product names */}
-                                            <div className="flex-1 min-w-0 ml-2">
-                                                <p className="text-xs text-gray-600 truncate">
-                                                    {order.items.map(i => i.product?.name ?? 'Mahsulot').join(', ')}
-                                                </p>
-                                            </div>
+                                                {/* Product names */}
+                                                <div className="flex-1 min-w-0 ml-2">
+                                                    <p className="text-xs text-gray-600 truncate">
+                                                        {order.items.map(i => i.product?.name ?? 'Mahsulot').join(', ')}
+                                                    </p>
+                                                </div>
 
-                                            {/* Arrow */}
-                                            <ChevronRight size={16} className="text-gray-300 group-hover:text-blue-500 transition-colors shrink-0" />
+                                                {/* Arrow */}
+                                                <ChevronRight size={16} className="text-gray-300 group-hover:text-blue-500 transition-colors shrink-0" />
+                                            </div>
                                         </div>
-                                    </div>
-                                </Link>
+                                    </Link>
+
+                                    {/* Action buttons */}
+                                    {(canCancel || canReorder) && (
+                                        <div className="px-5 py-3 border-t border-gray-50 bg-gray-50/50 flex items-center gap-2">
+                                            {canReorder && (
+                                                <button
+                                                    onClick={(e) => { e.preventDefault(); handleReorder(order); }}
+                                                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 text-xs font-bold transition-colors"
+                                                >
+                                                    <RotateCcw size={12} />
+                                                    {t('reorder', language)}
+                                                </button>
+                                            )}
+                                            {canCancel && (
+                                                <button
+                                                    onClick={(e) => { e.preventDefault(); setCancelModal(order.id); }}
+                                                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 text-xs font-bold transition-colors ml-auto"
+                                                >
+                                                    <XCircle size={12} />
+                                                    {t('cancel', language)}
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             );
                         })}
+
+                        {/* Pagination — Load more */}
+                        {canLoadMore && (
+                            <button
+                                onClick={() => setVisibleCount(prev => prev + ORDERS_PER_PAGE)}
+                                className="w-full py-3.5 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <ChevronDown size={16} />
+                                {t('loadMore', language)} ({filtered.length - visibleCount} {t('orderCount', language)})
+                            </button>
+                        )}
                     </div>
                 )}
             </div>
