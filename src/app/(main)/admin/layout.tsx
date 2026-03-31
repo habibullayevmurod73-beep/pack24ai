@@ -6,22 +6,12 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import {
     LayoutDashboard,
-    Folders,
-    Package,
     Users,
     Settings,
     Bell,
     Search,
-    Menu,
     X,
     Phone,
-    PhoneIncoming,
-    PhoneOff,
-    CheckCircle,
-    ScanLine,
-    ClipboardList,
-    Percent,
-    Barcode,
     ShoppingCart,
     Factory,
     MessageSquare,
@@ -37,14 +27,11 @@ import {
     Plus,
     ChevronDown,
     LogOut,
-    ExternalLink,
     Newspaper,
     type LucideIcon
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
-import { Button } from '@/components/ui/Button';
 import { useCategoryStore } from '@/lib/store/useCategoryStore';
-import { useProductStore } from '@/lib/store/useProductStore';
 import { useHasMounted } from '@/lib/hooks/useHasMounted';
 
 interface NavItem {

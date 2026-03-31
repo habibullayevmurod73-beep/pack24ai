@@ -59,7 +59,8 @@ const FOOTER_LINKS: Record<string, { title: L; links: { href: string; label: L }
 };
 
 // ─── Statistika ──────────────────────────────────────────────────
-const STATS: { icon: LucideIcon; label: L }[] = [
+interface StatItem { icon: LucideIcon; label: L }
+const STATS: StatItem[] = [
     { icon: Users,   label: { uz: '150 000+ mijoz',         ru: '150 000+ клиентов',      en: '150 000+ clients',      qr: '150 000+ mijoz',       zh: '150 000+客户',  tr: '150 000+ müşteri',  tg: '150 000+ мизоҷ',     kk: '150 000+ клиент',    tk: '150 000+ müşderi',  fa: '۱۵۰۰۰۰+ مشتری' } },
     { icon: Package, label: { uz: '10 000+ mahsulot',        ru: '10 000+ товаров',        en: '10 000+ products',      qr: '10 000+ mahsulot',     zh: '10 000+产品',   tr: '10 000+ ürün',      tg: '10 000+ маҳсулот',   kk: '10 000+ тауар',      tk: '10 000+ haryt',     fa: '۱۰۰۰۰+ محصول' } },
     { icon: Truck,   label: { uz: "O'z kuni yetkazish",      ru: 'Доставка в день заказа', en: 'Same-day delivery',     qr: "Kúni yetkerish",       zh: '当天送达',      tr: 'Aynı gün teslimat', tg: 'Тавзеи ҳамон рӯз',  kk: 'Сол күні жеткізу',  tk: 'Şol gün eltip bermek',fa: 'تحویل همان روز' } },

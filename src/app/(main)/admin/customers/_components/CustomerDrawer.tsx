@@ -241,14 +241,14 @@ export default function CustomerDrawer({ isOpen, onClose, customer, onSaved }: C
 
                 {/* Tabs */}
                 <div className="flex border-b border-gray-100">
-                    {[
-                        { key: 'info', label: '📋 Tahrirlash' },
-                        { key: 'orders', label: `🛒 Buyurtmalar (${detail?.orders?.length ?? 0})` },
-                        { key: 'finance', label: '💰 Hisob-kitob' },
-                    ].map(t => (
+                    {([
+                        { key: 'info' as const, label: '📋 Tahrirlash' },
+                        { key: 'orders' as const, label: `🛒 Buyurtmalar (${detail?.orders?.length ?? 0})` },
+                        { key: 'finance' as const, label: '💰 Hisob-kitob' },
+                    ]).map(t => (
                         <button
                             key={t.key}
-                            onClick={() => setTab(t.key as any)}
+                            onClick={() => setTab(t.key)}
                             className={`flex-1 py-3 text-[11px] font-bold transition-colors ${
                                 tab === t.key ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-400 hover:text-gray-600'
                             }`}

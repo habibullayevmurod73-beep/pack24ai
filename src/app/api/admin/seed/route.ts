@@ -58,7 +58,7 @@ export async function GET() {
                 name: p.name,
                 description: p.description ?? '',
                 price: p.price,
-                originalPrice: (p as any).originalPrice ?? null,
+                originalPrice: p.originalPrice ?? null,
                 category: p.category,
                 image: p.image,
                 sku: p.sku,

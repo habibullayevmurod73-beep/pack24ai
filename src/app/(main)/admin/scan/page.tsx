@@ -1,50 +1,110 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { QrReader } from 'react-qr-reader';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Flashlight, Camera, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Camera, QrCode } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 
 export default function MobileScannerPage() {
     const router = useRouter();
     const [data, setData] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
     const [isScanning, setIsScanning] = useState(true);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    const handleScan = (result: any, error: any) => {
-        if (result) {
-            const scanData = result?.text;
-            setData(scanData);
-            setIsScanning(false);
-            toast.success("QR-kod muvaffaqiyatli o'qildi!");
+    // --- Native BarcodeDetector (Chrome/Edge 83+, Safari 17.2+) ---
+    useEffect(() => {
+        if (!isScanning) return;
 
-            // Parse logic
-            // Expected formats: 
-            // 1. https://pack24.uz/admin/tasks/scan?id=P24-...
-            // 2. P24-... (Direct ID)
-            // 3. /admin/production/ORD-...
+        let active = true;
 
-            let targetId = scanData;
+        const startCamera = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+                });
+                streamRef.current = stream;
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                    await videoRef.current.play();
+                }
 
-            if (scanData.includes('?id=')) {
-                targetId = scanData.split('?id=')[1];
-            } else if (scanData.includes('/production/')) {
-                const parts = scanData.split('/production/');
-                targetId = parts[1];
+                // Check BarcodeDetector support
+                if (!('BarcodeDetector' in window)) {
+                    toast.error("Bu brauzer QR skanerni qo'llab-quvvatlamaydi. Chrome yoki Safari ishlating.");
+                    return;
+                }
+
+                // @ts-expect-error — BarcodeDetector is not in TS lib yet
+                const detector = new BarcodeDetector({ formats: ['qr_code'] });
+
+                intervalRef.current = setInterval(async () => {
+                    if (!videoRef.current || !canvasRef.current || !active) return;
+                    const video = videoRef.current;
+                    const canvas = canvasRef.current;
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx || video.readyState < 2) return;
+
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    ctx.drawImage(video, 0, 0);
+
+                    try {
+                        const barcodes = await detector.detect(canvas);
+                        if (barcodes.length > 0) {
+                            const scanData = barcodes[0].rawValue;
+                            if (!scanData) return;
+                            handleResult(scanData);
+                        }
+                    } catch {
+                        // detection frame error — skip
+                    }
+                }, 300);
+            } catch (err) {
+                toast.error("Kamerani ochishda xato. Ruxsat berilganligini tekshiring.");
             }
+        };
 
-            // Redirect to production detail with worker view
-            // Using setTimeout to give user feedback
-            setTimeout(() => {
-                router.push(`/admin/production/${targetId}?view=worker`);
-            }, 1000);
+        startCamera();
+
+        return () => {
+            active = false;
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach((t) => t.stop());
+                streamRef.current = null;
+            }
+        };
+    }, [isScanning]);
+
+    const handleResult = (scanData: string) => {
+        setData(scanData);
+        setIsScanning(false);
+        toast.success("QR-kod muvaffaqiyatli o'qildi!");
+
+        // Stop camera
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach((t) => t.stop());
+            streamRef.current = null;
         }
 
-        if (error) {
-            // console.info(error);
+        // Parse QR data
+        let targetId = scanData;
+
+        if (scanData.includes('?id=')) {
+            targetId = scanData.split('?id=')[1];
+        } else if (scanData.includes('/production/')) {
+            const parts = scanData.split('/production/');
+            targetId = parts[1];
         }
+
+        setTimeout(() => {
+            router.push(`/admin/production/${targetId}?view=worker`);
+        }, 1000);
     };
 
     return (
@@ -66,13 +126,14 @@ export default function MobileScannerPage() {
             <div className="flex-1 flex flex-col items-center justify-center relative mt-16">
                 {isScanning ? (
                     <div className="w-full max-w-md aspect-square relative overflow-hidden rounded-3xl border-2 border-emerald-500/50 mx-4">
-                        <QrReader
-                            onResult={handleScan}
-                            constraints={{ facingMode: 'environment' }}
+                        <video
+                            ref={videoRef}
                             className="w-full h-full object-cover"
-                            videoContainerStyle={{ paddingTop: 0 }}
-                            videoStyle={{ objectFit: 'cover' }}
+                            playsInline
+                            muted
                         />
+                        <canvas ref={canvasRef} className="hidden" />
+
                         {/* Overlay Guide */}
                         <div className="absolute inset-0 border-[40px] border-black/50 pointer-events-none">
                             <div className="w-full h-full border-2 border-emerald-400 relative">
@@ -84,7 +145,7 @@ export default function MobileScannerPage() {
                         </div>
                         <div className="absolute bottom-4 left-0 right-0 text-center">
                             <span className="bg-black/60 px-3 py-1 rounded-full text-xs font-mono text-emerald-400 animate-pulse">
-                                QR-kodni kameraga to'g'irlang
+                                QR-kodni kameraga to&apos;g&apos;irlang
                             </span>
                         </div>
                     </div>
@@ -95,7 +156,7 @@ export default function MobileScannerPage() {
                         </div>
                         <h2 className="text-2xl font-bold mb-2">Muvaffaqiyatli!</h2>
                         <p className="text-gray-400 font-mono text-sm mb-6">{data}</p>
-                        <p className="text-emerald-400 text-sm">Yo'naltirilmoqda...</p>
+                        <p className="text-emerald-400 text-sm">Yo&apos;naltirilmoqda...</p>
                     </div>
                 )}
             </div>
@@ -110,7 +171,7 @@ export default function MobileScannerPage() {
                         className="flex-1 py-6 text-lg bg-zinc-800 hover:bg-zinc-700 border-zinc-700"
                         onClick={() => setIsScanning(!isScanning)}
                     >
-                        {isScanning ? 'To\'xtatish' : 'Qayta Skanerlash'}
+                        {isScanning ? "To'xtatish" : 'Qayta Skanerlash'}
                     </Button>
                 </div>
             </div>

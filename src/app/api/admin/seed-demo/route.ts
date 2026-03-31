@@ -183,7 +183,7 @@ export async function GET() {
                     name:         p.name,
                     description:  p.description ?? '',
                     price:        p.price,
-                    originalPrice: (p as any).originalPrice ?? null,
+                    originalPrice: p.originalPrice ?? null,
                     sku:          p.sku,
                     category:     p.category,
                     image:        p.image,

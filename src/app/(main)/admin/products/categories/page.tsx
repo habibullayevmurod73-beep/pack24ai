@@ -32,7 +32,7 @@ export default function AdminCategoriesPage() {
             toast.success("Kategoriya yangilandi!");
         } else {
             addCategory({
-                name: formData.name as any,
+                name: formData.name as { uz: string; ru: string; en: string },
                 icon: formData.icon || 'Box',
                 slug: formData.slug!,
                 isActive: true,

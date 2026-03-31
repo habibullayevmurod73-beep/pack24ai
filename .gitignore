@@ -50,4 +50,8 @@ prisma/*.db-journal
 *.tsbuildinfo
 next-env.d.ts
 
+# TSC debug output files
+tsc-*.txt
+tsc-check.txt
+
 /src/generated/prisma

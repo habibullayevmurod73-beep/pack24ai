@@ -11,6 +11,11 @@ export interface Product {
     category?: string;
     image: string;
     gallery?: string[];
+    videoUrl?: string;
+    tags?: string[];
+    minQuantity?: number;
+    minPrice?: number;
+    sizes?: { label: string; price: number; minQty?: number }[];
     inStock?: boolean;
     rating: number;
     reviews: number;

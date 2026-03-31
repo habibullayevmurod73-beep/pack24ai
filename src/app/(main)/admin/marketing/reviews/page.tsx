@@ -110,10 +110,10 @@ export default function ReviewsPage() {
 
             {/* Filter Tabs */}
             <div className="flex bg-white p-1 rounded-xl border border-gray-100 w-fit">
-                {['all', 'new', 'approved', 'rejected'].map((tab) => (
+                {(['all', 'new', 'approved', 'rejected'] as const).map((tab) => (
                     <button
                         key={tab}
-                        onClick={() => setFilter(tab as any)}
+                        onClick={() => setFilter(tab)}
                         className={cn(
                             "px-4 py-2 rounded-lg text-xs font-bold capitalize transition-all",
                             filter === tab

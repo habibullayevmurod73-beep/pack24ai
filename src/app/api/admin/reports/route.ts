@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
         });
 
         // Kunlik daromad simple format
-        const daily = (dailyRevenue as any[]).map(d => ({
+        const daily = dailyRevenue.map(d => ({
             date:    d.date?.slice(5) ?? '', // MM-DD
             revenue: Number(d.total ?? 0),
             orders:  Number(d.count ?? 0),

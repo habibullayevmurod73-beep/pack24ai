@@ -91,9 +91,9 @@ export async function POST(req: NextRequest) {
             let order = await prisma.order.findFirst({ where: { telegramUserId: telegramUserId?.toString(), status: 'draft' } });
             if (order) {
                 await prisma.orderItem.deleteMany({ where: { orderId: order.id } });
-                order = await prisma.order.update({ where: { id: order.id }, data: { totalAmount: total, items: { create: fItems } }, include: { items: { include: { product: true } } } as any });
+                order = await prisma.order.update({ where: { id: order.id }, data: { totalAmount: total, items: { create: fItems } }, include: { items: { include: { product: true } } } });
             } else {
-                order = await prisma.order.create({ data: { telegramUserId: telegramUserId?.toString(), status: 'draft', totalAmount: total, items: { create: fItems } }, include: { items: { include: { product: true } } } as any });
+                order = await prisma.order.create({ data: { telegramUserId: telegramUserId?.toString(), status: 'draft', totalAmount: total, items: { create: fItems } }, include: { items: { include: { product: true } } } });
             }
             return NextResponse.json(order);
         }
@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
             status:          order.status,
             paymentMethod:   order.paymentMethod,
             deliveryMethod:  order.deliveryMethod,
-            items:           (order.items as any[]).map(i => ({ quantity: i.quantity, price: i.price, product: i.product })),
+            items:           order.items.map((i: { quantity: number; price: number; product: { name: string } | null }) => ({ quantity: i.quantity, price: i.price, product: i.product })),
         }).catch(console.error);
 
         return NextResponse.json(order);

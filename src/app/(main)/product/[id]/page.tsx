@@ -426,7 +426,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
     // Gallery: asosiy rasm + qo'shimcha rasmlar (gallery field)
     const galleryImages = [
         product.image,
-        ...(Array.isArray((product as any).gallery) ? (product as any).gallery : []),
+        ...(Array.isArray(product.gallery) ? product.gallery : []),
     ].filter((img): img is string => Boolean(img) && img !== '/placeholder.png');
 
     // ── "Buy" panel (shared between inline mobile + sticky desktop) ──
@@ -539,7 +539,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                                 />
 
                                 {/* Video bo'limi */}
-                                {(product as any).videoUrl && (
+                                {product.videoUrl && (
                                     <div className="mt-5 rounded-2xl overflow-hidden border border-purple-100 bg-purple-50/30">
                                         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-purple-100">
                                             <Film size={14} className="text-purple-500" />
@@ -548,7 +548,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                                             </span>
                                         </div>
                                         <video
-                                            src={(product as any).videoUrl}
+                                            src={product.videoUrl}
                                             controls
                                             className="w-full max-h-72 object-contain bg-black"
                                             playsInline
@@ -599,9 +599,9 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                                     <span className="text-3xl font-extrabold text-blue-700">{format(product.price)}</span>
                                     {isOnSale && <span className="text-lg text-gray-400 line-through">{format(product.originalPrice!)}</span>}
                                 </div>
-                                {(product as any).minPrice && (
+                                {product.minPrice && (
                                     <p className="text-xs text-gray-500 mt-1">
-                                        {t("Ulgurji narx:", "Оптовая цена:")} <span className="font-bold text-emerald-600">{format((product as any).minPrice)}</span>
+                                        {t("Ulgurji narx:", "Оптовая цена:")} <span className="font-bold text-emerald-600">{format(product.minPrice)}</span>
                                         <span className="text-gray-400"> dan</span>
                                     </p>
                                 )}
@@ -611,8 +611,8 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                             <div className="flex items-center gap-1.5 mb-5">
                                 <Check size={14} className="text-emerald-500" />
                                 <span className="text-sm font-semibold text-emerald-600">{t("Mavjud", "В наличии", "In stock", "Mevcut", "现货", "Мавҷуд", "Бар", "Bar", "موجود", "Bar")}</span>
-                                {(product as any).sku && (
-                                    <span className="ml-auto text-xs text-gray-400 font-mono">SKU: {(product as any).sku}</span>
+                                {product.sku && (
+                                    <span className="ml-auto text-xs text-gray-400 font-mono">SKU: {product.sku}</span>
                                 )}
                             </div>
 
@@ -657,7 +657,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                                 )}
                                 {tab === 'spec' && (
                                     <div>
-                                        {(product as any).sizes?.length > 0 && (
+                                        {product.sizes && product.sizes.length > 0 && (
                                             <div className="mb-6">
                                                 <h3 className="font-bold text-gray-800 mb-3">{t("O'lchamlar jadvali", "Таблица размеров")}</h3>
                                                 <table className="w-full text-sm border-collapse">
@@ -669,7 +669,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {(product as any).sizes.map((s: any, i: number) => (
+                                                        {product.sizes!.map((s, i) => (
                                                             <tr key={i} className="hover:bg-blue-50 transition-colors">
                                                                 <td className="py-2 px-3 border border-gray-100 font-mono">{s.label}</td>
                                                                 <td className="py-2 px-3 border border-gray-100 text-right font-bold text-blue-600">{format(s.price)}</td>
@@ -687,7 +687,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                                                     <span className="font-medium">{v as string}</span>
                                                 </div>
                                             ))}
-                                            {Object.keys(product.specifications ?? {}).length === 0 && !(product as any).sizes?.length && (
+                                            {Object.keys(product.specifications ?? {}).length === 0 && !product.sizes?.length && (
                                                 <p className="text-gray-400">{t("Ma'lumot yo'q.", "Данные отсутствуют.")}</p>
                                             )}
                                         </div>

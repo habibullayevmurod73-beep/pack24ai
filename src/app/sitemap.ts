@@ -7,12 +7,20 @@ export default async function sitemap() {
     const staticPages = [
         { url: BASE_URL, lastModified: new Date(), changeFrequency: 'daily' as const, priority: 1.0 },
         { url: `${BASE_URL}/catalog`, lastModified: new Date(), changeFrequency: 'daily' as const, priority: 0.9 },
+        { url: `${BASE_URL}/contacts`, lastModified: new Date(), changeFrequency: 'monthly' as const, priority: 0.7 },
+        { url: `${BASE_URL}/delivery`, lastModified: new Date(), changeFrequency: 'monthly' as const, priority: 0.6 },
+        { url: `${BASE_URL}/payment`, lastModified: new Date(), changeFrequency: 'monthly' as const, priority: 0.6 },
+        { url: `${BASE_URL}/reviews`, lastModified: new Date(), changeFrequency: 'weekly' as const, priority: 0.6 },
+        { url: `${BASE_URL}/discounts`, lastModified: new Date(), changeFrequency: 'weekly' as const, priority: 0.7 },
+        { url: `${BASE_URL}/special-offers`, lastModified: new Date(), changeFrequency: 'weekly' as const, priority: 0.7 },
+        { url: `${BASE_URL}/faq`, lastModified: new Date(), changeFrequency: 'monthly' as const, priority: 0.5 },
+        { url: `${BASE_URL}/recycling`, lastModified: new Date(), changeFrequency: 'monthly' as const, priority: 0.5 },
+        { url: `${BASE_URL}/configurator`, lastModified: new Date(), changeFrequency: 'monthly' as const, priority: 0.6 },
+        { url: `${BASE_URL}/active-vacancies`, lastModified: new Date(), changeFrequency: 'weekly' as const, priority: 0.4 },
         { url: `${BASE_URL}/tools`, lastModified: new Date(), changeFrequency: 'weekly' as const, priority: 0.7 },
         { url: `${BASE_URL}/tools/ai-design`, lastModified: new Date(), changeFrequency: 'weekly' as const, priority: 0.6 },
         { url: `${BASE_URL}/tools/dieline`, lastModified: new Date(), changeFrequency: 'weekly' as const, priority: 0.6 },
         { url: `${BASE_URL}/tools/mockup-generator`, lastModified: new Date(), changeFrequency: 'weekly' as const, priority: 0.6 },
-        { url: `${BASE_URL}/cart`, lastModified: new Date(), changeFrequency: 'monthly' as const, priority: 0.4 },
-        { url: `${BASE_URL}/checkout`, lastModified: new Date(), changeFrequency: 'monthly' as const, priority: 0.4 },
     ];
 
     // Dynamic: categories
@@ -25,7 +33,7 @@ export default async function sitemap() {
             orderBy: { createdAt: 'desc' },
         });
         categoryPages = categories.map((cat: { slug: string; updatedAt: Date | null }) => ({
-            url: `${BASE_URL}/catalog/${cat.slug}`,
+            url: `${BASE_URL}/category/${cat.slug}`,
             lastModified: cat.updatedAt ?? new Date(),
             changeFrequency: 'weekly' as const,
             priority: 0.8,
