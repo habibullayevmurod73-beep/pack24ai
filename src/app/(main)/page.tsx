@@ -1,5 +1,5 @@
 import HomeHero from '@/components/home/HomeHero';
-import CategoryCatalogGrid from '@/components/home/CategoryCatalogGrid';
+
 import MobileCategoryStrip from '@/components/home/MobileCategoryStrip';
 import ConfiguratorSection from '@/components/home/ConfiguratorSection';
 import ReviewsSection from '@/components/home/ReviewsSection';
@@ -51,8 +51,7 @@ export default async function Home() {
                 shuning uchun kategoriya kartalari darhol ko'rinadi */}
             <HomeHero initialProducts={initialProducts} />
 
-            {/* Kategoriya katalog grid — pack24.ru uslubida */}
-            <CategoryCatalogGrid />
+
 
             {/* Mobil kategoriyalar */}
             <MobileCategoryStrip />

@@ -67,9 +67,9 @@ export default function Navbar() {
                             PACK24 <span className="text-blue-600">AI</span>
                         </span>
                     </Link>
-
-                    {/* Catalog dropdown */}
+                    {/* Catalog button */}
                     <NavCatalogDropdown />
+
 
                     {/* Search */}
                     <NavSearchBar />

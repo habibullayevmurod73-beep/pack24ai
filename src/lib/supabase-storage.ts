@@ -11,10 +11,11 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
 const BUCKET       = process.env.SUPABASE_STORAGE_BUCKET ?? 'products';
 
-if (!SUPABASE_URL || !SERVICE_KEY) {
-  console.warn(
-    '[supabase-storage] NEXT_PUBLIC_SUPABASE_URL yoki SUPABASE_SERVICE_ROLE_KEY .env da topilmadi!'
-  );
+if (!SUPABASE_URL) {
+  console.warn('[supabase-storage] NEXT_PUBLIC_SUPABASE_URL .env da topilmadi!');
+}
+if (!SERVICE_KEY) {
+  console.warn('[supabase-storage] SUPABASE_SERVICE_ROLE_KEY .env da topilmadi!');
 }
 
 /**
