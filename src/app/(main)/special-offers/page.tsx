@@ -6,13 +6,13 @@ import { useLanguage } from '@/lib/contexts/LanguageContext';
 export default function SpecialOffersPage() {
     const { language } = useLanguage();
 
-    const title: Partial<Record<string, string>> = { uz: "Maxsus Takliflar", ru: 'Спецпредложения', en: 'Special Offers', qr: 'Arnawlı usınıslar', zh: '特别优惠', tr: 'Özel Teklifler', tg: 'Пешниҳодҳои хосс', kk: 'Арнайы ұсыныс', tk: 'Ýörite teklip', fa: 'پیشنهادات ویژه' };
+    const title: Record<string, string> = { uz: "Maxsus Takliflar", ru: 'Спецпредложения', en: 'Special Offers', qr: 'Arnawlı usınıslar', zh: '特别优惠', tr: 'Özel Teklifler', tg: 'Пешниҳодҳои хосс', kk: 'Арнайы ұсыныс', tk: 'Ýörite teklip', fa: 'پیشنهادات ویژه' };
 
     return (
         <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
             <div className="max-w-7xl mx-auto">
                 <h1 className="text-3xl font-extrabold text-gray-900 mb-8">
-                    {title[language] || title['en']}
+                    {title[language as string] || title['en']}
                 </h1>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
