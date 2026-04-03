@@ -27,6 +27,8 @@ model User {
   address       String?                         // Mijoz manzili
   notes         String?                         // Admin eslatmalari
 
+  orders       Order[]                          // Mijoz buyurtmalari
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -53,6 +55,7 @@ model TelegramConfig {
   welcomeMessage String   @default("Assalomu alaykum! Xush kelibsiz.")
   mainButton     String   @default("Katalog")
   isActive       Boolean  @default(false)
+  salesChatId    String   @default("")
   updatedAt      DateTime @updatedAt
 }
 
@@ -64,6 +67,8 @@ model Product {
   originalPrice Float?
   sku          String?
   category     String?
+  categoryId   Int?                              // Yangi: Category relation
+  categoryRel  Category? @relation(fields: [categoryId], references: [id])
   image        String
   gallery        Json     @default("[]")
   videoUrl       String?
@@ -86,13 +91,14 @@ model Product {
 }
 
 model Category {
-  id        Int      @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   name      String
-  slug      String   @unique
+  slug      String    @unique
   image     String?
   parentId  Int?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  products  Product[]                           // Yangi: Product relation
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
 
 model Order {
@@ -101,16 +107,26 @@ model Order {
   customerName    String?
   contactPhone    String?     
   
+  // Yangi: User relation (opsional — mavjud orderlar uchun)
+  userId          Int?
+  user            User?       @relation(fields: [userId], references: [id])
+  
   status          String      @default("draft") // draft, new, processing, shipping, delivered, cancelled
   totalAmount     Float       @default(0)
   
   shippingAddress String?
   shippingLocation String?    // JSON or "lat,long"
-  comment         String?     // Buyurtma izohi (checkout izoh maydoni)
+  comment         String?     // Buyurtma izohi
   deliveryMethod  String?     // 'courier', 'pickup'
 
   paymentMethod   String?     // 'cash', 'click', 'payme'
   paymentStatus   String      @default("pending")
+  
+  // Yangi: Status timestamp'lar — analytics uchun
+  confirmedAt     DateTime?   // Tasdiqlangan
+  shippedAt       DateTime?   // Jo'natilgan
+  deliveredAt     DateTime?   // Yetkazilgan
+  cancelledAt     DateTime?   // Bekor qilingan
   
   items           OrderItem[]
   
@@ -232,5 +248,34 @@ model News {
   publishedAt DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// ─── Qayta ishlash bo'limi (Makulatura) ──────────────────────────────────────
+model RecyclePoint {
+  id        Int      @id @default(autoincrement())
+  regionUz  String
+  regionRu  String
+  cityUz    String
+  cityRu    String
+  phone     String
+  status    String   @default("active") // active, planned
+  color     String   @default("bg-emerald-500")
+  requests  RecycleRequest[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RecycleRequest {
+  id          Int          @id @default(autoincrement())
+  name        String
+  phone       String
+  regionId    Int
+  point       RecyclePoint @relation(fields: [regionId], references: [id])
+  material    String?
+  volume      Int?
+  pickupType  String       @default("base") // base, pickup
+  status      String       @default("new")  // new, processing, completed, cancelled
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 

@@ -37,10 +37,11 @@ export const authOptions: NextAuthOptions = {
                 const isValid = hashPassword(credentials.password) === user.passwordHash;
                 if (!isValid) return null;
 
+                const userWithEmail = user as typeof user & { email?: string | null };
                 return {
                     id: String(user.id),
                     name: user.name,
-                    email: user.email ?? user.phone, // email optional field, fallback to phone
+                    email: userWithEmail.email ?? user.phone, // email optional field, fallback to phone
                 };
             },
         }),

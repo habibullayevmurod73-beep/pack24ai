@@ -21,6 +21,16 @@ interface DashboardData {
         periodRevenue: number;
         completedOrders: number;
         conversionRate: number;
+        periodOrders: number;
+        aov: number;
+        cancelRate: number;
+        repeatRate: number;
+        cancelledOrders: number;
+    };
+    trends: {
+        ordersGrowth: number;
+        revenueGrowth: number;
+        conversionChange: number;
     };
     topProducts: {
         productId: number;
@@ -164,11 +174,33 @@ export default function AdminDashboard() {
 
             {/* KPI cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard label="Davr buyurtmalari"  value={loading ? '…' : fmt(s?.newOrders ?? 0)}         sub={`${period} kun`}          icon={ShoppingBag}   color="bg-blue-500"    trend={12}  loading={loading} />
-                <StatCard label="Davr daromadi"       value={loading ? '…' : `${fmtM(s?.periodRevenue ?? 0)} so'm`} sub="yetkazildilar bilan" icon={DollarSign}    color="bg-emerald-500" trend={8}   loading={loading} />
-                <StatCard label="Konversiya"           value={loading ? '…' : `${s?.conversionRate ?? 0}%`}  sub="yetkazildi / jami"        icon={TrendingUp}    color="bg-purple-500"  trend={-2}  loading={loading} />
+                <StatCard label="Davr buyurtmalari"  value={loading ? '…' : fmt(s?.periodOrders ?? 0)}         sub={`${period} kun`}          icon={ShoppingBag}   color="bg-blue-500"    trend={data?.trends?.ordersGrowth}  loading={loading} />
+                <StatCard label="Davr daromadi"       value={loading ? '…' : `${fmtM(s?.periodRevenue ?? 0)} so'm`} sub="yetkazildilar bilan" icon={DollarSign}    color="bg-emerald-500" trend={data?.trends?.revenueGrowth}   loading={loading} />
+                <StatCard label="Konversiya"           value={loading ? '…' : `${s?.conversionRate ?? 0}%`}  sub="yetkazildi / jami"        icon={TrendingUp}    color="bg-purple-500"  trend={data?.trends?.conversionChange}  loading={loading} />
                 <StatCard label="Jami buyurtmalar"    value={loading ? '…' : fmt(s?.totalOrders ?? 0)}      sub="barcha vaqt"               icon={Package}       color="bg-orange-500"  loading={loading} />
             </div>
+
+            {/* Extended KPI row */}
+            {!loading && s && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-white rounded-2xl border border-gray-100 p-4 hover:shadow-md transition-shadow">
+                        <p className="text-xs text-gray-400 mb-1">O'rtacha buyurtma (AOV)</p>
+                        <p className="text-xl font-extrabold text-gray-900">{fmtM(s.aov)} <span className="text-xs font-normal text-gray-400">so'm</span></p>
+                    </div>
+                    <div className="bg-white rounded-2xl border border-gray-100 p-4 hover:shadow-md transition-shadow">
+                        <p className="text-xs text-gray-400 mb-1">Takroriy mijozlar</p>
+                        <p className="text-xl font-extrabold text-emerald-600">{s.repeatRate}%</p>
+                    </div>
+                    <div className="bg-white rounded-2xl border border-gray-100 p-4 hover:shadow-md transition-shadow">
+                        <p className="text-xs text-gray-400 mb-1">Bekor qilish</p>
+                        <p className={`text-xl font-extrabold ${s.cancelRate > 20 ? 'text-red-500' : 'text-gray-700'}`}>{s.cancelRate}%</p>
+                    </div>
+                    <div className="bg-white rounded-2xl border border-gray-100 p-4 hover:shadow-md transition-shadow">
+                        <p className="text-xs text-gray-400 mb-1">Yetkazildi (davr)</p>
+                        <p className="text-xl font-extrabold text-emerald-600">{fmt(s.completedOrders)}</p>
+                    </div>
+                </div>
+            )}
 
             {/* Charts row */}
             <div className="grid lg:grid-cols-3 gap-5">

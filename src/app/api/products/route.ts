@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { parseProduct } from '@/lib/product-utils';
+import { downloadAndUploadToSupabase, processGalleryUrls } from '@/lib/media-utils';
 
 // ─── Prisma Product filter type ───────────────────────────────────────────────
 interface ProductWhere {
@@ -56,9 +57,9 @@ export async function POST(request: Request) {
                 originalPrice:  body.originalPrice ? parseFloat(body.originalPrice) : null,
                 sku:            body.sku            || null,
                 category:       body.category       || null,
-                image:          body.image          || '/placeholder.png',
-                gallery:        Array.isArray(body.gallery) ? body.gallery : [],
-                videoUrl:       body.videoUrl       || null,
+                image:          await downloadAndUploadToSupabase(body.image || '/placeholder.png'),
+                gallery:        Array.isArray(body.gallery) ? await processGalleryUrls(body.gallery) : [],
+                videoUrl:       await downloadAndUploadToSupabase(body.videoUrl || null),
                 specifications: body.specifications ?? {},
                 tags:           Array.isArray(body.tags) ? body.tags : [],
                 minQuantity:    body.minQuantity    ? parseInt(body.minQuantity) : 1,

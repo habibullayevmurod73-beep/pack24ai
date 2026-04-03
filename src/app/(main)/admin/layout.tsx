@@ -28,6 +28,7 @@ import {
     ChevronDown,
     LogOut,
     Newspaper,
+    Recycle,
     type LucideIcon
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
@@ -178,6 +179,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'To‘lov turi', href: '/admin/payments', icon: CreditCard },
         { name: 'Yetkazib berish', href: '/admin/delivery', icon: Truck },
         { name: 'Filiallar', href: '/admin/branches', icon: MapPin },
+        { name: 'Qayta ishlash', href: '/admin/recycling', icon: Recycle },
         {
             name: 'Xodimlar',
             href: '/admin/staff',

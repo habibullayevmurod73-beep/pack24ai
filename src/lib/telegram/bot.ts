@@ -58,3 +58,27 @@ export const getBot = async () => {
 export const resetBot = () => {
     botInstance = null;
 };
+
+// Yordamchi funksiya xabar yuborish uchun
+export const sendTelegramMessage = async (message: string) => {
+    try {
+        const bot = await getBot();
+        if (!bot) return false;
+
+        const config = await prisma.telegramConfig.findFirst();
+        if (!config || !config.salesChatId) return false;
+
+        // salesChatId guruh yoki lichka bo'lishi mumkin
+        const chatIds = config.salesChatId.split(',').map((id: string) => id.trim());
+        
+        for (const chatId of chatIds) {
+            if (chatId) {
+                await bot.telegram.sendMessage(chatId, message, { parse_mode: 'HTML' });
+            }
+        }
+        return true;
+    } catch (error) {
+        console.error('Telegramga xabar yuborishda xatolik:', error);
+        return false;
+    }
+};

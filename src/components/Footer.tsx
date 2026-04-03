@@ -9,7 +9,6 @@ import {
     Package, Truck, Star, Users
 } from 'lucide-react';
 import type { Language } from '@/lib/translations';
-import type { LucideIcon } from 'lucide-react';
 
 
 type L = Record<Language, string>;

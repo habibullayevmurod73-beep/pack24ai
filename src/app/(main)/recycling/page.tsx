@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useLanguage } from '@/lib/contexts/LanguageContext';
 import {
@@ -86,6 +86,46 @@ export default function RecyclingPage() {
     const [selectedRegion, setSelectedRegion] = useState('');
     const [form, setForm] = useState({ name: '', phone: '', volume: '', material: '', pickup: 'base' });
 
+    // ─── Dinamik regionlar (DB dan yuklash, fallback: REGIONS) ──────────
+    interface DynRegion {
+        id: number;
+        uz: string;
+        ru: string;
+        city: { uz: string; ru: string };
+        phone: string;
+        status: string;
+        color: string;
+    }
+    const [dynRegions, setDynRegions] = useState<DynRegion[]>([]);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch('/api/recycling/points');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (Array.isArray(data) && data.length > 0) {
+                        setDynRegions(data.map((p: { id: number; regionUz: string; regionRu: string; cityUz: string; cityRu: string; phone: string; status: string; color: string }) => ({
+                            id: p.id,
+                            uz: p.regionUz,
+                            ru: p.regionRu,
+                            city: { uz: p.cityUz, ru: p.cityRu },
+                            phone: p.phone,
+                            status: p.status,
+                            color: p.color,
+                        })));
+                        return;
+                    }
+                }
+            } catch { /* fallback */ }
+            // Fallback: hardcoded
+            setDynRegions(REGIONS);
+        })();
+    }, []);
+
+    // Aktiv region ro'yxati
+    const activeRegions = dynRegions.length > 0 ? dynRegions : REGIONS;
+
     const t = (uz: string, ru: string) => language === 'ru' ? ru : uz;
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -95,11 +135,30 @@ export default function RecyclingPage() {
             return;
         }
         setSubmitting(true);
-        // Simulate API call
-        await new Promise(r => setTimeout(r, 1200));
-        setSubmitting(false);
-        setSubmitted(true);
-        toast.success(t("So'rovingiz qabul qilindi! Tez orada bog'lanamiz.", 'Заявка принята! Скоро свяжемся.'));
+        try {
+            const res = await fetch('/api/recycling', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: form.name,
+                    phone: form.phone,
+                    regionId: Number(selectedRegion),
+                    material: form.material || null,
+                    volume: form.volume ? Number(form.volume) : null,
+                    pickupType: form.pickup,
+                }),
+            });
+            if (res.ok) {
+                setSubmitted(true);
+                toast.success(t("So'rovingiz qabul qilindi! Tez orada bog'lanamiz.", 'Заявка принята! Скоро свяжемся.'));
+            } else {
+                toast.error(t('Xatolik yuz berdi, qaytadan urinib ko\'ring', 'Ошибка, попробуйте ещё раз'));
+            }
+        } catch {
+            toast.error(t('Server bilan aloqa yo\'q', 'Нет связи с сервером'));
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     return (
@@ -279,11 +338,11 @@ export default function RecyclingPage() {
             {/* ── 12 REGIONS ───────────────────────────────────────────────────── */}
             <section id="regions" className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-16">
                 <div className="text-center mb-10">
-                    <h2 className="text-3xl font-extrabold text-gray-900">{t("12 Viloyat — Bizning Tarmog'imiz", '12 Регионов — Наша Сеть')}</h2>
+                    <h2 className="text-3xl font-extrabold text-gray-900">{t(`${activeRegions.length} Viloyat — Bizning Tarmog'imiz`, `${activeRegions.length} Регионов — Наша Сеть`)}</h2>
                     <p className="text-gray-500 mt-2">{t("Har bir viloyatda makulatura qabul va mahsulot sotish bazasi", 'В каждом регионе — база приёма макулатуры и продажи товаров')}</p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {REGIONS.map((r) => (
+                    {activeRegions.map((r) => (
                         <div key={r.id} className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-lg transition-all group">
                             <div className="flex items-start gap-3 mb-3">
                                 <div className={`w-10 h-10 ${r.color} rounded-xl flex items-center justify-center text-white font-extrabold text-sm shrink-0 shadow-md`}>
@@ -416,7 +475,7 @@ export default function RecyclingPage() {
                                             className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-400 bg-white transition-colors"
                                         >
                                             <option value="">{t('Viloyatni tanlang...', 'Выберите регион...')}</option>
-                                            {REGIONS.map(r => (
+                                            {activeRegions.map(r => (
                                                 <option key={r.id} value={r.id}>{t(r.uz, r.ru)}</option>
                                             ))}
                                         </select>

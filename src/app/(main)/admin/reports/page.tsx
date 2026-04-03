@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
     TrendingUp, ShoppingCart, DollarSign, Package,
-    RefreshCw, ArrowUp, ArrowDown,
+    RefreshCw, ArrowUp, ArrowDown, Download,
     ChevronRight, Box, AlertCircle, Wifi, WifiOff,
     type LucideIcon
 } from 'lucide-react';
@@ -24,6 +24,15 @@ interface ReportData {
         periodRevenue: number;
         completedOrders: number;
         conversionRate: number;
+        aov: number;
+        cancelRate: number;
+        repeatRate: number;
+        cancelledOrders: number;
+    };
+    trends: {
+        ordersGrowth: number;
+        revenueGrowth: number;
+        conversionChange: number;
     };
     topProducts: {
         productId: number;
@@ -49,7 +58,7 @@ function fmtM(n: number) {
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, icon: Icon, color, loading, trend }: {
     label: string; value: string; sub?: string; icon: LucideIcon;
-    color: string; loading: boolean; trend?: 'up' | 'down' | null;
+    color: string; loading: boolean; trend?: number | null;
 }) {
     if (loading) return (
         <div className="bg-white rounded-2xl border border-gray-100 p-5 animate-pulse">
@@ -58,6 +67,7 @@ function StatCard({ label, value, sub, icon: Icon, color, loading, trend }: {
             <div className="h-3 bg-gray-50 rounded w-20" />
         </div>
     );
+    const isUp = (trend ?? 0) >= 0;
     return (
         <div className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md transition-shadow">
             <div className="flex items-start justify-between mb-3">
@@ -68,8 +78,12 @@ function StatCard({ label, value, sub, icon: Icon, color, loading, trend }: {
             </div>
             <div className="flex items-end gap-2">
                 <p className="text-2xl font-extrabold text-gray-900">{value}</p>
-                {trend === 'up'   && <span className="flex items-center gap-0.5 text-emerald-600 text-xs font-bold mb-0.5"><ArrowUp size={12} /> Yuqori</span>}
-                {trend === 'down' && <span className="flex items-center gap-0.5 text-red-500    text-xs font-bold mb-0.5"><ArrowDown size={12} /> Past</span>}
+                {trend !== undefined && trend !== null && (
+                    <span className={`flex items-center gap-0.5 text-xs font-bold px-2 py-0.5 rounded-full mb-0.5 ${isUp ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
+                        {isUp ? <ArrowUp size={11} /> : <ArrowDown size={11} />}
+                        {Math.abs(trend)}%
+                    </span>
+                )}
             </div>
             {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
         </div>
@@ -125,6 +139,7 @@ export default function ReportsPage() {
     const [error, setError]     = useState<string | null>(null);
     const [period, setPeriod]   = useState(30);
     const [online, setOnline]   = useState(true);
+    const [showExport, setShowExport] = useState(false);
 
     // Network status listener
     useEffect(() => {
@@ -168,10 +183,8 @@ export default function ReportsPage() {
             color: STATUS_MAP[o.status]?.color ?? '#9ca3af',
         }));
 
-    // Trend: konversiya 50% dan yuqori bo'lsa up
-    const convTrend: 'up' | 'down' | null = s
-        ? (s.conversionRate >= 50 ? 'up' : 'down')
-        : null;
+
+
 
     return (
         <div className="p-6 bg-[#F9FAFB] min-h-screen">
@@ -214,6 +227,40 @@ export default function ReportsPage() {
                     >
                         <RefreshCw size={15} className={`text-gray-500 ${loading ? 'animate-spin' : ''}`} />
                     </button>
+
+                    {/* Export Button */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowExport(!showExport)}
+                            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition-colors"
+                        >
+                            <Download size={14} /> Export
+                        </button>
+                        {showExport && (
+                            <div className="absolute right-0 top-12 bg-white rounded-xl border border-gray-200 shadow-xl py-2 z-50 min-w-[200px]">
+                                {[
+                                    { type: 'orders',    label: '📦 Buyurtmalar (CSV)',    emoji: '📦' },
+                                    { type: 'products',  label: '🏷️ Mahsulotlar (CSV)',    emoji: '🏷️' },
+                                    { type: 'customers', label: '👥 Mijozlar (CSV)',        emoji: '👥' },
+                                    { type: 'recycling', label: '♻️ Makulatura (CSV)',      emoji: '♻️' },
+                                ].map(item => (
+                                    <button
+                                        key={item.type}
+                                        onClick={() => {
+                                            window.open(`/api/admin/export?type=${item.type}&period=${period}`, '_blank');
+                                            setShowExport(false);
+                                        }}
+                                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                    >
+                                        {item.label}
+                                    </button>
+                                ))}
+                                <div className="border-t border-gray-100 mt-1 pt-1 px-4 py-2">
+                                    <p className="text-[10px] text-gray-400">Davr: so'nggi {period} kun</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -229,7 +276,7 @@ export default function ReportsPage() {
                     icon={ShoppingCart}
                     color="bg-blue-500"
                     loading={loading}
-                    trend={s ? (s.periodOrders > 0 ? 'up' : null) : null}
+                    trend={data?.trends?.ordersGrowth}
                 />
                 <StatCard
                     label="Davr daromadi"
@@ -238,7 +285,7 @@ export default function ReportsPage() {
                     icon={DollarSign}
                     color="bg-emerald-500"
                     loading={loading}
-                    trend={s ? (s.periodRevenue > 0 ? 'up' : 'down') : null}
+                    trend={data?.trends?.revenueGrowth}
                 />
                 <StatCard
                     label="Konversiya darajasi"
@@ -247,7 +294,7 @@ export default function ReportsPage() {
                     icon={TrendingUp}
                     color="bg-purple-500"
                     loading={loading}
-                    trend={convTrend}
+                    trend={data?.trends?.conversionChange}
                 />
                 <StatCard
                     label="Jami daromad"
@@ -260,7 +307,7 @@ export default function ReportsPage() {
                 />
             </div>
 
-            {/* Quick info row */}
+            {/* Extended KPI row */}
             {!loading && s && (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
                     {[

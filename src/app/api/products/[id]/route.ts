@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { parseProduct } from '@/lib/product-utils';
 
+import { downloadAndUploadToSupabase, processGalleryUrls } from '@/lib/media-utils';
+
 export async function GET(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
@@ -28,11 +30,11 @@ export async function PUT(
 
         const data: Record<string, unknown> = {};
 
-        // Skalyar maydonlar
+        // Skalyar maydonlar o'zgarishi kutilyapti
         const scalarFields = [
             'name', 'description', 'price', 'originalPrice',
-            'sku', 'category', 'image', 'inStock', 'status',
-            'sourceUrl', 'minQuantity', 'rating', 'reviews', 'isFeatured', 'videoUrl',
+            'sku', 'category', 'inStock', 'status',
+            'sourceUrl', 'minQuantity', 'rating', 'reviews', 'isFeatured',
         ] as const;
 
         for (const key of scalarFields) {
@@ -45,8 +47,12 @@ export async function PUT(
                                              data.originalPrice = parseFloat(String(data.originalPrice));
         if (data.minQuantity !== undefined)  data.minQuantity  = parseInt(String(data.minQuantity));
 
-        // Json maydonlar — to'g'ridan-to'g'ri array/object (Prisma Json tipida stringify kerak emas)
-        if ('gallery'        in body) data.gallery        = Array.isArray(body.gallery) ? body.gallery : [];
+        // Rasm maydonlarini avtomatik tekshirib yuklaymiz
+        if ('image'    in body) data.image    = await downloadAndUploadToSupabase(body.image);
+        if ('videoUrl' in body) data.videoUrl = await downloadAndUploadToSupabase(body.videoUrl);
+
+        // Json maydonlar
+        if ('gallery'        in body) data.gallery        = Array.isArray(body.gallery) ? await processGalleryUrls(body.gallery) : [];
         if ('specifications' in body) data.specifications  = body.specifications ?? {};
         if ('tags'           in body) data.tags            = Array.isArray(body.tags) ? body.tags : [];
 
