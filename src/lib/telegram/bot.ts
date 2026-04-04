@@ -14,6 +14,18 @@ const MAT: Record<string, { label: string; emoji: string; price: number }> = {
 
 const fmtN = (n: number) => n.toLocaleString('ru-RU');
 
+// ─── In-memory session state (ariza yaratish uchun) ───────────────────────────
+interface ArizaSession {
+    step: 'name' | 'phone' | 'region' | 'material' | 'volume' | 'address' | 'confirm';
+    name?: string;
+    phone?: string;
+    regionId?: number;
+    material?: string;
+    volume?: number;
+    address?: string;
+}
+const arizaSessions = new Map<string, ArizaSession>();
+
 let botInstance: Telegraf | null = null;
 
 // ─── Yordamchi: Inline button yaratish ──────────────────────────────────────
@@ -96,6 +108,38 @@ export const getBot = async () => {
             }
         );
     });
+
+    // ════════════════════════════════════════════════════════════════════════
+    // /ariza — Mijoz ariza yuborish flow boshlanishi
+    // ════════════════════════════════════════════════════════════════════════
+    const startArizaFlow = async (ctx: Context) => {
+        const tgId = ctx.from!.id.toString();
+        const name = ctx.from!.first_name || '';
+
+        // Agar allaqachon driver yoki supervisor bo'lsa — chiqish
+        const driver = await prisma.driver.findUnique({ where: { telegramId: tgId } });
+        if (driver) { await ctx.reply('🚚 Siz haydovchisiz — /ishlarim buyrug\'ini ishlating.'); return; }
+        const sup = await prisma.supervisor.findUnique({ where: { telegramId: tgId } });
+        if (sup) { await ctx.reply('👷 Siz masulsiz — /arizalar buyrug\'ini ishlating.'); return; }
+
+        // Session boshlanishi — ism so'rash
+        arizaSessions.set(tgId, { step: 'name', name });
+        await ctx.reply(
+            `♻️ <b>Yangi ariza yuborish</b>\n\n` +
+            `Iltimos, ismingizni kiriting:`,
+            {
+                parse_mode: 'HTML',
+                reply_markup: {
+                    inline_keyboard: [
+                        [btn(`📝 ${name}`, `ariza_usename`)],
+                        [btn('❌ Bekor qilish', 'ariza_cancel')],
+                    ],
+                },
+            }
+        );
+    };
+
+    bot.command('ariza', startArizaFlow);
 
     // ════════════════════════════════════════════════════════════════════════
     // MASUL SHAXS buyruqlari
@@ -255,6 +299,82 @@ export const getBot = async () => {
         const tgId = ctx.from.id.toString();
 
         try {
+            // ── ARIZA SESSION CALLBACKS ───────────────────────────────────
+            if (data === 'ariza_usename') {
+                const ses = arizaSessions.get(tgId);
+                if (ses?.step === 'name' && ses.name) {
+                    ses.step = 'phone';
+                    await ctx.answerCbQuery('✅');
+                    await ctx.editMessageText(
+                        `👤 Ism: <b>${ses.name}</b>\n\n📱 Telefon raqamingizni kiriting:\n<i>Masalan: 998901234567</i>`,
+                        { parse_mode: 'HTML' }
+                    );
+                    return;
+                }
+            }
+
+            if (data === 'ariza_cancel') {
+                arizaSessions.delete(tgId);
+                await ctx.answerCbQuery('❌ Bekor qilindi');
+                await ctx.editMessageText('❌ Ariza bekor qilindi.\n\nYangi ariza uchun /ariza yuboring.');
+                return;
+            }
+
+            if (data.startsWith('ariza_region_')) {
+                const regionId = parseInt(data.split('_')[2]);
+                const ses = arizaSessions.get(tgId);
+                if (ses?.step === 'region') {
+                    ses.regionId = regionId;
+                    ses.step = 'material';
+                    const matButtons = Object.entries(MAT).map(([key, m]) =>
+                        [btn(`${m.emoji} ${m.label}`, `ariza_mat_${key}`)]
+                    );
+                    await ctx.answerCbQuery('✅');
+                    await ctx.editMessageText(
+                        `📦 <b>Material turini tanlang:</b>`,
+                        { parse_mode: 'HTML', reply_markup: { inline_keyboard: [...matButtons, [btn('❌ Bekor', 'ariza_cancel')]] } }
+                    );
+                    return;
+                }
+            }
+
+            if (data.startsWith('ariza_mat_')) {
+                const matKey = data.replace('ariza_mat_', '');
+                const ses = arizaSessions.get(tgId);
+                if (ses?.step === 'material') {
+                    ses.material = matKey;
+                    ses.step = 'volume';
+                    await ctx.answerCbQuery('✅');
+                    await ctx.editMessageText(
+                        `⚖️ <b>Taxminiy og'irlik (kg):</b>\n\n<i>Masalan: 100</i>\nBilmasangiz 0 yozing.`,
+                        { parse_mode: 'HTML' }
+                    );
+                    return;
+                }
+            }
+
+            if (data === 'ariza_pickup') {
+                const ses = arizaSessions.get(tgId);
+                if (ses?.step === 'address') {
+                    ses.step = 'confirm';
+                    await ctx.answerCbQuery('✅');
+                    await ctx.editMessageText(
+                        `🏠 <b>Manzilingizni kiriting:</b>\n\n<i>Masalan: Toshkent sh., Chilonzor-7, 3-uy</i>`,
+                        { parse_mode: 'HTML' }
+                    );
+                    return;
+                }
+            }
+
+            if (data === 'ariza_base') {
+                const ses = arizaSessions.get(tgId);
+                if (ses?.step === 'address') {
+                    // O'zi olib keladi — ariza yaratish
+                    await ctx.answerCbQuery('✅');
+                    await createArizaFromSession(ctx, tgId, 'base', null);
+                    return;
+                }
+            }
             // ── Masul: Haydovchi tayinlash ──────────────────────────────────
             if (data.startsWith('assign_')) {
                 const parts = data.split('_');
@@ -557,6 +677,91 @@ export const getBot = async () => {
         // Agar /buyruq bo'lsa — skip
         if (text.startsWith('/')) return;
 
+        // ── "♻️ Ariza yuborish" tugmasi ─────────────────────────────────
+        if (text === '♻️ Ariza yuborish') {
+            await startArizaFlow(ctx);
+            return;
+        }
+
+        // ── ARIZA SESSION: bosqichma-bosqich ─────────────────────────────
+        const ses = arizaSessions.get(tgId);
+        if (ses) {
+            // 1. Ism kiritish
+            if (ses.step === 'name') {
+                ses.name = text.trim();
+                ses.step = 'phone';
+                await ctx.reply(
+                    `👤 Ism: <b>${ses.name}</b>\n\n📱 Telefon raqamingizni kiriting:\n<i>Masalan: 998901234567</i>`,
+                    { parse_mode: 'HTML' }
+                );
+                return;
+            }
+
+            // 2. Telefon kiritish
+            if (ses.step === 'phone') {
+                const phone = text.replace(/[^0-9+]/g, '');
+                if (phone.length < 9) {
+                    await ctx.reply('❌ Telefon raqami noto\'g\'ri! Kamida 9 ta raqam kiriting.\n<i>Masalan: 998901234567</i>', { parse_mode: 'HTML' });
+                    return;
+                }
+                ses.phone = phone;
+                ses.step = 'region';
+
+                // Hududlar ro'yxati
+                const points = await prisma.recyclePoint.findMany({ where: { status: 'active' }, orderBy: { regionUz: 'asc' } });
+                if (points.length === 0) {
+                    arizaSessions.delete(tgId);
+                    await ctx.reply('❌ Hozircha aktiv yig\'ish hududlari yo\'q. Keyinroq qayta urinib ko\'ring.');
+                    return;
+                }
+
+                const regionButtons = points.map(p =>
+                    [btn(`📍 ${p.regionUz} — ${p.cityUz}`, `ariza_region_${p.id}`)]
+                );
+                regionButtons.push([btn('❌ Bekor qilish', 'ariza_cancel')]);
+
+                await ctx.reply(
+                    `📍 <b>Hududingizni tanlang:</b>`,
+                    { parse_mode: 'HTML', reply_markup: { inline_keyboard: regionButtons } }
+                );
+                return;
+            }
+
+            // 3. Og'irlik kiritish
+            if (ses.step === 'volume') {
+                const vol = parseInt(text.replace(',', '.'));
+                ses.volume = isNaN(vol) || vol <= 0 ? 0 : vol;
+                ses.step = 'address';
+
+                await ctx.reply(
+                    `📦 Material: <b>${MAT[ses.material || 'mix']?.emoji || '📦'} ${MAT[ses.material || 'mix']?.label || ses.material}</b>\n` +
+                    `⚖️ Hajm: <b>${ses.volume || 'ko\'rsatilmagan'} kg</b>\n\n` +
+                    `🏠 <b>Qanday topshirasiz?</b>`,
+                    {
+                        parse_mode: 'HTML',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [btn('🚚 Haydovchi kelsin (pickup)', 'ariza_pickup')],
+                                [btn('🏢 O\'zim olib boraman', 'ariza_base')],
+                                [btn('❌ Bekor', 'ariza_cancel')],
+                            ],
+                        },
+                    }
+                );
+                return;
+            }
+
+            // 4. Manzil kiritish (pickup)
+            if (ses.step === 'confirm') {
+                const address = text.trim();
+                await createArizaFromSession(ctx, tgId, 'pickup', address);
+                return;
+            }
+
+            // Agar noma'lum step bo'lsa
+            arizaSessions.delete(tgId);
+        }
+
         // ── Haydovchi: Og'irlik kiritish (CALC_ state) ──────────────────
         const driver = await prisma.driver.findUnique({ where: { telegramId: tgId } });
         if (driver?.vehicleInfo?.startsWith('CALC_')) {
@@ -568,7 +773,6 @@ export const getBot = async () => {
                 return;
             }
 
-            // Og'irlik kiritildi, endi chegirma so'rash
             await prisma.driver.update({
                 where: { id: driver.id },
                 data: { vehicleInfo: `DISCOUNT_${requestId}_${weight}` },
@@ -595,7 +799,6 @@ export const getBot = async () => {
             }
 
             const effectiveWeight = weight - (weight * discount / 100);
-            // Material tanlash state
             await prisma.driver.update({
                 where: { id: driver.id },
                 data: { vehicleInfo: `MATERIAL_${requestId}_${weight}_${discount}` },
@@ -711,18 +914,19 @@ export const getBot = async () => {
     bot.help((ctx) => {
         ctx.reply(
             `📋 <b>Buyruqlar:</b>\n\n` +
-            `<b>Masul shaxs:</b>\n` +
+            `<b>👤 Mijoz:</b>\n` +
+            `/ariza — ♻️ Yangi ariza yuborish\n` +
+            `/arizalarim — Mening arizalarim\n` +
+            `/shikoyat — Shikoyat qoldirish\n\n` +
+            `<b>👷 Masul shaxs:</b>\n` +
             `/arizalar — Aktiv arizalar\n` +
             `/haydovchilar — Haydovchilar ro'yxati\n` +
             `/hisobot — Moliyaviy hisobot (30 kun)\n` +
             `/tolash — Kutilayotgan to'lovlar\n\n` +
-            `<b>Haydovchi:</b>\n` +
+            `<b>🚚 Haydovchi:</b>\n` +
             `/ishlarim — Tayinlangan ishlar\n` +
             `/status — Online/Offline\n` +
-            `/hisobot — Mening hisobotim\n\n` +
-            `<b>Mijoz:</b>\n` +
-            `/arizalarim — Mening arizalarim\n` +
-            `/shikoyat — Shikoyat qoldirish`,
+            `/hisobot — Mening hisobotim`,
             { parse_mode: 'HTML' }
         );
     });
@@ -731,8 +935,137 @@ export const getBot = async () => {
     return bot;
 };
 
+// ─── Ariza yaratish helper ──────────────────────────────────────────────────
+async function createArizaFromSession(ctx: Context, tgId: string, pickupType: string, address: string | null) {
+    const ses = arizaSessions.get(tgId);
+    if (!ses || !ses.name || !ses.phone || !ses.regionId) {
+        arizaSessions.delete(tgId);
+        await ctx.reply('❌ Sessiya tugagan. Qayta /ariza yuboring.');
+        return;
+    }
+
+    try {
+        const point = await prisma.recyclePoint.findUnique({ where: { id: ses.regionId } });
+        const matInfo = MAT[ses.material || 'mix'] || MAT.mix;
+
+        const request = await prisma.recycleRequest.create({
+            data: {
+                name: ses.name,
+                phone: ses.phone,
+                regionId: ses.regionId,
+                material: ses.material || 'mix',
+                volume: ses.volume || null,
+                pickupType,
+                address: address || null,
+                customerTgId: tgId,
+                status: 'new',
+            },
+        });
+
+        arizaSessions.delete(tgId);
+
+        await ctx.reply(
+            `✅ <b>Ariza yuborildi! #${request.id}</b>\n\n` +
+            `👤 ${ses.name} | 📞 ${ses.phone}\n` +
+            `📍 ${point?.regionUz || '—'}, ${point?.cityUz || '—'}\n` +
+            `${matInfo.emoji} ${matInfo.label}` +
+            `${ses.volume ? ` | ⚖️ ~${ses.volume} kg` : ''}\n` +
+            `🏠 ${pickupType === 'pickup' ? `Pickup: ${address}` : "O'zi olib boradi"}\n\n` +
+            `⏳ Tez orada masul shaxs siz bilan bog'lanadi!\n` +
+            `Holat: /arizalarim`,
+            { parse_mode: 'HTML' }
+        );
+
+        // ── Masul shaxslarga xabar ────────────────────────────────────────
+        const supervisors = await prisma.supervisor.findMany({
+            where: { pointId: ses.regionId, isActive: true },
+        });
+        const bot = botInstance;
+        if (bot) {
+            for (const sup of supervisors) {
+                if (sup.telegramId) {
+                    try {
+                        await bot.telegram.sendMessage(sup.telegramId,
+                            `📬 <b>Yangi ariza! #${request.id}</b>\n\n` +
+                            `👤 ${ses.name} | 📞 ${ses.phone}\n` +
+                            `📍 ${point?.regionUz || '—'}\n` +
+                            `${matInfo.emoji} ${matInfo.label}` +
+                            `${ses.volume ? ` | ⚖️ ~${ses.volume} kg` : ''}\n` +
+                            `🏠 ${pickupType === 'pickup' ? `Pickup: ${address}` : "O'zi keladi"}\n\n` +
+                            `Haydovchi tayinlash uchun /arizalar`,
+                            { parse_mode: 'HTML' }
+                        );
+                    } catch (e) {
+                        console.error(`Supervisorga xabar yuborishda xato (${sup.id}):`, e);
+                    }
+                }
+            }
+        }
+
+        // ── Admin guruhga xabar ───────────────────────────────────────────
+        const config = await prisma.telegramConfig.findFirst();
+        if (config?.salesChatId && bot) {
+            const chatIds = config.salesChatId.split(',').map(id => id.trim());
+            for (const chatId of chatIds) {
+                if (chatId) {
+                    try {
+                        await bot.telegram.sendMessage(chatId,
+                            `📬 <b>Yangi ariza! #${request.id}</b>\n👤 ${ses.name} | 📞 ${ses.phone}\n📍 ${point?.regionUz || '—'}\n${matInfo.emoji} ${matInfo.label}`,
+                            { parse_mode: 'HTML' }
+                        );
+                    } catch (e) {
+                        console.error(`Admin chatga xabar yuborishda xato (${chatId}):`, e);
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Ariza yaratishda xato:', error);
+        arizaSessions.delete(tgId);
+        await ctx.reply('❌ Ariza yaratishda xatolik yuz berdi. Qayta /ariza yuboring.');
+    }
+}
+
 // ─── Reset ──────────────────────────────────────────────────────────────────
-export const resetBot = () => { botInstance = null; };
+export const resetBot = () => {
+    if (botInstance) {
+        try { botInstance.stop('reset'); } catch {}
+    }
+    botInstance = null;
+    pollingStarted = false;
+};
+
+// ─── Polling rejim (development uchun — webhook kerak emas) ─────────────────
+let pollingStarted = false;
+
+export const startPolling = async () => {
+    if (pollingStarted) return;
+    const bot = await getBot();
+    if (!bot) {
+        console.warn('[Bot] Token sozlanmagan — polling boshlanmadi');
+        return;
+    }
+
+    try {
+        // Avval webhook ni o'chirish
+        await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+        console.log('🤖 Webhook o\'chirildi, polling boshlanmoqda...');
+    } catch (e) {
+        console.error('Webhook o\'chirishda xato:', e);
+    }
+
+    pollingStarted = true;
+    bot.launch({ dropPendingUpdates: true })
+        .then(() => console.log('🤖 Bot polling rejimda ishga tushdi!'))
+        .catch((err) => {
+            console.error('Bot polling xatosi:', err);
+            pollingStarted = false;
+        });
+
+    // Graceful shutdown
+    process.once('SIGINT', () => bot.stop('SIGINT'));
+    process.once('SIGTERM', () => bot.stop('SIGTERM'));
+};
 
 // ─── Admin xabar yuborish (salesChatId ga) ──────────────────────────────────
 export const sendTelegramMessage = async (message: string) => {
