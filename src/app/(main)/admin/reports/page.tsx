@@ -13,6 +13,8 @@ import {
 } from 'recharts';
 import Image from 'next/image';
 import Link from 'next/link';
+import SalesFunnel from '../dashboard/components/SalesFunnel';
+import RegionSalesMap from '../dashboard/components/RegionSalesMap';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface ReportData {
@@ -28,6 +30,7 @@ interface ReportData {
         cancelRate: number;
         repeatRate: number;
         cancelledOrders: number;
+        peakHour: number;
     };
     trends: {
         ordersGrowth: number;
@@ -44,6 +47,15 @@ interface ReportData {
     }[];
     ordersByStatus: { status: string; _count: { status: number } }[];
     dailyRevenue: { date: string; revenue: number; orders: number }[];
+    funnelData: {
+        draft: number;
+        new: number;
+        processing: number;
+        shipping: number;
+        delivered: number;
+        cancelled: number;
+    } | null;
+    regionSales: { region: string; orders: number; revenue: number }[];
     period: number;
 }
 
@@ -256,7 +268,7 @@ export default function ReportsPage() {
                                     </button>
                                 ))}
                                 <div className="border-t border-gray-100 mt-1 pt-1 px-4 py-2">
-                                    <p className="text-[10px] text-gray-400">Davr: so'nggi {period} kun</p>
+                                    <p className="text-[10px] text-gray-400">Davr: so&apos;nggi {period} kun</p>
                                 </div>
                             </div>
                         )}
@@ -309,12 +321,13 @@ export default function ReportsPage() {
 
             {/* Extended KPI row */}
             {!loading && s && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
                     {[
                         { label: "Yangi buyurtmalar (24h)", value: fmt(s.newOrders),        clr: 'text-blue-600'   },
                         { label: "Yetkazilgan",             value: fmt(s.completedOrders),  clr: 'text-emerald-600'},
-                        { label: "Davr buyurtmalari",       value: fmt(s.periodOrders),     clr: 'text-purple-600' },
+                        { label: "O'rtacha buyurtma (AOV)", value: `${fmtM(s.aov)} so'm`,  clr: 'text-purple-600' },
                         { label: "Konversiya",              value: `${s.conversionRate}%`,  clr: s.conversionRate >= 50 ? 'text-emerald-600' : 'text-red-500' },
+                        { label: "⏰ Eng faol soat",        value: `${s.peakHour}:00`,      clr: 'text-blue-600'   },
                     ].map(({ label, value, clr }) => (
                         <div key={label} className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex flex-col">
                             <span className="text-[11px] text-gray-400 mb-1">{label}</span>
@@ -382,6 +395,12 @@ export default function ReportsPage() {
                         <EmptyChart height={200} />
                     )}
                 </div>
+            </div>
+
+            {/* Funnel + Region */}
+            <div className="grid lg:grid-cols-2 gap-5 mb-5">
+                <SalesFunnel data={data?.funnelData ?? null} loading={loading} />
+                <RegionSalesMap data={data?.regionSales ?? []} loading={loading} />
             </div>
 
             {/* Orders bar + Top products */}

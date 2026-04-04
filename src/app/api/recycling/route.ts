@@ -20,20 +20,24 @@ export async function POST(request: Request) {
                 material: body.material || null,
                 volume: body.volume ? Number(body.volume) : null,
                 pickupType: body.pickupType || 'base',
-                status: 'new'
-            }
+                address: body.address || null,
+                customerTgId: body.customerTgId || null,
+                status: 'new',
+            },
         });
 
-        // Telegramga bot orqali bildirishnoma yuborish
+        // Telegramga bildirishnoma — adminga
         try {
-            const message = `♻️ <b>Yangi Makulatura So'rovi #${req.id}</b>\n\n` +
-                            `👤 Mijoz: ${req.name}\n` +
-                            `📞 Telefon: ${req.phone}\n` +
-                            `📍 Viloyat: ${point ? point.regionUz : body.regionId}\n` +
-                            `🚚 Usul: ${req.pickupType === 'pickup' ? 'Kuryer vizovi' : 'O\'zi olib keladi'}\n` +
-                            `📦 Hajmi: ${req.volume ? req.volume + ' kg' : 'Noma\'lum'}\n` +
-                            `📄 Material: ${req.material || 'Ko\'rsatilmagan'}`;
-            
+            const message =
+                `♻️ <b>Yangi Makulatura So'rovi #${req.id}</b>\n\n` +
+                `👤 Mijoz: ${req.name}\n` +
+                `📞 Telefon: ${req.phone}\n` +
+                `📍 Viloyat: ${point ? point.regionUz : body.regionId}\n` +
+                `${req.address ? `🏠 Manzil: ${req.address}\n` : ''}` +
+                `🚚 Usul: ${req.pickupType === 'pickup' ? 'Kuryer chiqishi' : 'O\'zi olib keladi'}\n` +
+                `📦 Hajmi: ${req.volume ? req.volume + ' kg' : 'Noma\'lum'}\n` +
+                `📄 Material: ${req.material || 'Ko\'rsatilmagan'}`;
+
             await sendTelegramMessage(message);
         } catch (botErr) {
             console.error('Telegramga yuborib bolmadi', botErr);
@@ -41,6 +45,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ success: true, req }, { status: 201 });
     } catch (error) {
+        console.error('[Recycling POST]', error);
         return NextResponse.json({ error: 'Server xatosi' }, { status: 500 });
     }
 }

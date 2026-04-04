@@ -157,13 +157,83 @@ export async function GET(req: NextRequest) {
         const cancelRate = curCount > 0 ? Math.round((curCancelled / curCount) * 100) : 0;
         const repeatCount = Number(repeatCustomers?.[0]?.count ?? 0);
 
-        // Noyob mijozlar soni (telefon bo'yicha)
         const uniquePhones = new Set(
             periodOrders
                 .map((o: { contactPhone: string | null }) => o.contactPhone)
                 .filter(Boolean)
         ).size;
         const repeatRate = uniquePhones > 0 ? Math.round((repeatCount / uniquePhones) * 100) : 0;
+
+        // ─── Sotuv Funnel (status pipeline) ──────────────────────────────────
+        const funnelData = {
+            draft:      ordersByStatus.find(s => s.status === 'draft')?._count?.status ?? 0,
+            new:        ordersByStatus.find(s => s.status === 'new')?._count?.status ?? 0,
+            processing: ordersByStatus.find(s => s.status === 'processing')?._count?.status ?? 0,
+            shipping:   ordersByStatus.find(s => s.status === 'shipping')?._count?.status ?? 0,
+            delivered:  ordersByStatus.find(s => s.status === 'delivered')?._count?.status ?? 0,
+            cancelled:  ordersByStatus.find(s => s.status === 'cancelled')?._count?.status ?? 0,
+        };
+
+        // ─── Viloyat bo'yicha savdo ──────────────────────────────────────────
+        let regionSales: { region: string; orders: number; revenue: number }[] = [];
+        try {
+            const regionData = await prisma.$queryRaw<{
+                region: string;
+                orders: number;
+                revenue: number;
+            }[]>`
+                SELECT
+                    CASE
+                        WHEN "shippingAddress" ILIKE '%toshkent%' OR "shippingAddress" ILIKE '%ташкент%' THEN 'Toshkent'
+                        WHEN "shippingAddress" ILIKE '%samarqand%' OR "shippingAddress" ILIKE '%самарканд%' THEN 'Samarqand'
+                        WHEN "shippingAddress" ILIKE '%buxoro%' OR "shippingAddress" ILIKE '%бухар%' THEN 'Buxoro'
+                        WHEN "shippingAddress" ILIKE '%andijon%' OR "shippingAddress" ILIKE '%андижан%' THEN 'Andijon'
+                        WHEN "shippingAddress" ILIKE '%farg''ona%' OR "shippingAddress" ILIKE '%ферган%' THEN 'Farg''ona'
+                        WHEN "shippingAddress" ILIKE '%namangan%' OR "shippingAddress" ILIKE '%наманган%' THEN 'Namangan'
+                        WHEN "shippingAddress" ILIKE '%xorazm%' OR "shippingAddress" ILIKE '%хорезм%' OR "shippingAddress" ILIKE '%urganch%' THEN 'Xorazm'
+                        WHEN "shippingAddress" ILIKE '%qashqadaryo%' OR "shippingAddress" ILIKE '%кашкадар%' OR "shippingAddress" ILIKE '%qarshi%' THEN 'Qashqadaryo'
+                        WHEN "shippingAddress" ILIKE '%surxondaryo%' OR "shippingAddress" ILIKE '%сурхандар%' OR "shippingAddress" ILIKE '%termiz%' THEN 'Surxondaryo'
+                        WHEN "shippingAddress" ILIKE '%jizzax%' OR "shippingAddress" ILIKE '%джизак%' THEN 'Jizzax'
+                        WHEN "shippingAddress" ILIKE '%sirdaryo%' OR "shippingAddress" ILIKE '%сырдар%' THEN 'Sirdaryo'
+                        WHEN "shippingAddress" ILIKE '%navoiy%' OR "shippingAddress" ILIKE '%навои%' THEN 'Navoiy'
+                        WHEN "shippingAddress" ILIKE '%nukus%' OR "shippingAddress" ILIKE '%qoraqalpog%' OR "shippingAddress" ILIKE '%каракалп%' THEN 'Qoraqalpog''iston'
+                        ELSE 'Boshqa'
+                    END as region,
+                    COUNT(*)::int as orders,
+                    COALESCE(SUM("totalAmount"), 0)::float as revenue
+                FROM "Order"
+                WHERE "createdAt" >= ${from}
+                  AND status NOT IN ('draft', 'cancelled')
+                  AND "shippingAddress" IS NOT NULL
+                  AND "shippingAddress" != ''
+                GROUP BY region
+                ORDER BY revenue DESC
+            `;
+            regionSales = regionData.map(r => ({
+                region: r.region,
+                orders: Number(r.orders),
+                revenue: Number(r.revenue),
+            }));
+        } catch {
+            // Viloyat so'rovi xato bo'lsa — bo'sh qoladi
+        }
+
+        // ─── Eng faol soat ───────────────────────────────────────────────────
+        let peakHour = 0;
+        try {
+            const hourData = await prisma.$queryRaw<{ hour: number; cnt: number }[]>`
+                SELECT
+                    EXTRACT(HOUR FROM "createdAt")::int as hour,
+                    COUNT(*)::int as cnt
+                FROM "Order"
+                WHERE "createdAt" >= ${from}
+                  AND status NOT IN ('draft')
+                GROUP BY hour
+                ORDER BY cnt DESC
+                LIMIT 1
+            `;
+            peakHour = hourData?.[0]?.hour ?? 0;
+        } catch { /* ignore */ }
 
         return NextResponse.json({
             summary: {
@@ -179,11 +249,14 @@ export async function GET(req: NextRequest) {
                 cancelRate,
                 repeatRate,
                 cancelledOrders: curCancelled,
+                peakHour,
             },
             trends,
             topProducts: topProductsWithDetails,
             ordersByStatus,
             dailyRevenue: daily,
+            funnelData,
+            regionSales,
             period: days,
         });
     } catch (error) {
@@ -191,3 +264,4 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Server xatosi' }, { status: 500 });
     }
 }
+

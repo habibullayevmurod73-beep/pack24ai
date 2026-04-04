@@ -27,10 +27,25 @@ model User {
   address       String?                         // Mijoz manzili
   notes         String?                         // Admin eslatmalari
 
-  orders       Order[]                          // Mijoz buyurtmalari
+  orders            Order[]                     // Mijoz buyurtmalari
+  pushSubscriptions PushSubscription[]          // Push notification subscriptionlar
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+// ─── Push Notification Subscriptionlar ───────────────────────────────────────
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  endpoint  String   @unique           // Browser push endpoint URL
+  p256dh    String                     // Public ECDH key
+  auth      String                     // Auth secret
+  userId    Int?                       // Autentifikatsiya qilingan foydalanuvchi (ixtiyoriy)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userAgent String?                    // Browser turi (debug uchun)
+  isActive  Boolean  @default(true)    // Subscription hali ham faol
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -251,31 +266,168 @@ model News {
 }
 
 // ─── Qayta ishlash bo'limi (Makulatura) ──────────────────────────────────────
+
+// Yig'ish bazasi
 model RecyclePoint {
-  id        Int      @id @default(autoincrement())
-  regionUz  String
-  regionRu  String
-  cityUz    String
-  cityRu    String
-  phone     String
-  status    String   @default("active") // active, planned
-  color     String   @default("bg-emerald-500")
-  requests  RecycleRequest[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          Int      @id @default(autoincrement())
+  regionUz    String
+  regionRu    String
+  cityUz      String
+  cityRu      String
+  phone       String
+  address     String?                    // Baza manzili
+  pricePerKg  Float    @default(800)     // Default narx (so'm/kg) — masul+admin belgilaydi
+  status      String   @default("active") // active, planned
+  color       String   @default("bg-emerald-500")
+
+  requests    RecycleRequest[]
+  supervisors Supervisor[]
+  drivers     Driver[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
+// Masul shaxs (Supervisor) — hududga biriktrilgan
+model Supervisor {
+  id           Int      @id @default(autoincrement())
+  name         String
+  phone        String   @unique
+  telegramId   String?  @unique          // Telegram user ID
+  telegramName String?
+  pointId      Int?                      // Biriktrilgan baza
+  point        RecyclePoint? @relation(fields: [pointId], references: [id])
+  isActive     Boolean  @default(true)
+
+  drivers      Driver[]
+  requests     RecycleRequest[]          // Yo'naltirilgan arizalar
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// Haydovchi
+model Driver {
+  id             Int      @id @default(autoincrement())
+  name           String
+  phone          String   @unique
+  telegramId     String?  @unique
+  telegramName   String?
+  supervisorId   Int?                    // Qaysi masul ostida
+  supervisor     Supervisor? @relation(fields: [supervisorId], references: [id])
+  pointId        Int?                    // Qaysi baza hududida
+  point          RecyclePoint? @relation(fields: [pointId], references: [id])
+  status         String   @default("active")  // active, inactive, on_route, busy
+  isOnline       Boolean  @default(false)
+  vehicleInfo    String?                 // Mashina ma'lumoti
+  lastSeenAt     DateTime?
+
+  collections    RecycleCollection[]
+  assignedRequests RecycleRequest[]
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// Mijoz arizasi (kengaytirilgan)
 model RecycleRequest {
-  id          Int          @id @default(autoincrement())
-  name        String
-  phone       String
-  regionId    Int
-  point       RecyclePoint @relation(fields: [regionId], references: [id])
-  material    String?
-  volume      Int?
-  pickupType  String       @default("base") // base, pickup
-  status      String       @default("new")  // new, processing, completed, cancelled
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id            Int          @id @default(autoincrement())
+  name          String
+  phone         String
+  regionId      Int
+  point         RecyclePoint @relation(fields: [regionId], references: [id])
+  material      String?                  // qog'oz, karton, gazeta, jurnal, ofis, kitob, aralash
+  volume        Int?                     // Taxminiy hajm (kg)
+  pickupType    String       @default("base") // base, pickup
+  address       String?                  // Mijoz manzili (pickup uchun)
+  customerTgId  String?                  // Mijoz Telegram ID (ixtiyoriy)
+
+  // Status pipeline: new → dispatched → assigned → en_route → arrived → collecting → collected → confirmed → completed / cancelled / disputed
+  status        String       @default("new")
+
+  // Dispatch zanjiri
+  supervisorId    Int?
+  supervisor      Supervisor? @relation(fields: [supervisorId], references: [id])
+  dispatchedAt    DateTime?              // Admin masulga yo'naltirgan vaqt
+
+  assignedDriverId Int?
+  assignedDriver   Driver? @relation(fields: [assignedDriverId], references: [id])
+  assignedAt       DateTime?             // Haydovchi tayinlangan vaqt
+
+  // Jarayon vaqtlari
+  driverEnRouteAt  DateTime?             // Haydovchi yo'lga chiqdi
+  driverArrivedAt  DateTime?             // Haydovchi yetib keldi
+  collectedAt      DateTime?             // Yuk yig'ildi
+  confirmedAt      DateTime?             // Mijoz tasdiqladi
+  completedAt      DateTime?             // To'liq yakunlandi
+
+  completedNote    String?
+
+  collections      RecycleCollection[]
+  complaints       RecycleComplaint[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// Yig'ish hisob-kitobi
+model RecycleCollection {
+  id            Int      @id @default(autoincrement())
+  requestId     Int
+  request       RecycleRequest @relation(fields: [requestId], references: [id])
+  driverId      Int
+  driver        Driver   @relation(fields: [driverId], references: [id])
+
+  // Kalkulator: effectiveWeight = actualWeight - (actualWeight * discountPercent / 100)
+  // totalAmount = effectiveWeight * pricePerKg
+  actualWeight     Float                 // Haqiqiy og'irlik (kg)
+  discountPercent  Float    @default(0)  // Chegirma foizi (sifat, namlik va h.k.)
+  effectiveWeight  Float                 // Hisoblangan og'irlik (kg)
+  pricePerKg       Float                 // Narx (so'm/kg)
+  totalAmount      Float                 // Jami summa (so'm)
+
+  discountReason   String?              // Chegirma sababi: namlik, iflos, yirtiq...
+  materialType     String?              // qog'oz, karton, gazeta, jurnal, ofis, kitob, aralash
+  notes            String?
+
+  // Mijoz tasdiqlashi
+  customerConfirmed Boolean?             // null=kutilmoqda, true=tasdiqladi, false=inkor
+  customerComment   String?
+
+  // Punkt'ga topshirish
+  deliveredToPoint  Boolean  @default(false)
+  deliveredAt       DateTime?
+
+  // To'lov — masul belgilaydi: haydovchiga yoki mijozga
+  paymentStatus    String   @default("pending")  // pending, paid_to_driver, paid_to_customer, paid_both, completed
+  paymentToDriver  Float?                // Haydovchiga to'langan summa
+  paymentToCustomer Float?               // Mijozga to'langan summa
+  paymentNote      String?
+  paidAt           DateTime?
+  paidBy           String?               // Masul ismi
+
+  collectedAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// Shikoyat tizimi (2 darajali: masul → admin/direktor)
+model RecycleComplaint {
+  id          Int      @id @default(autoincrement())
+  requestId   Int
+  request     RecycleRequest @relation(fields: [requestId], references: [id])
+
+  fromPhone   String                     // Shikoyatchi telefoni
+  fromName    String
+  level       String   @default("supervisor")  // supervisor, director (=admin)
+  message     String                     // Shikoyat matni
+
+  status      String   @default("open")  // open, in_progress, resolved, closed
+  response    String?                    // Javob matni
+  respondedBy String?
+  resolvedAt  DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 

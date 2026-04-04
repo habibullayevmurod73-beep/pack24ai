@@ -137,6 +137,14 @@ function OrdersContent() {
                     <p className="text-xs text-gray-400 mt-0.5">Jami: {orders.length} ta</p>
                 </div>
                 <button
+                    onClick={() => window.open('/api/admin/export?type=orders&period=90', '_blank')}
+                    title="CSV yuklash"
+                    aria-label="CSV yuklash"
+                    className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 rounded-xl text-xs transition-colors"
+                >
+                    <Download size={12} /> Export
+                </button>
+                <button
                     onClick={fetchOrders}
                     disabled={loading}
                     title="Yangilash"

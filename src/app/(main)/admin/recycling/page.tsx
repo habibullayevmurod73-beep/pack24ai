@@ -5,8 +5,12 @@ import { toast } from 'sonner';
 import {
     Recycle, MapPin, Plus, Pencil, Trash2, Phone, Package,
     CheckCircle, Clock, XCircle, Filter, Search, Truck,
-    ChevronDown, AlertTriangle, Eye
+    ChevronDown, AlertTriangle, Eye, Download, Users, DollarSign, MessageCircle
 } from 'lucide-react';
+import SupervisorsTab from './_components/SupervisorsTab';
+import DriversTab from './_components/DriversTab';
+import CollectionsTab from './_components/CollectionsTab';
+import ComplaintsTab from './_components/ComplaintsTab';
 
 // ─── Типлар ──────────────────────────────────────────────────────────────────
 
@@ -33,16 +37,46 @@ interface RecycleRequest {
     volume: number | null;
     pickupType: string;
     status: string;
+    address?: string | null;
+    customerTgId?: string | null;
+    supervisorId?: number | null;
+    supervisor?: { id: number; name: string } | null;
+    assignedDriverId?: number | null;
+    assignedDriver?: { id: number; name: string; phone: string } | null;
+    dispatchedAt?: string | null;
+    assignedAt?: string | null;
+    driverEnRouteAt?: string | null;
+    driverArrivedAt?: string | null;
+    collectedAt?: string | null;
+    confirmedAt?: string | null;
+    completedAt?: string | null;
+    collections?: { id: number }[];
+    complaints?: { id: number }[];
     createdAt: string;
+}
+
+interface Supervisor {
+    id: number;
+    name: string;
+    phone: string;
+    pointId: number | null;
 }
 
 // ─── Ренглар ─────────────────────────────────────────────────────────────────
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; icon: React.ElementType }> = {
-    new:        { bg: 'bg-blue-100',    text: 'text-blue-700',    icon: Clock },
-    processing: { bg: 'bg-yellow-100',  text: 'text-yellow-700',  icon: Package },
-    completed:  { bg: 'bg-emerald-100', text: 'text-emerald-700', icon: CheckCircle },
-    cancelled:  { bg: 'bg-red-100',     text: 'text-red-700',     icon: XCircle },
+    new:         { bg: 'bg-blue-100',    text: 'text-blue-700',    icon: Clock },
+    dispatched:  { bg: 'bg-indigo-100',  text: 'text-indigo-700',  icon: Package },
+    assigned:    { bg: 'bg-purple-100',  text: 'text-purple-700',  icon: Truck },
+    en_route:    { bg: 'bg-cyan-100',    text: 'text-cyan-700',    icon: Truck },
+    arrived:     { bg: 'bg-teal-100',    text: 'text-teal-700',    icon: MapPin },
+    collecting:  { bg: 'bg-amber-100',   text: 'text-amber-700',   icon: Package },
+    collected:   { bg: 'bg-orange-100',  text: 'text-orange-700',  icon: Package },
+    confirmed:   { bg: 'bg-lime-100',    text: 'text-lime-700',    icon: CheckCircle },
+    completed:   { bg: 'bg-emerald-100', text: 'text-emerald-700', icon: CheckCircle },
+    disputed:    { bg: 'bg-pink-100',    text: 'text-pink-700',    icon: AlertTriangle },
+    processing:  { bg: 'bg-yellow-100',  text: 'text-yellow-700',  icon: Package },
+    cancelled:   { bg: 'bg-red-100',     text: 'text-red-700',     icon: XCircle },
 };
 
 const POINT_COLORS = [
@@ -53,9 +87,17 @@ const POINT_COLORS = [
 
 const STATUS_LABELS: Record<string, string> = {
     new: 'Yangi',
-    processing: 'Jarayonda',
+    dispatched: 'Yo\'naltirildi',
+    assigned: 'Tayinlandi',
+    en_route: 'Yo\'lda',
+    arrived: 'Yetib keldi',
+    collecting: 'Yig\'ilmoqda',
+    collected: 'Yig\'ildi',
+    confirmed: 'Tasdiqlandi',
     completed: 'Bajarildi',
-    cancelled: 'Bekor qilindi',
+    disputed: 'Bahsli',
+    processing: 'Jarayonda',
+    cancelled: 'Bekor',
 };
 
 const EMPTY_POINT = { regionUz: '', regionRu: '', cityUz: '', cityRu: '', phone: '', status: 'planned', color: 'bg-blue-500' };
@@ -64,7 +106,8 @@ const EMPTY_POINT = { regionUz: '', regionRu: '', cityUz: '', cityRu: '', phone:
 
 export default function AdminRecyclingPage() {
     // ─── State ────────────────────────────────────────────────────────────
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'points' | 'requests'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'points' | 'requests' | 'supervisors' | 'drivers' | 'collections' | 'complaints'>('dashboard');
+    const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
 
     // Points
     const [points, setPoints] = useState<RecyclePoint[]>([]);
@@ -112,10 +155,15 @@ export default function AdminRecyclingPage() {
         }
     }, []);
 
+    const fetchSupervisors = useCallback(async () => {
+        try { const r = await fetch('/api/admin/recycling/supervisors'); if (r.ok) setSupervisors(await r.json()); } catch { /* ignore */ }
+    }, []);
+
     useEffect(() => {
         fetchPoints();
         fetchRequests();
-    }, [fetchPoints, fetchRequests]);
+        fetchSupervisors();
+    }, [fetchPoints, fetchRequests, fetchSupervisors]);
 
     // ─── Point CRUD ───────────────────────────────────────────────────────
     const handlePointSubmit = async () => {
@@ -240,19 +288,29 @@ export default function AdminRecyclingPage() {
                         Bazalar va arizalarni boshqarish
                     </p>
                 </div>
+                <button
+                    onClick={() => window.open('/api/admin/export?type=recycling&period=365', '_blank')}
+                    className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition-colors"
+                >
+                    <Download size={14} /> Export CSV
+                </button>
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+            <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit flex-wrap">
                 {([
                     ['dashboard', '📊 Dashboard'],
                     ['points', '📍 Bazalar'],
                     ['requests', '📋 Arizalar'],
+                    ['supervisors', '👷 Masullar'],
+                    ['drivers', '🚚 Haydovchilar'],
+                    ['collections', '💰 Hisob-kitob'],
+                    ['complaints', '⚠️ Shikoyatlar'],
                 ] as const).map(([key, label]) => (
                     <button
                         key={key}
                         onClick={() => setActiveTab(key)}
-                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                        className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
                             activeTab === key
                                 ? 'bg-white text-gray-900 shadow-sm'
                                 : 'text-gray-500 hover:text-gray-700'
@@ -604,12 +662,15 @@ export default function AdminRecyclingPage() {
                                 className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-emerald-400"
                             />
                         </div>
-                        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+                        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl flex-wrap">
                             {[
                                 ['all', 'Barchasi'],
                                 ['new', '🔵 Yangi'],
-                                ['processing', '🟡 Jarayonda'],
+                                ['dispatched', '📤 Yuborilgan'],
+                                ['en_route', '🚚 Yo\'lda'],
+                                ['collected', '✅ Yig\'ildi'],
                                 ['completed', '🟢 Bajarildi'],
+                                ['disputed', '⚠️ Bahsli'],
                                 ['cancelled', '🔴 Bekor'],
                             ].map(([key, label]) => (
                                 <button
@@ -642,54 +703,62 @@ export default function AdminRecyclingPage() {
                     ) : (
                         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                             {/* Table Header */}
-                            <div className="hidden lg:grid grid-cols-[60px_1fr_140px_120px_100px_100px_160px] gap-4 px-5 py-3 bg-gray-50 border-b border-gray-100 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                            <div className="hidden lg:grid grid-cols-[50px_1fr_120px_100px_80px_80px_160px_160px] gap-3 px-5 py-3 bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                                 <span>ID</span>
                                 <span>Mijoz</span>
                                 <span>Viloyat</span>
                                 <span>Material</span>
                                 <span>Hajm</span>
                                 <span>Usul</span>
+                                <span>Dispatch</span>
                                 <span>Status</span>
                             </div>
 
                             {filteredRequests.map(r => {
                                 const sc = STATUS_COLORS[r.status] || STATUS_COLORS.new;
-                                const StatusIcon = sc.icon;
                                 return (
-                                    <div key={r.id} className="grid grid-cols-1 lg:grid-cols-[60px_1fr_140px_120px_100px_100px_160px] gap-2 lg:gap-4 px-5 py-4 border-b border-gray-50 hover:bg-gray-50/50 transition-colors items-center">
-                                        {/* ID */}
+                                    <div key={r.id} className="grid grid-cols-1 lg:grid-cols-[50px_1fr_120px_100px_80px_80px_160px_160px] gap-2 lg:gap-3 px-5 py-4 border-b border-gray-50 hover:bg-gray-50/50 transition-colors items-center">
                                         <span className="text-sm font-bold text-gray-400">#{r.id}</span>
 
-                                        {/* Client */}
                                         <div className="min-w-0">
                                             <p className="font-bold text-gray-900 text-sm truncate">{r.name}</p>
                                             <p className="text-xs text-gray-400">{r.phone}</p>
-                                            <p className="text-[10px] text-gray-300 lg:hidden">
-                                                {new Date(r.createdAt).toLocaleString('ru-RU')}
-                                            </p>
+                                            {r.address && <p className="text-[10px] text-gray-300 truncate">📍 {r.address}</p>}
                                         </div>
 
-                                        {/* Region */}
-                                        <span className="text-xs text-gray-600 font-medium">
-                                            📍 {getPointName(r.regionId)}
+                                        <span className="text-xs text-gray-600 font-medium truncate">📍 {getPointName(r.regionId)}</span>
+                                        <span className="text-xs text-gray-500 truncate">{r.material || '—'}</span>
+                                        <span className="text-sm font-bold text-gray-700">{r.volume ? `${r.volume} kg` : '—'}</span>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full w-fit ${r.pickupType === 'pickup' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                                            {r.pickupType === 'pickup' ? '🚛' : '🏭'}
                                         </span>
 
-                                        {/* Material */}
-                                        <span className="text-xs text-gray-500 truncate">
-                                            {r.material || '—'}
-                                        </span>
-
-                                        {/* Volume */}
-                                        <span className="text-sm font-bold text-gray-700">
-                                            {r.volume ? `${r.volume} kg` : '—'}
-                                        </span>
-
-                                        {/* Pickup type */}
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full w-fit ${
-                                            r.pickupType === 'pickup' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
-                                        }`}>
-                                            {r.pickupType === 'pickup' ? '🚛 Kuryer' : '🏭 Baza'}
-                                        </span>
+                                        {/* Dispatch info */}
+                                        <div className="space-y-1">
+                                            {r.supervisor ? (
+                                                <span className="text-[10px] bg-indigo-50 text-indigo-600 font-bold px-1.5 py-0.5 rounded block truncate">👷 {r.supervisor.name}</span>
+                                            ) : r.status === 'new' ? (
+                                                <select
+                                                    title="Masulga yo'naltirish"
+                                                    defaultValue=""
+                                                    onChange={async (e) => {
+                                                        if (!e.target.value) return;
+                                                        const res = await fetch('/api/admin/recycling/dispatch', {
+                                                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                            body: JSON.stringify({ action: 'dispatch_to_supervisor', requestId: r.id, supervisorId: Number(e.target.value) }),
+                                                        });
+                                                        if (res.ok) { toast.success('Masulga yo\'naltirildi ✅'); fetchRequests(); }
+                                                    }}
+                                                    className="text-[10px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border-0 w-full cursor-pointer"
+                                                >
+                                                    <option value="">📤 Masulga →</option>
+                                                    {supervisors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                                </select>
+                                            ) : <span className="text-[10px] text-gray-300">—</span>}
+                                            {r.assignedDriver && (
+                                                <span className="text-[10px] bg-purple-50 text-purple-600 font-bold px-1.5 py-0.5 rounded block truncate">🚚 {r.assignedDriver.name}</span>
+                                            )}
+                                        </div>
 
                                         {/* Status dropdown */}
                                         <div className="relative">
@@ -697,15 +766,21 @@ export default function AdminRecyclingPage() {
                                                 value={r.status}
                                                 onChange={e => updateRequestStatus(r.id, e.target.value)}
                                                 title={`Ariza #${r.id} statusini o'zgartirish`}
-                                                className={`w-full text-xs font-bold px-3 py-1.5 rounded-lg border-0 cursor-pointer appearance-none
-                                                    ${sc.bg} ${sc.text} focus:outline-none focus:ring-2 focus:ring-emerald-200`}
+                                                className={`w-full text-[10px] font-bold px-2 py-1.5 rounded-lg border-0 cursor-pointer appearance-none ${sc.bg} ${sc.text} focus:outline-none focus:ring-2 focus:ring-emerald-200`}
                                             >
                                                 <option value="new">🔵 Yangi</option>
-                                                <option value="processing">🟡 Jarayonda</option>
+                                                <option value="dispatched">📤 Yo&apos;naltirildi</option>
+                                                <option value="assigned">👤 Tayinlandi</option>
+                                                <option value="en_route">🚚 Yo&apos;lda</option>
+                                                <option value="arrived">📍 Yetdi</option>
+                                                <option value="collecting">📦 Yig&apos;ilmoqda</option>
+                                                <option value="collected">✅ Yig&apos;ildi</option>
+                                                <option value="confirmed">💚 Tasdiqlandi</option>
                                                 <option value="completed">🟢 Bajarildi</option>
+                                                <option value="disputed">⚠️ Bahsli</option>
                                                 <option value="cancelled">🔴 Bekor</option>
                                             </select>
-                                            <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${sc.text}`} />
+                                            <ChevronDown size={10} className={`absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none ${sc.text}`} />
                                         </div>
                                     </div>
                                 );
@@ -720,6 +795,18 @@ export default function AdminRecyclingPage() {
                     </p>
                 </div>
             )}
+
+            {/* MASUL SHAXSLAR TAB */}
+            {activeTab === 'supervisors' && <SupervisorsTab points={points.map(p => ({ id: p.id, regionUz: p.regionUz }))} />}
+
+            {/* HAYDOVCHILAR TAB */}
+            {activeTab === 'drivers' && <DriversTab points={points.map(p => ({ id: p.id, regionUz: p.regionUz }))} supervisors={supervisors.map(s => ({ id: s.id, name: s.name }))} />}
+
+            {/* HISOB-KITOB TAB */}
+            {activeTab === 'collections' && <CollectionsTab />}
+
+            {/* SHIKOYATLAR TAB */}
+            {activeTab === 'complaints' && <ComplaintsTab />}
         </div>
     );
 }

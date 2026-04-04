@@ -188,10 +188,10 @@ export default function Footer() {
 
                         {/* Stats */}
                         <div className="mt-5 grid grid-cols-2 gap-2">
-                            {STATS.map((stat, i) => (
+                            {STATS.map(({ icon: Icon, label }, i) => (
                                 <div key={i} className="flex items-center gap-1.5 text-blue-200/60 text-xs">
-                                    <stat.icon size={12} className="text-blue-400 shrink-0" />
-                                    <span>{lbl(stat.label)}</span>
+                                    <Icon size={12} className="text-blue-400 shrink-0" />
+                                    <span>{lbl(label)}</span>
                                 </div>
                             ))}
                         </div>

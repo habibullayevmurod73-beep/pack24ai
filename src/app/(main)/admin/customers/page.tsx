@@ -4,11 +4,12 @@ import { useState, useEffect, useCallback } from 'react';
 import {
     Search, Users, Building2, Package, Handshake,
     Crown, UserPlus, UserX, Ban, RefreshCw, Loader2,
-    Phone, ChevronRight, Filter,
+    Phone, ChevronRight, Filter, BarChart3,
     TrendingUp, ShoppingCart, Calendar, ChevronDown,
     DollarSign, AlertTriangle, UserCheck
 } from 'lucide-react';
 import CustomerDrawer from './_components/CustomerDrawer';
+import CustomerAnalytics from './_components/CustomerAnalytics';
 
 // ── Konfiguratsiya ───────────────────────────────────────────────
 const CUSTOMER_TYPES: Record<string, { label: string; color: string; bg: string }> = {
@@ -88,6 +89,7 @@ export default function CustomersPage() {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
+    const [activeView, setActiveView] = useState<'list' | 'analytics'>('list');
 
     const fetchCustomers = useCallback(async () => {
         setLoading(true);
@@ -152,16 +154,39 @@ export default function CustomersPage() {
                         {stats?.guests ? ` (${stats.registered} ro'yxatdan + ${stats.guests} mehmon)` : ''}
                     </p>
                 </div>
-                <button
-                    onClick={() => fetchCustomers()}
-                    disabled={loading}
-                    className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 font-semibold px-4 py-2.5 rounded-xl text-sm hover:bg-gray-50 transition-colors"
-                >
-                    <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                    Yangilash
-                </button>
+                <div className="flex items-center gap-2">
+                    {/* View tabs */}
+                    <div className="flex rounded-xl overflow-hidden border border-gray-200 bg-white text-sm">
+                        <button
+                            onClick={() => setActiveView('list')}
+                            className={`px-4 py-2 font-semibold transition-colors flex items-center gap-1.5 ${activeView === 'list' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+                        >
+                            <Users size={14} /> Ro&apos;yxat
+                        </button>
+                        <button
+                            onClick={() => setActiveView('analytics')}
+                            className={`px-4 py-2 font-semibold transition-colors flex items-center gap-1.5 ${activeView === 'analytics' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+                        >
+                            <BarChart3 size={14} /> Analitika
+                        </button>
+                    </div>
+                    <button
+                        onClick={() => fetchCustomers()}
+                        disabled={loading}
+                        className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 font-semibold px-4 py-2.5 rounded-xl text-sm hover:bg-gray-50 transition-colors"
+                    >
+                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                        Yangilash
+                    </button>
+                </div>
             </div>
 
+            {/* Analytics View */}
+            {activeView === 'analytics' && <CustomerAnalytics />}
+
+            {/* List View */}
+            {activeView === 'list' && (
+            <>
             {/* Stat Cards — Moliyaviy */}
             {stats && (
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -399,6 +424,8 @@ export default function CustomersPage() {
                 customer={selectedCustomer}
                 onSaved={() => fetchCustomers()}
             />
+            </>
+            )}
         </div>
     );
 }

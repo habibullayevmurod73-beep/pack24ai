@@ -5,12 +5,14 @@ import {
     Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend
 } from 'recharts';
 import {
-    TrendingUp, Users, ShoppingBag, DollarSign,
-    ArrowUpRight, ArrowDownRight, RefreshCw, Package, Clock, CheckCircle,
-    XCircle, ChevronRight, Box
+    TrendingUp, ShoppingBag, DollarSign,
+    ArrowUpRight, ArrowDownRight, RefreshCw, Package,
+    ChevronRight, Box
 } from 'lucide-react';
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import SalesFunnel from './components/SalesFunnel';
+import RegionSalesMap from './components/RegionSalesMap';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface DashboardData {
@@ -26,6 +28,7 @@ interface DashboardData {
         cancelRate: number;
         repeatRate: number;
         cancelledOrders: number;
+        peakHour: number;
     };
     trends: {
         ordersGrowth: number;
@@ -41,6 +44,15 @@ interface DashboardData {
     }[];
     ordersByStatus: { status: string; _count: { status: number } }[];
     dailyRevenue: { date: string; revenue: number; orders: number }[];
+    funnelData: {
+        draft: number;
+        new: number;
+        processing: number;
+        shipping: number;
+        delivered: number;
+        cancelled: number;
+    } | null;
+    regionSales: { region: string; orders: number; revenue: number }[];
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -182,10 +194,10 @@ export default function AdminDashboard() {
 
             {/* Extended KPI row */}
             {!loading && s && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                     <div className="bg-white rounded-2xl border border-gray-100 p-4 hover:shadow-md transition-shadow">
-                        <p className="text-xs text-gray-400 mb-1">O'rtacha buyurtma (AOV)</p>
-                        <p className="text-xl font-extrabold text-gray-900">{fmtM(s.aov)} <span className="text-xs font-normal text-gray-400">so'm</span></p>
+                        <p className="text-xs text-gray-400 mb-1">O&apos;rtacha buyurtma (AOV)</p>
+                        <p className="text-xl font-extrabold text-gray-900">{fmtM(s.aov)} <span className="text-xs font-normal text-gray-400">so&apos;m</span></p>
                     </div>
                     <div className="bg-white rounded-2xl border border-gray-100 p-4 hover:shadow-md transition-shadow">
                         <p className="text-xs text-gray-400 mb-1">Takroriy mijozlar</p>
@@ -198,6 +210,10 @@ export default function AdminDashboard() {
                     <div className="bg-white rounded-2xl border border-gray-100 p-4 hover:shadow-md transition-shadow">
                         <p className="text-xs text-gray-400 mb-1">Yetkazildi (davr)</p>
                         <p className="text-xl font-extrabold text-emerald-600">{fmt(s.completedOrders)}</p>
+                    </div>
+                    <div className="bg-white rounded-2xl border border-gray-100 p-4 hover:shadow-md transition-shadow">
+                        <p className="text-xs text-gray-400 mb-1">⏰ Eng faol soat</p>
+                        <p className="text-xl font-extrabold text-blue-600">{s.peakHour}:00</p>
                     </div>
                 </div>
             )}
@@ -254,9 +270,15 @@ export default function AdminDashboard() {
                             </PieChart>
                         </ResponsiveContainer>
                     ) : (
-                        <div className="h-52 flex items-center justify-center text-gray-300 text-sm">Ma'lumot yo'q</div>
+                        <div className="h-52 flex items-center justify-center text-gray-300 text-sm">Ma&apos;lumot yo&apos;q</div>
                     )}
                 </div>
+            </div>
+
+            {/* Funnel + Region row */}
+            <div className="grid lg:grid-cols-2 gap-5">
+                <SalesFunnel data={data?.funnelData ?? null} loading={loading} />
+                <RegionSalesMap data={data?.regionSales ?? []} loading={loading} />
             </div>
 
             {/* Bar + Top products */}
@@ -303,7 +325,7 @@ export default function AdminDashboard() {
                                 </div>
                             ))
                         ) : (data?.topProducts ?? []).length === 0 ? (
-                            <div className="p-8 text-center text-gray-300 text-sm">Ma'lumot yo'q</div>
+                            <div className="p-8 text-center text-gray-300 text-sm">Ma&apos;lumot yo&apos;q</div>
                         ) : (
                             (data?.topProducts ?? []).slice(0, 6).map((p, i) => (
                                 <div key={p.productId} className="px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors">
@@ -327,7 +349,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Quick status overview */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 {Object.entries(STATUS_LABELS).map(([key, meta]) => {
                     const count = data?.ordersByStatus.find(o => o.status === key)?._count?.status ?? 0;
                     return (

@@ -24,6 +24,7 @@ export default function TelegramBotPage() {
     const [activeLang, setActiveLang] = useState('uz');
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [testLoading, setTestLoading] = useState(false);
 
     // Config State
     const [botToken, setBotToken] = useState('');
@@ -31,12 +32,14 @@ export default function TelegramBotPage() {
     const [mainButtonText, setMainButtonText] = useState("Do'kon 🏪");
     const [botUsername, setBotUsername] = useState('Mavjud emas');
     const [copied, setCopied] = useState(false);
+    const [salesChatId, setSalesChatId] = useState('');
+    const [webhookInfo, setWebhookInfo] = useState<any>(null);
 
-    // Mock Data for stats (can be connected to backend later)
+    // Mock Data for stats
     const [botStats, setBotStats] = useState({
-        name: 'Pack24 Bot',
+        name: 'PACK24AI_bot',
         username: '@...',
-        version: 'v1.0.0',
+        version: 'v2.0.0 (Recycling Ready)',
         lastUpdated: 'Hozir',
         subscribers: 0,
         orders: 0
@@ -55,7 +58,9 @@ export default function TelegramBotPage() {
                 setBotToken(data.botToken || '');
                 setWelcomeText(data.welcomeMessage || '');
                 setMainButtonText(data.mainButton || '');
+                setSalesChatId(data.salesChatId || '');
                 setBotUsername(data.botUsername || 'Mavjud emas');
+                setWebhookInfo(data.webhookInfo);
                 setBotStats(prev => ({ ...prev, username: data.botUsername || '@...' }));
             }
         } catch (error) {
@@ -75,7 +80,8 @@ export default function TelegramBotPage() {
                 body: JSON.stringify({
                     botToken,
                     welcomeMessage: welcomeText,
-                    mainButton: mainButtonText
+                    mainButton: mainButtonText,
+                    salesChatId
                 })
             });
 
@@ -84,6 +90,7 @@ export default function TelegramBotPage() {
                 setBotUsername(data.botUsername);
                 setBotStats(prev => ({ ...prev, username: data.botUsername }));
                 toast.success('Sozlamalar saqlandi');
+                fetchConfig(); // Refresh to get webhook info
             } else {
                 toast.error('Saqlashda xatolik');
             }
@@ -95,8 +102,31 @@ export default function TelegramBotPage() {
         }
     };
 
+    const handleTest = async () => {
+        setTestLoading(true);
+        try {
+            const res = await fetch('/api/admin/telegram/test', { method: 'POST' });
+            const data = await res.json();
+            
+            if (res.ok) {
+                const successCount = data.results?.filter((r: any) => r.status === 'success').length || 0;
+                if (successCount > 0) {
+                    toast.success(`${successCount} ta manzilga test xabari yuborildi!`);
+                } else {
+                    toast.warning('Bot ishlamoqda, lekin Chat ID-lar xato yoki kiritilmagan.');
+                }
+            } else {
+                toast.error(data.error || 'Testda xatolik');
+            }
+        } catch (error) {
+            toast.error('Server bilan bog\'lanishda xatolik');
+        } finally {
+            setTestLoading(false);
+        }
+    };
+
     const handleCopyToken = () => {
-        navigator.clipboard.writeText('/set_group -100...'); // TODO: Add group ID logic
+        navigator.clipboard.writeText('/set_group'); 
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
@@ -112,16 +142,18 @@ export default function TelegramBotPage() {
             {/* 1. Header with Stats */}
             <div className="grid md:grid-cols-3 gap-6 mb-8">
                 <Card className="col-span-2 p-6 flex items-center gap-6 border border-gray-100 shadow-sm rounded-[16px]">
-                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-200">
+                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200">
                         <Bot className="w-10 h-10" />
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900">{botStats.name}</h1>
-                        <p className="text-blue-500 font-medium mb-1">{botStats.username}</p>
+                        <p className="text-emerald-500 font-medium mb-1">{botStats.username}</p>
                         <div className="flex items-center gap-2 text-sm text-gray-500">
                             <span className="bg-gray-100 px-2 py-0.5 rounded text-gray-600 font-medium text-xs">{botStats.version}</span>
                             <span>•</span>
-                            <span>{botToken ? 'Faol' : 'Faol emas'}</span>
+                            <span className={botToken ? 'text-emerald-600 font-bold' : 'text-red-500'}>
+                                {botToken ? 'Faol' : 'Faol emas'}
+                            </span>
                         </div>
                     </div>
                 </Card>
@@ -138,35 +170,14 @@ export default function TelegramBotPage() {
                     </Card>
                     <Card className="p-5 flex flex-col justify-center border border-gray-100 shadow-sm rounded-[16px]">
                         <div className="flex items-center gap-3 mb-2 text-gray-500">
-                            <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
+                            <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
                                 <ShoppingCart className="w-5 h-5" />
                             </div>
-                            <span className="text-sm font-medium">Buyurtmalar</span>
+                            <span className="text-sm font-medium">Topshiriqlar</span>
                         </div>
                         <p className="text-2xl font-bold text-gray-900">{botStats.orders.toLocaleString()}</p>
                     </Card>
                 </div>
-            </div>
-
-            {/* 2. Tabs */}
-            <div className="flex items-center gap-8 border-b border-gray-200 mb-8">
-                {['settings', 'actions', 'qr'].map((tab) => (
-                    <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
-                        className={`pb-4 text-sm font-medium transition-all relative ${activeTab === tab
-                            ? 'text-[#064E3B] font-bold'
-                            : 'text-gray-500 hover:text-gray-700'
-                            }`}
-                    >
-                        {tab === 'settings' && 'Bot sozlamalari'}
-                        {tab === 'actions' && 'Amallar'}
-                        {tab === 'qr' && 'QR kod'}
-                        {activeTab === tab && (
-                            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#064E3B] rounded-t-full" />
-                        )}
-                    </button>
-                ))}
             </div>
 
             {/* Main Content */}
@@ -174,10 +185,33 @@ export default function TelegramBotPage() {
                 {/* Left Column: Settings */}
                 <div className="xl:col-span-2 space-y-8">
 
+                    {/* Webhook Status */}
+                    {botToken && (
+                        <Card className={`p-4 border-l-4 rounded-xl flex items-center justify-between ${webhookInfo?.url ? 'border-emerald-500 bg-emerald-50/30' : 'border-amber-500 bg-amber-50/30'}`}>
+                            <div className="flex items-center gap-3">
+                                <Globe className={webhookInfo?.url ? 'text-emerald-600' : 'text-amber-600'} size={20} />
+                                <div>
+                                    <p className="text-sm font-bold text-gray-900">Webhook Holati</p>
+                                    <p className="text-xs text-gray-500 truncate max-w-[300px]">
+                                        {webhookInfo?.url || 'Webhook sozlanmagan'}
+                                    </p>
+                                </div>
+                            </div>
+                            {webhookInfo?.pending_update_count > 0 && (
+                                <Badge variant="secondary" className="bg-amber-100 text-amber-700">
+                                    {webhookInfo.pending_update_count} kutilmoqda
+                                </Badge>
+                            )}
+                            <Button variant="ghost" size="sm" onClick={() => fetchConfig()} title="Yangilash">
+                                <RefreshCcw size={14} className={loading ? 'animate-spin' : ''} />
+                            </Button>
+                        </Card>
+                    )}
+
                     {/* Token Input */}
-                    <div className="bg-white rounded-[16px] shadow-sm border border-gray-100 p-6">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Bot Token (BotFather)</label>
-                        <div className="flex gap-2">
+                    <div className="bg-white rounded-[16px] shadow-sm border border-gray-100 p-6 space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Bot Token (BotFather)</label>
                             <Input
                                 type="password"
                                 value={botToken}
@@ -185,25 +219,49 @@ export default function TelegramBotPage() {
                                 placeholder="123456789:ABCdef..."
                                 className="font-mono text-sm"
                             />
+                            <p className="text-xs text-gray-500 mt-2">BotFather orqali olingan tokenni kiriting.</p>
                         </div>
-                        <p className="text-xs text-gray-500 mt-2">BotFather orqali olingan tokenni kiriting.</p>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Menejerlar Guruh ID (salesChatId)</label>
+                            <Input
+                                value={salesChatId}
+                                onChange={(e) => setSalesChatId(e.target.value)}
+                                placeholder="-100123456789"
+                                className="font-mono text-sm"
+                            />
+                            <p className="text-xs text-gray-500 mt-2">Yangi arizalar haqida xabar boradigan guruh yoki kanal ID-si. Vergul bilan bir nechta yozish mumkin.</p>
+                        </div>
                     </div>
 
                     {/* 3. Connection Instructions */}
                     <div className="bg-white rounded-[16px] shadow-sm border border-gray-100 overflow-hidden">
                         <div className="p-6 border-b border-gray-50">
-                            <h2 className="text-lg font-bold text-gray-900">Buyurtmalarni Telegram guruhiga yo'naltirish</h2>
-                            <p className="text-sm text-gray-500 mt-1">Bot orqali kelgan buyurtmalar menejerlar guruhiga avtomatik tushadi</p>
+                            <h2 className="text-lg font-bold text-gray-900">Botni Sozlash Bo'yicha Qo'llanma</h2>
+                            <p className="text-sm text-gray-500 mt-1">Bot barcha rollar (Admin, Masul, Haydovchi, Mijoz) uchun xizmat qiladi</p>
                         </div>
                         <div className="p-6 bg-gray-50/50">
-                            <ol className="space-y-4 relative before:absolute before:left-3.5 before:top-2 before:h-full before:w-0.5 before:bg-gray-200 before:z-0">
-                                <li className="relative flex items- gap-4 z-10">
-                                    <span className="flex-shrink-0 w-7 h-7 rounded-full bg-white border-2 border-blue-500 text-blue-600 font-bold text-sm flex items-center justify-center shadow-sm">1</span>
-                                    <p className="text-sm text-gray-700 pt-1">Telegramda yangi guruh yarating va <span className="font-semibold text-gray-900">{botStats.username}</span> ni guruhga qo'shing.</p>
+                            <ol className="space-y-4 relative">
+                                <li className="flex gap-4">
+                                    <span className="flex-shrink-0 w-7 h-7 rounded-full bg-emerald-500 text-white font-bold text-sm flex items-center justify-center">1</span>
+                                    <div>
+                                        <p className="text-sm font-bold text-gray-900">Tokenni kiriting</p>
+                                        <p className="text-xs text-gray-600">BotFather'dan olingan tokenni kiriting va saqlashni bosing. Webhook avtomatik sozlanadi.</p>
+                                    </div>
                                 </li>
-                                <li className="relative flex items-start gap-4 z-10">
-                                    <span className="flex-shrink-0 w-7 h-7 rounded-full bg-white border-2 border-blue-500 text-blue-600 font-bold text-sm flex items-center justify-center shadow-sm">2</span>
-                                    <p className="text-sm text-gray-700 pt-1">Botni guruhda <b>Administrator</b> qilib tayinlang.</p>
+                                <li className="flex gap-4">
+                                    <span className="flex-shrink-0 w-7 h-7 rounded-full bg-emerald-500 text-white font-bold text-sm flex items-center justify-center">2</span>
+                                    <div>
+                                        <p className="text-sm font-bold text-gray-900">Masul va Haydovchilarni biriktiring</p>
+                                        <p className="text-xs text-gray-600">Admin paneldagi "Recycling" bo'limida Masul va Haydovchilarga o'zlarining Telegram ID raqamlarini kiriting.</p>
+                                    </div>
+                                </li>
+                                <li className="flex gap-4">
+                                    <span className="flex-shrink-0 w-7 h-7 rounded-full bg-emerald-500 text-white font-bold text-sm flex items-center justify-center">3</span>
+                                    <div>
+                                        <p className="text-sm font-bold text-gray-900">Botni guruhga qo'shing</p>
+                                        <p className="text-xs text-gray-600">Agar arizalar guruhga tushishini xohlasangiz, botni guruhga qo'shing va guruh ID-sini yuqorida ko'rsating.</p>
+                                    </div>
                                 </li>
                             </ol>
                         </div>
@@ -212,26 +270,9 @@ export default function TelegramBotPage() {
                     {/* 4. Multilingual Settings */}
                     <Card className="p-0 border border-gray-100 shadow-sm rounded-[16px] overflow-hidden">
                         <div className="p-6 border-b border-gray-50 flex items-center justify-between">
-                            <h2 className="text-lg font-bold text-gray-900">Bot Matnlari</h2>
+                            <h2 className="text-lg font-bold text-gray-900">Mijozlar uchun Xush Kelibsiz Matni</h2>
                             <div className="flex bg-gray-100 p-1 rounded-lg">
-                                {[
-                                    { code: 'uz', label: "O'zbek", flag: '🇺🇿' },
-                                    { code: 'ru', label: 'Русский', flag: '🇷🇺' },
-                                    { code: 'en', label: 'English', flag: '🇬🇧' },
-                                    { code: 'tr', label: 'Türkçe', flag: '🇹🇷' }
-                                ].map((lang) => (
-                                    <button
-                                        key={lang.code}
-                                        onClick={() => setActiveLang(lang.code)}
-                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeLang === lang.code
-                                            ? 'bg-white text-gray-900 shadow-sm'
-                                            : 'text-gray-500 hover:text-gray-700'
-                                            }`}
-                                    >
-                                        <span>{lang.flag}</span>
-                                        <span className="hidden sm:inline">{lang.label}</span>
-                                    </button>
-                                ))}
+                                <Badge variant="secondary" className="bg-white text-gray-700 shadow-sm">🇺🇿 O'zbek</Badge>
                             </div>
                         </div>
 
@@ -240,29 +281,24 @@ export default function TelegramBotPage() {
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Boshlang'ich matn /start
                                 </label>
-                                <div className="relative">
-                                    <textarea
-                                        value={welcomeText}
-                                        onChange={(e) => setWelcomeText(e.target.value)}
-                                        className="w-full min-h-[140px] p-4 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#064E3B]/20 focus:border-[#064E3B] text-gray-700 resize-y"
-                                        placeholder="Botga kirganda chiqadigan matn..."
-                                    />
-                                    <div className="absolute bottom-3 right-3 text-xs text-gray-400 bg-white/80 px-2 py-0.5 rounded-full backdrop-blur-sm border border-gray-100">
-                                        {welcomeText.length} belgi
-                                    </div>
-                                </div>
-                                <p className="text-xs text-gray-500 mt-2">
-                                    <span className="text-blue-600 font-mono bg-blue-50 px-1 rounded mx-1">{'{user}'}</span> - mijoz ismi,
+                                <textarea
+                                    value={welcomeText}
+                                    onChange={(e) => setWelcomeText(e.target.value)}
+                                    className="w-full min-h-[120px] p-4 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-gray-700 resize-none text-sm"
+                                    placeholder="Botga kirganda chiqadigan matn..."
+                                />
+                                <p className="text-[10px] text-gray-500 mt-2">
+                                    <span className="text-blue-600 font-mono bg-blue-50 px-1 rounded mx-1">{'{user}'}</span> - ismi,
                                     <span className="text-blue-600 font-mono bg-blue-50 px-1 rounded mx-1">{'{bot}'}</span> - bot nomi
                                 </p>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Asosiy tugma nomi</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Web App Tugmasi</label>
                                 <Input
                                     value={mainButtonText}
                                     onChange={(e) => setMainButtonText(e.target.value)}
-                                    placeholder="Masalan: Do'kon"
+                                    placeholder="Masalan: Katalog"
                                 />
                             </div>
                         </div>
@@ -270,14 +306,26 @@ export default function TelegramBotPage() {
 
                     {/* Footer Actions */}
                     <div className="flex items-center justify-end gap-3 pt-4">
-                        <Button variant="secondary" className="bg-white border text-gray-700 hover:bg-gray-50">Bekor qilish</Button>
-                        <Button onClick={handleSave} disabled={saving} className="bg-[#064E3B] hover:bg-[#053d2e] shadow-lg shadow-[#064E3B]/20">
-                            {saving ? (
-                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        <Button 
+                            onClick={handleTest} 
+                            disabled={testLoading || !botToken} 
+                            variant="secondary" 
+                            className="border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 px-6 py-6 rounded-2xl font-bold"
+                        >
+                            {testLoading ? (
+                                <Loader2 className="w-5 h-5 animate-spin mr-2" />
                             ) : (
-                                <Save className="w-4 h-4 mr-2" />
+                                <Smartphone className="w-5 h-5 mr-2" />
                             )}
-                            O'zgarishlarni saqlash
+                            BOTNI TEKSHIRISH
+                        </Button>
+                        <Button onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-200 px-8 py-6 rounded-2xl font-bold">
+                            {saving ? (
+                                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                            ) : (
+                                <Save className="w-5 h-5 mr-2" />
+                            )}
+                            SOZLAMALARNI SAQLASH
                         </Button>
                     </div>
                 </div>
@@ -286,13 +334,15 @@ export default function TelegramBotPage() {
                 <div className="hidden xl:block">
                     <div className="sticky top-6">
                         <div className="border-[12px] border-gray-900 rounded-[3rem] overflow-hidden shadow-2xl bg-gray-100 min-h-[600px] relative">
-                            {/* iPhone Notch */}
+                            {/* iPhone UI */}
                             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-gray-900 rounded-b-xl z-20"></div>
 
                             {/* Telegram Header */}
                             <div className="bg-[#517DA2] text-white p-4 pt-10 relative z-10">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">P</div>
+                                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold font-mono">
+                                        {botStats.name.charAt(0)}
+                                    </div>
                                     <div>
                                         <h4 className="font-bold text-sm leading-tight">{botStats.name}</h4>
                                         <p className="text-[10px] opacity-80">bot</p>
@@ -301,24 +351,25 @@ export default function TelegramBotPage() {
                             </div>
 
                             {/* Chat Area */}
-                            <div className="p-4 space-y-4 h-[440px] overflow-y-auto bg-[#8FAEC5] bg-opacity-20 bg-[url('https://web.telegram.org/img/bg_0.png')]">
-                                {/* Bot Message */}
-                                <div className="bg-white p-3 rounded-2xl rounded-tl-none max-w-[85%] shadow-sm text-sm text-gray-800">
+                            <div className="p-4 space-y-4 h-[440px] overflow-y-auto bg-[#8FAEC5]/20 bg-[url('https://web.telegram.org/img/bg_0.png')]">
+                                <div className="bg-white p-3 rounded-2xl rounded-tl-none max-w-[85%] shadow-sm text-[13px] text-gray-800 leading-relaxed whitespace-pre-wrap">
                                     {welcomeText.replace('{user}', 'Mijoz').replace('{bot}', botStats.name)}
-                                </div>
-                                <div className="bg-white p-3 rounded-2xl rounded-tl-none max-w-[85%] shadow-sm text-sm text-gray-800">
-                                    Pastdagi tugmani bosib bizning mahsulotlar bilan tanishing 👇
+                                    {"\n\n"}
+                                    ♻️ Makulatura topshirish uchun <b>/ariza</b> buyrug'ini yuboring!
                                 </div>
                             </div>
 
                             {/* Keyboard Area */}
-                            <div className="absolute bottom-0 w-full bg-[#F0F2F5] p-2 border-t border-gray-300">
-                                <button className="w-full bg-white py-3 rounded-lg text-sm text-gray-800 font-medium shadow-sm active:scale-[0.99] transition-transform border border-b-2 border-gray-300">
+                            <div className="absolute bottom-0 w-full bg-[#F0F2F5]/90 backdrop-blur-md p-3 border-t border-gray-300 space-y-2">
+                                <button className="w-full bg-white py-3 rounded-xl text-sm text-[#0088CC] font-bold shadow-sm border border-gray-200">
                                     {mainButtonText}
+                                </button>
+                                <button className="w-full bg-white py-3 rounded-xl text-sm text-gray-800 font-medium shadow-sm border border-gray-200">
+                                    ♻️ Ariza yuborish
                                 </button>
                             </div>
                         </div>
-                        <p className="text-center text-gray-400 text-sm mt-4">Real vaqt rejimida ko'rinish (Preview)</p>
+                        <p className="text-center text-gray-400 text-xs mt-4 uppercase font-bold tracking-widest">Bot Preview</p>
                     </div>
                 </div>
             </div>
