@@ -9,31 +9,29 @@ export const metadata: Metadata = {
 };
 
 const QUICK_LINKS = [
-    { label: 'Mahsulotlar',      href: '/catalog',       emoji: '📦' },
-    { label: 'Konfigurator',     href: '/configurator',  emoji: '⚙️' },
-    { label: 'Yetkazib berish',  href: '/delivery',      emoji: '🚚' },
-    { label: 'Chegirmalar',      href: '/discounts',     emoji: '🏷️' },
-    { label: 'Kontaktlar',       href: '/contacts',      emoji: '📞' },
-    { label: 'FAQ',              href: '/faq',           emoji: '❓' },
+    { label: 'Mahsulotlar',     href: '/catalog',      emoji: '📦' },
+    { label: 'Konfigurator',    href: '/configurator', emoji: '⚙️' },
+    { label: 'Yetkazib berish', href: '/delivery',     emoji: '🚚' },
+    { label: 'Chegirmalar',     href: '/discounts',    emoji: '🏷️' },
+    { label: 'Kontaktlar',      href: '/contacts',     emoji: '📞' },
+    { label: 'FAQ',             href: '/faq',          emoji: '❓' },
 ];
 
 export default function NotFound() {
     return (
-        <div className="min-h-[75vh] flex items-center justify-center px-4 bg-gradient-to-b from-white to-gray-50">
+        <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-b from-white to-gray-50">
             <div className="max-w-lg w-full text-center">
 
-                {/* 404 visual */}
+                {/* 404 Visual */}
                 <div className="relative mb-10 select-none">
-                    <p className="text-[140px] font-black leading-none tracking-tighter text-gray-50 drop-shadow-sm">
+                    <p className="text-[140px] font-black leading-none tracking-tighter text-gray-100">
                         404
                     </p>
-                    {/* Icon centered over 404 */}
                     <div className="absolute inset-0 flex items-center justify-center">
                         <div className="relative">
                             <div className="w-24 h-24 bg-white border border-blue-100 rounded-3xl flex items-center justify-center shadow-xl shadow-blue-50">
                                 <PackageSearch className="w-12 h-12 text-blue-500" strokeWidth={1.5} />
                             </div>
-                            {/* Ping animation */}
                             <span className="absolute -top-1 -right-1 flex h-4 w-4">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-30" />
                                 <span className="relative inline-flex rounded-full h-4 w-4 bg-blue-500 items-center justify-center">
@@ -44,16 +42,14 @@ export default function NotFound() {
                     </div>
                 </div>
 
-                {/* Text */}
                 <h1 className="text-2xl font-extrabold text-gray-900 mb-3">
                     Sahifa topilmadi
                 </h1>
                 <p className="text-gray-500 text-sm mb-8 max-w-sm mx-auto leading-relaxed">
-                    Bu sahifa o'chirilgan, ko'chirilgan yoki hech qachon mavjud bo'lmagan.
-                    Quyidagi havolalardan foydalaning.
+                    Bu sahifa o&apos;chirilgan, ko&apos;chirilgan yoki hech qachon mavjud bo&apos;lmagan.
                 </p>
 
-                {/* Main actions */}
+                {/* Main Actions */}
                 <div className="flex flex-col sm:flex-row gap-3 justify-center mb-10">
                     <Link
                         href="/"
@@ -67,14 +63,14 @@ export default function NotFound() {
                         className="flex items-center justify-center gap-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 font-semibold px-8 py-3 rounded-xl text-sm transition-colors hover:bg-gray-50"
                     >
                         <Search size={15} />
-                        Katalogga o'tish
+                        Katalogga o&apos;tish
                     </Link>
                 </div>
 
-                {/* Quick links grid */}
+                {/* Quick Links */}
                 <div className="border-t border-gray-100 pt-8">
                     <p className="text-[11px] text-gray-400 uppercase tracking-widest font-bold mb-4">
-                        Foydali bo'limlar
+                        Foydali bo&apos;limlar
                     </p>
                     <div className="grid grid-cols-3 gap-2">
                         {QUICK_LINKS.map((link) => (
