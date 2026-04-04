@@ -1,6 +1,18 @@
 import { Telegraf, Context } from 'telegraf';
 import { prisma } from '@/lib/prisma';
 
+// ─── Material narxlari (so'm/kg) ─────────────────────────────────────────────
+const MAT: Record<string, { label: string; emoji: string; price: number }> = {
+    qogoz:   { label: "Qog'oz (rangsiz)",  emoji: '📄', price: 600  },
+    karton:  { label: 'Karton',            emoji: '📦', price: 700  },
+    plastik: { label: 'Plastik',           emoji: '🧴', price: 1000 },
+    temir:   { label: 'Temir/Metallar',   emoji: '🔩', price: 2000 },
+    shisha:  { label: 'Shisha',            emoji: '🫙', price: 300  },
+    gazeta:  { label: 'Gazeta',            emoji: '📰', price: 400  },
+    mix:     { label: 'Aralash',           emoji: '🗑️', price: 500  },
+};
+
+const fmtN = (n: number) => n.toLocaleString('ru-RU');
 
 let botInstance: Telegraf | null = null;
 
@@ -408,21 +420,125 @@ export const getBot = async () => {
             // ── Mijoz: Shikoyat darajasi tanlash ────────────────────────────
             if (data.startsWith('complaint_supervisor_') || data.startsWith('complaint_director_')) {
                 const parts = data.split('_');
-                const level = parts[1]; // supervisor yoki director
+                const level = parts[1];
                 const requestId = parseInt(parts[2]);
-
-                // Sessiyani saqlash
                 const req = await prisma.recycleRequest.findUnique({ where: { id: requestId } });
                 if (!req) { await ctx.answerCbQuery('Ariza topilmadi'); return; }
-
                 await ctx.answerCbQuery(`${level === 'director' ? '🏢 Direktor' : '👷 Masul'}ga shikoyat`);
                 await ctx.editMessageText(
-                    `⚠️ <b>Shikoyat — ${level === 'director' ? 'Direktor' : 'Masul shaxs'}ga</b>\n\nAriza #${requestId}\n\n📝 Endi shikoyat matninigini yozing (keyingi xabar sifatida):`,
+                    `⚠️ <b>Shikoyat — ${level === 'director' ? 'Direktor' : 'Masul shaxs'}ga</b>\n\nAriza #${requestId}\n\n📝 Shikoyat matninigini yozing:`,
+                    { parse_mode: 'HTML' }
+                );
+            }
+
+            // ── Haydovchi: Material tanlash ─────────────────────────────────
+            if (data.startsWith('mat_')) {
+                const [, materialType, rIdStr] = data.split('_');
+                const requestId = parseInt(rIdStr);
+                const driver = await prisma.driver.findUnique({ where: { telegramId: tgId } });
+                if (!driver?.vehicleInfo?.startsWith(`MATERIAL_${requestId}_`)) {
+                    await ctx.answerCbQuery('Sessiya tugagan'); return;
+                }
+                const vp = driver.vehicleInfo.split('_');
+                const weight = parseFloat(vp[2]);
+                const discount = parseFloat(vp[3]);
+                const req = await prisma.recycleRequest.findUnique({ where: { id: requestId }, include: { point: true, supervisor: true } });
+                if (!req) { await ctx.answerCbQuery('Ariza topilmadi'); return; }
+
+                const matInfo = MAT[materialType] || MAT.mix;
+                const price = req.point?.pricePerKg || matInfo.price;
+                const effectiveWeight = weight - (weight * discount / 100);
+                const totalAmount = Math.round(effectiveWeight * price);
+
+                const collection = await prisma.recycleCollection.create({
+                    data: { requestId, driverId: driver.id, actualWeight: weight, discountPercent: discount, effectiveWeight, pricePerKg: price, totalAmount, materialType, collectedAt: new Date() },
+                });
+                await prisma.recycleRequest.update({ where: { id: requestId }, data: { status: 'collected', collectedAt: new Date() } });
+                await prisma.driver.update({ where: { id: driver.id }, data: { vehicleInfo: null, status: 'active' } });
+
+                await ctx.answerCbQuery('✅ Yig\'ish yakunlandi!');
+                await ctx.editMessageText(
+                    `✅ <b>Yig'ish yakunlandi! #${requestId}</b>\n\n` +
+                    `${matInfo.emoji} ${matInfo.label}\n` +
+                    `⚖️ ${weight} kg${discount > 0 ? ` → ${effectiveWeight.toFixed(1)} kg (${discount}%)` : ''}\n` +
+                    `💰 ${fmtN(price)} so'm/kg\n━━━━━━━━━━━━━━━━━━\n💵 <b>Jami: ${fmtN(totalAmount)} so'm</b>`,
                     { parse_mode: 'HTML' }
                 );
 
-                // State saqlash (complaint_level_requestId formatida)
-                // Buni text handler'da o'qiymiz
+                // Mijozga xabar
+                if (req.customerTgId) {
+                    await bot.telegram.sendMessage(req.customerTgId,
+                        `📦 <b>Makulatura yig'ildi! #${requestId}</b>\n\n` +
+                        `${matInfo.emoji} Material: <b>${matInfo.label}</b>\n` +
+                        `⚖️ Og'irlik: <b>${weight} kg</b>\n` +
+                        `${discount > 0 ? `🏷️ Chegirma: <b>${discount}%</b> → ${effectiveWeight.toFixed(1)} kg\n` : ''}` +
+                        `💰 Narx: <b>${fmtN(price)} so'm/kg</b>\n━━━━━━━━━━━━━━━━━━\n` +
+                        `💵 Jami: <b>${fmtN(totalAmount)} so'm</b>\n\nMa'lumotlar to'g'rimi?`,
+                        { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[btn('✅ Tasdiqlash', `confirm_${collection.id}`), btn('❌ Inkor qilish', `deny_${collection.id}`)]] } }
+                    );
+                }
+
+                // Masulga xabar + to'lov tugmasi
+                if (req.supervisor?.telegramId) {
+                    await bot.telegram.sendMessage(req.supervisor.telegramId,
+                        `📦 <b>Ariza #${requestId} — yig'ildi</b>\n\n` +
+                        `${matInfo.emoji} ${matInfo.label}\n` +
+                        `⚖️ ${weight} kg${discount > 0 ? ` → ${effectiveWeight.toFixed(1)} kg (${discount}%)` : ''}\n` +
+                        `💵 <b>${fmtN(totalAmount)} so'm</b>\n` +
+                        `🚚 Haydovchi: ${driver.name}\n` +
+                        `👤 Mijoz: ${req.name} | ${req.phone}\n\n` +
+                        `Mijoz tasdiqlashini kuting yoki to'lovni boshlang:`,
+                        { parse_mode: 'HTML', reply_markup: { inline_keyboard: [
+                            [btn(`💵 Mijozga to'lash`, `pay_cust_${collection.id}`)],
+                            [btn(`🚚 Haydovchiga to'lash (10%)`, `pay_drv_${collection.id}`)],
+                            [btn(`💰 Ikkalasiga to'lash`, `pay_both_${collection.id}`)],
+                        ] } }
+                    );
+                }
+            }
+
+            // ── Masul: To'lovni tasdiqlash ──────────────────────────────────
+            if (data.startsWith('pay_cust_') || data.startsWith('pay_drv_') || data.startsWith('pay_both_')) {
+                const parts = data.split('_');
+                const payType = `${parts[0]}_${parts[1]}`;
+                const collectionId = parseInt(parts[2]);
+                const sup = await prisma.supervisor.findUnique({ where: { telegramId: tgId } });
+                if (!sup) { await ctx.answerCbQuery('❌ Ruxsat yo\'q'); return; }
+
+                const coll = await prisma.recycleCollection.findUnique({
+                    where: { id: collectionId },
+                    include: { request: true, driver: true },
+                });
+                if (!coll) { await ctx.answerCbQuery('Topilmadi'); return; }
+
+                const paymentStatus = payType === 'pay_cust' ? 'paid_to_customer' : payType === 'pay_drv' ? 'paid_to_driver' : 'paid_both';
+                const payToCust = payType !== 'pay_drv' ? coll.totalAmount : null;
+                const payToDrv  = payType !== 'pay_cust' ? Math.round(coll.totalAmount * 0.1) : null;
+
+                await prisma.recycleCollection.update({
+                    where: { id: collectionId },
+                    data: { paymentStatus, paymentToCustomer: payToCust ?? undefined, paymentToDriver: payToDrv ?? undefined, paidBy: sup.name },
+                });
+                await ctx.answerCbQuery('✅ To\'lov amalga oshirildi!');
+                const icon  = payType === 'pay_cust' ? '👤' : payType === 'pay_drv' ? '🚚' : '💰';
+                const label = payType === 'pay_cust' ? 'Mijozga' : payType === 'pay_drv' ? 'Haydovchiga' : 'Ikkalasiga';
+                await ctx.editMessageText(
+                    `✅ <b>To'lov amalga oshirildi!</b>\n\n${icon} ${label}: <b>${fmtN(payToCust ?? payToDrv ?? 0)} so'm</b>\n👷 Tasdiqladi: ${sup.name}\n📋 Ariza #${coll.requestId}`,
+                    { parse_mode: 'HTML' }
+                );
+
+                if (payToCust && coll.request.customerTgId) {
+                    await bot.telegram.sendMessage(coll.request.customerTgId,
+                        `💰 <b>To'lov amalga oshirildi!</b>\n\nAriza #${coll.requestId}\n💵 <b>${fmtN(payToCust)} so'm</b>\n✅ Rahmat! Qayta murojaat qiling ♻️`,
+                        { parse_mode: 'HTML' }
+                    );
+                }
+                if (payToDrv && coll.driver.telegramId) {
+                    await bot.telegram.sendMessage(coll.driver.telegramId,
+                        `💰 <b>Ish haqi o'tkazildi!</b>\n\nAriza #${coll.requestId}\n💵 <b>${fmtN(payToDrv)} so'm</b>\n✅ Rahmat! 🚚`,
+                        { parse_mode: 'HTML' }
+                    );
+                }
             }
 
         } catch (error) {
@@ -475,74 +591,119 @@ export const getBot = async () => {
             const discount = parseFloat(text.replace(',', '.'));
 
             if (isNaN(discount) || discount < 0 || discount > 50) {
-                ctx.reply('❌ Chegirma 0 dan 50 gacha bo\'lishi kerak!');
-                return;
+                ctx.reply('❌ Chegirma 0 dan 50 gacha bo\'lishi kerak!'); return;
             }
 
-            const req = await prisma.recycleRequest.findUnique({ where: { id: requestId }, include: { point: true } });
-            if (!req) { ctx.reply('❌ Ariza topilmadi'); return; }
-
-            const price = req.point?.pricePerKg || 800;
             const effectiveWeight = weight - (weight * discount / 100);
-            const totalAmount = Math.round(effectiveWeight * price);
-
-            // Collection yaratish
-            const collection = await prisma.recycleCollection.create({
-                data: {
-                    requestId, driverId: driver.id,
-                    actualWeight: weight, discountPercent: discount,
-                    effectiveWeight, pricePerKg: price, totalAmount,
-                    materialType: req.material, collectedAt: new Date(),
-                },
+            // Material tanlash state
+            await prisma.driver.update({
+                where: { id: driver.id },
+                data: { vehicleInfo: `MATERIAL_${requestId}_${weight}_${discount}` },
             });
 
-            // Ariza statusini yangilash
-            await prisma.recycleRequest.update({ where: { id: requestId }, data: { status: 'collected', collectedAt: new Date() } });
-            // Haydovchi state tozalash
-            await prisma.driver.update({ where: { id: driver.id }, data: { vehicleInfo: null, status: 'active' } });
-
-            ctx.reply(
-                `✅ <b>Yig'ish yakunlandi! #${requestId}</b>\n\n` +
-                `⚖️ Og'irlik: ${weight} kg\n` +
-                `${discount > 0 ? `🏷️ Chegirma: ${discount}%\n📊 Hisoblangan: ${effectiveWeight.toFixed(1)} kg\n` : ''}` +
-                `💰 Narx: ${price.toLocaleString('ru-RU')} so'm/kg\n` +
-                `━━━━━━━━━━━━━━━━━━\n` +
-                `💵 <b>Jami: ${totalAmount.toLocaleString('ru-RU')} so'm</b>`,
-                { parse_mode: 'HTML' }
+            const matButtons = Object.entries(MAT).map(([key, m]) =>
+                [btn(`${m.emoji} ${m.label} — ${fmtN(m.price)} so'm/kg`, `mat_${key}_${requestId}`)]
             );
 
-            // Mijozga xabar (ixtiyoriy)
-            if (req.customerTgId) {
-                await bot.telegram.sendMessage(req.customerTgId,
-                    `📦 <b>Makulatura yig'ildi! #${requestId}</b>\n\n` +
-                    `⚖️ Og'irlik: <b>${weight} kg</b>\n` +
-                    `${discount > 0 ? `🏷️ Chegirma: <b>${discount}%</b>\n📊 Hisoblangan: <b>${effectiveWeight.toFixed(1)} kg</b>\n` : ''}` +
-                    `💰 Narx: <b>${price.toLocaleString('ru-RU')} so'm/kg</b>\n` +
-                    `━━━━━━━━━━━━━━━━━━\n` +
-                    `💵 Jami: <b>${totalAmount.toLocaleString('ru-RU')} so'm</b>\n\n` +
-                    `Ma'lumotlar to'g'rimi?`,
-                    {
-                        parse_mode: 'HTML',
-                        reply_markup: {
-                            inline_keyboard: [
-                                [btn('✅ Tasdiqlash', `confirm_${collection.id}`), btn('❌ Inkor qilish', `deny_${collection.id}`)],
-                            ],
-                        },
-                    }
-                );
-            }
-
-            // Masulga xabar
-            if (req.supervisorId) {
-                const sup = await prisma.supervisor.findUnique({ where: { id: req.supervisorId } });
-                if (sup?.telegramId) {
-                    await bot.telegram.sendMessage(sup.telegramId,
-                        `📦 Ariza #${requestId} — yuk yig'ildi\n⚖️ ${weight} kg | 💵 ${totalAmount.toLocaleString('ru-RU')} so'm\n🚚 ${driver.name}`,
-                        { parse_mode: 'HTML' }
-                    );
-                }
-            }
+            ctx.reply(
+                `📊 <b>Hisob-kitob:</b>\n\n` +
+                `⚖️ Og'irlik: <b>${weight} kg</b>\n` +
+                `${discount > 0 ? `🏷️ Chegirma: <b>${discount}%</b>\n📊 Hisoblangan: <b>${effectiveWeight.toFixed(1)} kg</b>\n` : ''}` +
+                `\n📦 <b>Material turini tanlang:</b>`,
+                { parse_mode: 'HTML', reply_markup: { inline_keyboard: matButtons } }
+            );
             return;
+        }
+    });
+
+    // ─── /hisobot — Haydovchi yoki Masul uchun moliyaviy hisobot ───────────────
+    bot.command('hisobot', async (ctx) => {
+        const tgId = ctx.from.id.toString();
+        const from30 = new Date(); from30.setDate(from30.getDate() - 30);
+
+        const driver = await prisma.driver.findUnique({ where: { telegramId: tgId } });
+        if (driver) {
+            const cols = await prisma.recycleCollection.findMany({
+                where: { driverId: driver.id, createdAt: { gte: from30 } },
+                orderBy: { createdAt: 'desc' },
+            });
+            if (cols.length === 0) { ctx.reply('📊 Oxirgi 30 kunda yig\'ish yo\'q.'); return; }
+            const totalAmt = cols.reduce((s, c) => s + c.totalAmount, 0);
+            const totalKg  = cols.reduce((s, c) => s + c.actualWeight, 0);
+            const paid = cols.filter(c => c.paymentStatus !== 'pending').length;
+            const details = cols.slice(0, 5).map((c, i) =>
+                `${i + 1}. #${c.requestId} — ${c.actualWeight}kg → ${fmtN(c.totalAmount)} so'm ${c.paymentStatus === 'pending' ? '⏳' : '✅'}`
+            ).join('\n');
+            ctx.reply(
+                `📊 <b>Hisobotingiz (30 kun)</b>\n\n` +
+                `📦 Yig'ishlar: <b>${cols.length}</b>\n` +
+                `⚖️ Jami: <b>${totalKg.toFixed(1)} kg</b>\n` +
+                `💵 Summa: <b>${fmtN(totalAmt)} so'm</b>\n` +
+                `✅ To'langan: <b>${paid}/${cols.length}</b>\n\n` +
+                `<b>Oxirgi 5 ta:</b>\n${details}`,
+                { parse_mode: 'HTML' }
+            );
+            return;
+        }
+
+        const sup = await prisma.supervisor.findUnique({ where: { telegramId: tgId } });
+        if (sup) {
+            const drivers = await prisma.driver.findMany({ where: { supervisorId: sup.id } });
+            const dIds = drivers.map(d => d.id);
+            const cols = await prisma.recycleCollection.findMany({
+                where: { driverId: { in: dIds }, createdAt: { gte: from30 } },
+                include: { driver: true },
+            });
+            const totalAmt = cols.reduce((s, c) => s + c.totalAmount, 0);
+            const totalKg  = cols.reduce((s, c) => s + c.actualWeight, 0);
+            const pending  = cols.filter(c => c.paymentStatus === 'pending').length;
+            const byDrv = drivers.map(d => {
+                const dc = cols.filter(c => c.driverId === d.id);
+                return { name: d.name, count: dc.length, kg: dc.reduce((s, c) => s + c.actualWeight, 0), amt: dc.reduce((s, c) => s + c.totalAmount, 0) };
+            }).filter(d => d.count > 0);
+            const drvLines = byDrv.map(d => `🚚 ${d.name}: ${d.count} ta | ${d.kg.toFixed(0)} kg | ${fmtN(d.amt)} so'm`).join('\n');
+            ctx.reply(
+                `📊 <b>Jamoaviy hisobot (30 kun)</b>\n\n` +
+                `📦 Jami: <b>${cols.length}</b>  ⚖️ <b>${totalKg.toFixed(1)} kg</b>\n` +
+                `💵 Summa: <b>${fmtN(totalAmt)} so'm</b>\n` +
+                `⏳ To'lanmagan: <b>${pending} ta</b>\n\n` +
+                `<b>Haydovchilar:</b>\n${drvLines || 'Yig\'ish yo\'q'}`,
+                { parse_mode: 'HTML' }
+            );
+            return;
+        }
+        ctx.reply('❌ Siz tizimda ro\'yxatga olinmagansiz.');
+    });
+
+    // ─── /tolash — Masul uchun kutilayotgan to'lovlar ────────────────────────────
+    bot.command('tolash', async (ctx) => {
+        const tgId = ctx.from.id.toString();
+        const sup = await prisma.supervisor.findUnique({ where: { telegramId: tgId } });
+        if (!sup) { ctx.reply('❌ Siz masul sifatida ro\'yxatga olinmagansiz.'); return; }
+
+        const drivers = await prisma.driver.findMany({ where: { supervisorId: sup.id } });
+        const dIds = drivers.map(d => d.id);
+        const pending = await prisma.recycleCollection.findMany({
+            where: { driverId: { in: dIds }, paymentStatus: 'pending', customerConfirmed: true },
+            include: { request: { include: { point: true } }, driver: true },
+            orderBy: { createdAt: 'desc' }, take: 10,
+        });
+
+        if (pending.length === 0) { ctx.reply('✅ To\'lanmagan (tasdiqlangan) yig\'ishlar yo\'q.'); return; }
+
+        for (const coll of pending) {
+            await ctx.reply(
+                `💰 <b>To'lov kerak — Ariza #${coll.requestId}</b>\n\n` +
+                `👤 ${coll.request.name} | ${coll.request.phone}\n` +
+                `🚚 Haydovchi: ${coll.driver.name}\n` +
+                `⚖️ Og'irlik: ${coll.actualWeight} kg\n` +
+                `💵 Summa: <b>${fmtN(coll.totalAmount)} so'm</b>`,
+                { parse_mode: 'HTML', reply_markup: { inline_keyboard: [
+                    [btn(`💵 Mijozga to'lash`, `pay_cust_${coll.id}`)],
+                    [btn(`🚚 Haydovchiga to'lash (10%)`, `pay_drv_${coll.id}`)],
+                    [btn(`💰 Ikkalasiga to'lash`, `pay_both_${coll.id}`)],
+                ] } }
+            );
         }
     });
 
@@ -550,14 +711,15 @@ export const getBot = async () => {
     bot.help((ctx) => {
         ctx.reply(
             `📋 <b>Buyruqlar:</b>\n\n` +
-            `<b>Barcha foydalanuvchilar:</b>\n` +
-            `/start — Botni ishga tushirish\n\n` +
             `<b>Masul shaxs:</b>\n` +
             `/arizalar — Aktiv arizalar\n` +
-            `/haydovchilar — Haydovchilar ro'yxati\n\n` +
+            `/haydovchilar — Haydovchilar ro'yxati\n` +
+            `/hisobot — Moliyaviy hisobot (30 kun)\n` +
+            `/tolash — Kutilayotgan to'lovlar\n\n` +
             `<b>Haydovchi:</b>\n` +
             `/ishlarim — Tayinlangan ishlar\n` +
-            `/status — Online/Offline\n\n` +
+            `/status — Online/Offline\n` +
+            `/hisobot — Mening hisobotim\n\n` +
             `<b>Mijoz:</b>\n` +
             `/arizalarim — Mening arizalarim\n` +
             `/shikoyat — Shikoyat qoldirish`,
