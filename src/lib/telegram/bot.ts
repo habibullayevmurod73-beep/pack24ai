@@ -14,7 +14,7 @@ const MAT: Record<string, { label: string; emoji: string; price: number }> = {
 
 const fmtN = (n: number) => n.toLocaleString('ru-RU');
 
-// ─── In-memory session state (ariza yaratish uchun) ───────────────────────────
+// ─── In-memory session state ──────────────────────────────────────────────────
 interface ArizaSession {
     step: 'name' | 'phone' | 'region' | 'material' | 'volume' | 'address' | 'confirm';
     name?: string;
@@ -25,6 +25,44 @@ interface ArizaSession {
     address?: string;
 }
 const arizaSessions = new Map<string, ArizaSession>();
+
+// Shikoyat sessiyasi
+interface ComplaintSession {
+    requestId: number;
+    level: 'supervisor' | 'director';
+}
+const complaintSessions = new Map<string, ComplaintSession>();
+
+// ─── Rol-based persistent keyboard ──────────────────────────────────────────
+function customerKeyboard(mainButton?: string, appUrl?: string) {
+    const rows: any[][] = [];
+    if (mainButton && appUrl) {
+        rows.push([{ text: mainButton, web_app: { url: `${appUrl}/mobile` } }]);
+    }
+    rows.push(
+        [{ text: '♻️ Ariza yuborish' }, { text: '📋 Arizalarim' }],
+        [{ text: '📦 Buyurtmalarim' }, { text: '📞 Aloqa' }],
+    );
+    return { keyboard: rows, resize_keyboard: true };
+}
+function supervisorKeyboard() {
+    return {
+        keyboard: [
+            [{ text: '📋 Arizalar' }, { text: '🚚 Haydovchilar' }],
+            [{ text: '📊 Hisobot' }, { text: '💰 To\'lovlar' }],
+        ],
+        resize_keyboard: true,
+    };
+}
+function driverKeyboard() {
+    return {
+        keyboard: [
+            [{ text: '📋 Ishlarim' }, { text: '🔄 Status' }],
+            [{ text: '📊 Hisobot' }],
+        ],
+        resize_keyboard: true,
+    };
+}
 
 let botInstance: Telegraf | null = null;
 
@@ -45,11 +83,21 @@ export const getBot = async () => {
 
     const bot = new Telegraf(config.botToken);
 
+    // ─── Buyruqlar menyusini ro'yxatga olish ──────────────────────────────
+    await bot.telegram.setMyCommands([
+        { command: 'start',      description: '🏠 Bosh menyu' },
+        { command: 'ariza',      description: '♻️ Makulatura topshirish' },
+        { command: 'arizalarim', description: '📋 Mening arizalarim' },
+        { command: 'buyurtma',   description: '📦 Buyurtmani kuzatish' },
+        { command: 'narxlar',    description: '💰 Material narxlari' },
+        { command: 'help',       description: '❓ Yordam' },
+    ]).catch(() => {});
+
     // Middleware — log
     bot.use(async (ctx, next) => {
         const start = Date.now();
         await next();
-        console.log(`TG Update ${ctx.update.update_id} in ${Date.now() - start}ms`);
+        console.log(`TG ${ctx.updateType} in ${Date.now() - start}ms`);
     });
 
     // ════════════════════════════════════════════════════════════════════════
@@ -58,54 +106,63 @@ export const getBot = async () => {
     bot.start(async (ctx) => {
         const tgId = ctx.from.id.toString();
         const name = ctx.from.first_name || 'Foydalanuvchi';
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pack24.uz';
 
-        // Rolni aniqlash
+        // ── MASUL SHAXS ──
         const supervisor = await prisma.supervisor.findUnique({ where: { telegramId: tgId } });
         if (supervisor) {
-            ctx.reply(
-                `👷 Salom, <b>${supervisor.name}</b>!\n\nSiz <b>masul shaxs</b> sifatida tizimga ulangansiz.\n\nBuyruqlar:\n/arizalar — Sizga yo'naltirilgan arizalar\n/haydovchilar — Sizning haydovchilaringiz\n/hisobot — Oylik hisobot`,
-                { parse_mode: 'HTML' }
+            const activeCount = await prisma.recycleRequest.count({
+                where: { supervisorId: supervisor.id, status: { in: ['dispatched', 'assigned', 'en_route', 'arrived', 'collecting'] } }
+            });
+            await ctx.reply(
+                `👷 Salom, <b>${supervisor.name}</b>!\n\n` +
+                `Siz <b>masul shaxs</b> sifatida tizimga ulangansiz.\n\n` +
+                `📋 Aktiv arizalar: <b>${activeCount}</b>\n\n` +
+                `Quyidagi tugmalar orqali boshqaring 👇`,
+                { parse_mode: 'HTML', reply_markup: supervisorKeyboard() }
             );
             return;
         }
 
+        // ── HAYDOVCHI ──
         const driver = await prisma.driver.findUnique({ where: { telegramId: tgId } });
         if (driver) {
-            // Haydovchini online qilish
             await prisma.driver.update({ where: { id: driver.id }, data: { isOnline: true, lastSeenAt: new Date() } });
-            ctx.reply(
-                `🚚 Salom, <b>${driver.name}</b>!\n\nSiz <b>haydovchi</b> sifatida tizimga ulangansiz.\nHolat: 🟢 Online\n\nBuyruqlar:\n/ishlarim — Tayinlangan ishlar\n/status — Online/Offline\n/hisobot — Mening hisobotim`,
-                { parse_mode: 'HTML' }
+            const jobCount = await prisma.recycleRequest.count({
+                where: { assignedDriverId: driver.id, status: { in: ['assigned', 'en_route', 'arrived', 'collecting'] } }
+            });
+            await ctx.reply(
+                `🚚 Salom, <b>${driver.name}</b>!\n\n` +
+                `Holat: 🟢 <b>Online</b>\n` +
+                `📋 Aktiv ishlar: <b>${jobCount}</b>\n\n` +
+                `Quyidagi tugmalar orqali boshqaring 👇`,
+                { parse_mode: 'HTML', reply_markup: driverKeyboard() }
             );
             return;
         }
 
-        // Mijoz yoki yangi foydalanuvchi
+        // ── MIJOZ (mavjud) ──
         const existing = await prisma.recycleRequest.findFirst({ where: { customerTgId: tgId }, orderBy: { createdAt: 'desc' } });
         if (existing) {
-            ctx.reply(
-                `♻️ Salom, <b>${name}</b>!\n\nSizning oxirgi ariza: <b>#${existing.id}</b> — ${getStatusLabel(existing.status)}\n\nBuyruqlar:\n/arizalarim — Mening arizalarim\n/ariza — Yangi ariza yuborish\n/shikoyat — Shikoyat qoldirish`,
-                { parse_mode: 'HTML' }
+            await ctx.reply(
+                `♻️ Salom, <b>${name}</b>!\n\n` +
+                `Oxirgi ariza: <b>#${existing.id}</b> — ${getStatusLabel(existing.status)}\n\n` +
+                `Quyidagi tugmalar orqali foydalaning 👇`,
+                { parse_mode: 'HTML', reply_markup: customerKeyboard(config.mainButton, appUrl) }
             );
             return;
         }
 
-        // Yangi foydalanuvchi
-        ctx.reply(
-            config.welcomeMessage
-                .replace('{user}', name)
-                .replace('{bot}', ctx.botInfo.first_name) +
-            `\n\n♻️ Makulatura topshirish uchun /ariza buyrug'ini yuboring!`,
-            {
-                parse_mode: 'HTML',
-                reply_markup: {
-                    keyboard: [
-                        [{ text: config.mainButton, web_app: { url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://pack24.uz'}/mobile` } }],
-                        [{ text: '♻️ Ariza yuborish' }],
-                    ],
-                    resize_keyboard: true,
-                },
-            }
+        // ── YANGI FOYDALANUVCHI ──
+        await ctx.reply(
+            `🏭 <b>Pack24 — Qadoqlash Yechimlari</b>\n\n` +
+            `Salom, <b>${name}</b>! \n\n` +
+            `Biz orqali siz:\n` +
+            `📦 Qadoqlash mahsulotlarini buyurtma qilishingiz\n` +
+            `♻️ Makulaturani topshirib pul ishlashingiz\n` +
+            `📊 Buyurtmalaringizni kuzatishingiz mumkin\n\n` +
+            `Boshlash uchun quyidagi tugmalardan foydalaning 👇`,
+            { parse_mode: 'HTML', reply_markup: customerKeyboard(config.mainButton, appUrl) }
         );
     });
 
@@ -661,6 +718,79 @@ export const getBot = async () => {
                 }
             }
 
+            // ─── SHIKOYAT: ariza tanlash ──────────────────────────────────
+            if (data.startsWith('complaint_')) {
+                if (data === 'complaint_cancel') {
+                    complaintSessions.delete(ctx.from!.id.toString());
+                    await ctx.answerCbQuery('❌ Bekor qilindi');
+                    await ctx.editMessageText('❌ Shikoyat bekor qilindi.');
+                    return;
+                }
+                const reqId = parseInt(data.replace('complaint_', ''));
+                if (isNaN(reqId)) { await ctx.answerCbQuery('Xatolik'); return; }
+
+                await ctx.answerCbQuery('✅ Ariza tanlandi');
+                await ctx.editMessageText(
+                    `⚠️ <b>Shikoyat darajasini tanlang:</b>\n\n` +
+                    `📋 Ariza: <b>#${reqId}</b>`,
+                    {
+                        parse_mode: 'HTML',
+                        reply_markup: { inline_keyboard: [
+                            [btn('👷 Masul shaxsga', `complaint_level_supervisor_${reqId}`)],
+                            [btn('🏢 Direktorsiyaga', `complaint_level_director_${reqId}`)],
+                            [btn('❌ Bekor qilish', 'complaint_cancel')],
+                        ] },
+                    }
+                );
+                return;
+            }
+
+            if (data.startsWith('complaint_level_')) {
+                const parts = data.split('_');
+                // complaint_level_supervisor_123 or complaint_level_director_123
+                const level = parts[2] as 'supervisor' | 'director';
+                const reqId = parseInt(parts[3]);
+                if (isNaN(reqId)) { await ctx.answerCbQuery('Xatolik'); return; }
+
+                complaintSessions.set(ctx.from!.id.toString(), { requestId: reqId, level });
+                await ctx.answerCbQuery('✅');
+                await ctx.editMessageText(
+                    `📝 <b>Shikoyat matnini yozing:</b>\n\n` +
+                    `📋 Ariza: #${reqId}\n` +
+                    `📍 ${level === 'director' ? '🏢 Direktorsiyaga' : '👷 Masul shaxsga'} yo'naltiriladi.\n\n` +
+                    `<i>Shikoyatingizni yozing va yuboring:</i>`,
+                    { parse_mode: 'HTML' }
+                );
+                return;
+            }
+
+            // ─── MY_ORDERS: So'nggi buyurtmalar ──────────────────────────
+            if (data === 'my_orders') {
+                const myOrders = await prisma.order.findMany({
+                    where: { telegramUserId: ctx.from!.id.toString() },
+                    orderBy: { createdAt: 'desc' },
+                    take: 5,
+                    select: { id: true, totalAmount: true, status: true, createdAt: true },
+                });
+                if (myOrders.length === 0) {
+                    await ctx.answerCbQuery('Buyurtma yo\'q');
+                    await ctx.editMessageText('📦 Sizda hali buyurtma yo\'q.');
+                    return;
+                }
+                const statusMap: Record<string, string> = {
+                    new: '🔵', processing: '🟡', shipping: '🚚', delivered: '✅', cancelled: '🔴', draft: '⚪',
+                };
+                const list = myOrders.map(o =>
+                    `${statusMap[o.status] || '⚪'} <b>#${o.id}</b> — ${fmtN(o.totalAmount || 0)} so'm — ${new Date(o.createdAt).toLocaleDateString('ru-RU')}`
+                ).join('\n');
+                await ctx.answerCbQuery('✅');
+                await ctx.editMessageText(
+                    `📦 <b>So'nggi buyurtmalaringiz:</b>\n\n${list}\n\nBatafsil: /buyurtma [raqam]`,
+                    { parse_mode: 'HTML' }
+                );
+                return;
+            }
+
         } catch (error) {
             console.error('[Bot Callback]', error);
             await ctx.answerCbQuery('Xatolik yuz berdi');
@@ -817,6 +947,214 @@ export const getBot = async () => {
             );
             return;
         }
+
+        // ── PERSISTENT KEYBOARD TUGMALARI ────────────────────────────────
+        // Masul shaxs tugmalari
+        if (text === '📋 Arizalar') {
+            const sup = await prisma.supervisor.findUnique({ where: { telegramId: tgId } });
+            if (sup) {
+                const reqs = await prisma.recycleRequest.findMany({
+                    where: { supervisorId: sup.id, status: { in: ['new', 'dispatched', 'assigned', 'en_route', 'arrived', 'collecting'] } },
+                    include: { point: true },
+                    orderBy: { createdAt: 'desc' },
+                    take: 10,
+                });
+                if (reqs.length === 0) { await ctx.reply('📋 Hozircha aktiv arizalar yo\'q.'); return; }
+                for (const r of reqs) {
+                    await ctx.reply(
+                        `📋 <b>Ariza #${r.id}</b>\n` +
+                        `👤 ${r.name || '—'} | 📞 ${r.phone || '—'}\n` +
+                        `📍 ${r.point?.regionUz || '—'} | ${getStatusLabel(r.status)}`,
+                        { parse_mode: 'HTML' }
+                    );
+                }
+            } else {
+                await ctx.reply('❌ Siz masul sifatida ro\'yxatga olinmagansiz.');
+            }
+            return;
+        }
+        if (text === '🚚 Haydovchilar') {
+            const sup = await prisma.supervisor.findUnique({ where: { telegramId: tgId } });
+            if (sup) {
+                const drvs = await prisma.driver.findMany({ where: { supervisorId: sup.id }, orderBy: { name: 'asc' } });
+                if (drvs.length === 0) { await ctx.reply('🚚 Sizda haydovchilar yo\'q.'); return; }
+                const lines = drvs.map(d =>
+                    `${d.isOnline ? '🟢' : '🔴'} <b>${d.name}</b> — ${d.phone || '—'} — ${d.status || 'active'}`
+                ).join('\n');
+                await ctx.reply(`🚚 <b>Haydovchilar (${drvs.length}):</b>\n\n${lines}`, { parse_mode: 'HTML' });
+            } else {
+                await ctx.reply('❌ Siz masul sifatida ro\'yxatga olinmagansiz.');
+            }
+            return;
+        }
+        if (text === '📊 Hisobot') {
+            // /hisobot buyrug'ini ishlatish uchun
+            await ctx.reply('📊 /hisobot buyrug\'i orqali ko\'ring.');
+            return;
+        }
+        if (text === '💰 To\'lovlar') {
+            await ctx.reply('💰 /tolash buyrug\'i orqali ko\'ring.');
+            return;
+        }
+        if (text === '📋 Ishlarim') {
+            const drv = await prisma.driver.findUnique({ where: { telegramId: tgId } });
+            if (drv) {
+                const jobs = await prisma.recycleRequest.findMany({
+                    where: { assignedDriverId: drv.id, status: { in: ['assigned', 'en_route', 'arrived', 'collecting'] } },
+                    include: { point: true },
+                    orderBy: { createdAt: 'desc' },
+                });
+                if (jobs.length === 0) { await ctx.reply('📋 Hozircha ish yo\'q. Kuting...'); return; }
+                for (const r of jobs) {
+                    await ctx.reply(
+                        `📋 <b>Ish #${r.id}</b>\n` +
+                        `👤 ${r.name || '—'} | 📞 ${r.phone || '—'}\n` +
+                        `📍 ${r.address || '—'}\n` +
+                        `📊 ${getStatusLabel(r.status)}`,
+                        { parse_mode: 'HTML', reply_markup: { inline_keyboard: [
+                            r.status === 'assigned' ? [btn('🚚 Yo\'lga chiqdim', `en_route_${r.id}`)] :
+                            r.status === 'en_route' ? [btn('📍 Yetib keldim', `arrived_${r.id}`)] :
+                            r.status === 'arrived' ? [btn('📦 Yig\'ish boshlash', `collecting_${r.id}`)] :
+                            [],
+                        ] } }
+                    );
+                }
+            } else {
+                await ctx.reply('❌ Siz haydovchi sifatida ro\'yxatga olinmagansiz.');
+            }
+            return;
+        }
+        if (text === '🔄 Status') {
+            const drv = await prisma.driver.findUnique({ where: { telegramId: tgId } });
+            if (drv) {
+                const newStatus = !drv.isOnline;
+                await prisma.driver.update({ where: { id: drv.id }, data: { isOnline: newStatus, lastSeenAt: new Date() } });
+                await ctx.reply(`${newStatus ? '🟢 Online' : '🔴 Offline'} holatga o'tdingiz.`);
+            } else {
+                await ctx.reply('❌ Siz haydovchi sifatida ro\'yxatga olinmagansiz.');
+            }
+            return;
+        }
+        if (text === '📋 Arizalarim') {
+            const reqs = await prisma.recycleRequest.findMany({
+                where: { customerTgId: tgId },
+                orderBy: { createdAt: 'desc' },
+                take: 5,
+                include: { point: true },
+            });
+            if (reqs.length === 0) { await ctx.reply('📋 Sizda hali ariza yo\'q.\n\n♻️ /ariza orqali yangi ariza yuboring!'); return; }
+            const list = reqs.map(r =>
+                `${getStatusLabel(r.status)} <b>#${r.id}</b> — ${r.point?.regionUz || '—'} — ${new Date(r.createdAt).toLocaleDateString('ru-RU')}`
+            ).join('\n');
+            await ctx.reply(
+                `📋 <b>Arizalaringiz:</b>\n\n${list}`,
+                { parse_mode: 'HTML' }
+            );
+            return;
+        }
+
+        // Buyurtmalarim tugmasi
+        if (text === '📦 Buyurtmalarim') {
+            const tgUser = await prisma.order.findMany({
+                where: { telegramUserId: tgId },
+                orderBy: { createdAt: 'desc' },
+                take: 5,
+                select: { id: true, totalAmount: true, status: true, createdAt: true },
+            });
+            if (tgUser.length === 0) {
+                await ctx.reply('📦 Sizda hali buyurtma yo\'q.\n\nBuyurtma berish uchun 🏪 Pack24 do\'koniga kiring!');
+                return;
+            }
+            const statusMap: Record<string, string> = {
+                new: '🔵', processing: '🟡', shipping: '🚚', delivered: '✅', cancelled: '🔴', draft: '⚪',
+            };
+            const list = tgUser.map(o =>
+                `${statusMap[o.status] || '⚪'} <b>#${o.id}</b> — ${fmtN(o.totalAmount || 0)} so'm — ${new Date(o.createdAt).toLocaleDateString('ru-RU')}`
+            ).join('\n');
+            await ctx.reply(
+                `📦 <b>So'nggi buyurtmalaringiz:</b>\n\n${list}\n\n` +
+                `Batafsil: /buyurtma [raqam]\n<i>Masalan: /buyurtma ${tgUser[0].id}</i>`,
+                { parse_mode: 'HTML' }
+            );
+            return;
+        }
+
+        // Aloqa tugmasi
+        if (text === '📞 Aloqa') {
+            await ctx.reply(
+                `📞 <b>Pack24 — Aloqa ma'lumotlari</b>\n\n` +
+                `📱 Telefon: <b>+998 88 055-78-88</b>\n` +
+                `📧 Email: <b>sales@pack24.uz</b>\n` +
+                `🌐 Sayt: <b>pack24.uz</b>\n` +
+                `📍 Manzil: <b>Toshkent shahri</b>\n\n` +
+                `⏰ Ish vaqti: <b>8:00 — 21:00</b> (har kuni)`,
+                { parse_mode: 'HTML' }
+            );
+            return;
+        }
+
+        // ── SHIKOYAT FLOW: matn qabul qilish ────────────────────────────
+        const complaint = complaintSessions.get(tgId);
+        if (complaint) {
+            const complaintText = text.trim();
+            if (complaintText.length < 5) {
+                await ctx.reply('⚠️ Shikoyat matni kamida 5 ta belgidan iborat bo\'lishi kerak.');
+                return;
+            }
+
+            try {
+                const req = await prisma.recycleRequest.findUnique({
+                    where: { id: complaint.requestId },
+                    include: { supervisor: true },
+                });
+
+                complaintSessions.delete(tgId);
+
+                await ctx.reply(
+                    `✅ <b>Shikoyat qabul qilindi!</b>\n\n` +
+                    `📋 Ariza: #${complaint.requestId}\n` +
+                    `📝 ${complaintText.slice(0, 100)}${complaintText.length > 100 ? '...' : ''}\n\n` +
+                    `${complaint.level === 'director' ? '🏢 Direktorsiyaga' : '👷 Masul shaxsga'} yo'naltirildi.\n` +
+                    `Tez orada javob beriladi.`,
+                    { parse_mode: 'HTML' }
+                );
+
+                // Masulga/adminga xabar
+                if (complaint.level === 'supervisor' && req?.supervisor?.telegramId) {
+                    await bot.telegram.sendMessage(req.supervisor.telegramId,
+                        `⚠️ <b>Yangi shikoyat!</b>\n\n` +
+                        `📋 Ariza: #${complaint.requestId}\n` +
+                        `👤 ${ctx.from.first_name || 'Mijoz'}\n` +
+                        `📝 ${complaintText.slice(0, 200)}`,
+                        { parse_mode: 'HTML' }
+                    );
+                }
+
+                // Admin guruhga ham yuborish
+                const config2 = await prisma.telegramConfig.findFirst();
+                if (config2?.salesChatId) {
+                    const chatIds = config2.salesChatId.split(',').map(id => id.trim());
+                    for (const chatId of chatIds) {
+                        if (chatId) {
+                            try {
+                                await bot.telegram.sendMessage(chatId,
+                                    `⚠️ <b>${complaint.level === 'director' ? '🏢 DIREKTOR' : '👷 MASUL'}GA SHIKOYAT</b>\n\n` +
+                                    `📋 Ariza: #${complaint.requestId}\n` +
+                                    `👤 ${ctx.from.first_name || 'Mijoz'}\n` +
+                                    `📝 ${complaintText.slice(0, 200)}`,
+                                    { parse_mode: 'HTML' }
+                                );
+                            } catch {}
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Shikoyat saqlashda xato:', error);
+                complaintSessions.delete(tgId);
+                await ctx.reply('❌ Shikoyat yuborishda xatolik. Qayta /shikoyat yuboring.');
+            }
+            return;
+        }
     });
 
     // ─── /hisobot — Haydovchi yoki Masul uchun moliyaviy hisobot ───────────────
@@ -910,14 +1248,102 @@ export const getBot = async () => {
         }
     });
 
+    // ─── /shikoyat — Mijoz shikoyat qoldiradi ──────────────────────────────────
+    bot.command('shikoyat', async (ctx) => {
+        const tgId = ctx.from.id.toString();
+
+        // Mijozning arizalarini topish
+        const reqs = await prisma.recycleRequest.findMany({
+            where: { customerTgId: tgId },
+            orderBy: { createdAt: 'desc' },
+            take: 5,
+            include: { point: true },
+        });
+
+        if (reqs.length === 0) {
+            await ctx.reply('⚠️ Sizda arizalar yo\'q — avval /ariza yuboring.');
+            return;
+        }
+
+        // Ariza tanlash uchun inline tugmalar
+        const buttons = reqs.map(r => [
+            btn(`#${r.id} — ${r.point?.regionUz || 'Noma\'lum'} — ${getStatusLabel(r.status)}`, `complaint_${r.id}`)
+        ]);
+        buttons.push([btn('❌ Bekor qilish', 'complaint_cancel')]);
+
+        await ctx.reply(
+            `⚠️ <b>Shikoyat qoldirish</b>\n\n` +
+            `Qaysi ariza bo'yicha shikoyat qilmoqchisiz?\nTanlang:`,
+            { parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons } }
+        );
+    });
+
+    // ─── /narxlar — Material narxlari ─────────────────────────────────────────
+    bot.command('narxlar', async (ctx) => {
+        const lines = Object.values(MAT).map(m => `${m.emoji} ${m.label}: <b>${fmtN(m.price)} so'm/kg</b>`).join('\n');
+        await ctx.reply(
+            `💰 <b>Material narxlari:</b>\n\n${lines}\n\n` +
+            `<i>Narxlar o'zgarishi mumkin. Aniq narx yig'ish vaqtida belgilanadi.</i>\n\n` +
+            `♻️ Makulatura topshirish: /ariza`,
+            { parse_mode: 'HTML' }
+        );
+    });
+
+    // ─── /buyurtma — Pack24 buyurtmasini kuzatish ────────────────────────────
+    bot.command('buyurtma', async (ctx) => {
+        const args = ctx.message.text.split(' ');
+        if (args.length < 2 || isNaN(parseInt(args[1]))) {
+            await ctx.reply(
+                `📦 <b>Buyurtmani kuzatish</b>\n\n` +
+                `Buyurtma raqamini yozing:\n<i>Masalan: /buyurtma 123</i>\n\n` +
+                `Yoki quyidagi tugmani bosing:`,
+                {
+                    parse_mode: 'HTML',
+                    reply_markup: { inline_keyboard: [
+                        [btn('📋 So\'nggi buyurtmalarim', 'my_orders')],
+                    ] },
+                }
+            );
+            return;
+        }
+
+        const orderId = parseInt(args[1]);
+        const order = await prisma.order.findUnique({
+            where: { id: orderId },
+            include: { items: { include: { product: { select: { name: true, price: true } } } } },
+        });
+        if (!order) { await ctx.reply(`❌ Buyurtma #${orderId} topilmadi.`); return; }
+
+        const statusMap: Record<string, string> = {
+            new: '🔵 Yangi', processing: '🟡 Jarayonda', shipping: '🚚 Yo\'lda',
+            delivered: '✅ Yetkazildi', cancelled: '🔴 Bekor', draft: '⚪ Qoralama',
+        };
+        const items = order.items.map((it: any) =>
+            `  • ${it.product?.name || 'Mahsulot'} × ${it.quantity} = ${fmtN(it.price * it.quantity)} so'm`
+        ).join('\n');
+
+        await ctx.reply(
+            `📦 <b>Buyurtma #${order.id}</b>\n\n` +
+            `📊 Status: ${statusMap[order.status] || order.status}\n` +
+            `👤 ${order.customerName || '—'} | 📞 ${order.contactPhone || '—'}\n` +
+            `📍 ${order.shippingAddress || '—'}\n\n` +
+            `<b>Mahsulotlar:</b>\n${items || 'Mahsulotlar yo\'q'}\n\n` +
+            `💵 <b>Jami: ${fmtN(order.totalAmount || 0)} so'm</b>\n` +
+            `📅 ${new Date(order.createdAt).toLocaleDateString('ru-RU')}`,
+            { parse_mode: 'HTML' }
+        );
+    });
+
     // Help
     bot.help((ctx) => {
         ctx.reply(
-            `📋 <b>Buyruqlar:</b>\n\n` +
+            `📋 <b>Pack24 Bot — Buyruqlar</b>\n\n` +
             `<b>👤 Mijoz:</b>\n` +
-            `/ariza — ♻️ Yangi ariza yuborish\n` +
-            `/arizalarim — Mening arizalarim\n` +
-            `/shikoyat — Shikoyat qoldirish\n\n` +
+            `/ariza — ♻️ Makulatura topshirish\n` +
+            `/arizalarim — Arizalarim holati\n` +
+            `/buyurtma — 📦 Buyurtma kuzatish\n` +
+            `/narxlar — 💰 Material narxlari\n` +
+            `/shikoyat — ⚠️ Shikoyat qoldirish\n\n` +
             `<b>👷 Masul shaxs:</b>\n` +
             `/arizalar — Aktiv arizalar\n` +
             `/haydovchilar — Haydovchilar ro'yxati\n` +
@@ -926,7 +1352,9 @@ export const getBot = async () => {
             `<b>🚚 Haydovchi:</b>\n` +
             `/ishlarim — Tayinlangan ishlar\n` +
             `/status — Online/Offline\n` +
-            `/hisobot — Mening hisobotim`,
+            `/hisobot — Mening hisobotim\n\n` +
+            `<b>📱 Boshqa:</b>\n` +
+            `/start — Bosh menyu`,
             { parse_mode: 'HTML' }
         );
     });
