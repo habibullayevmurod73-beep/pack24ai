@@ -100,7 +100,7 @@ const STATUS_LABELS: Record<string, string> = {
     cancelled: 'Bekor',
 };
 
-const EMPTY_POINT = { regionUz: '', regionRu: '', cityUz: '', cityRu: '', phone: '', status: 'planned', color: 'bg-blue-500' };
+const EMPTY_POINT = { regionUz: '', regionRu: '', cityUz: '', cityRu: '', phone: '', address: '', lat: '', lng: '', status: 'planned', color: 'bg-blue-500' };
 
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -219,6 +219,9 @@ export default function AdminRecyclingPage() {
             cityUz: point.cityUz,
             cityRu: point.cityRu,
             phone: point.phone,
+            address: (point as RecyclePoint & { address?: string }).address || '',
+            lat: String((point as RecyclePoint & { lat?: number | null }).lat ?? ''),
+            lng: String((point as RecyclePoint & { lng?: number | null }).lng ?? ''),
             status: point.status,
             color: point.color,
         });
@@ -529,6 +532,46 @@ export default function AdminRecyclingPage() {
                                         type="tel"
                                         className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-emerald-400"
                                     />
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                                        Manzil (to'liq)
+                                    </label>
+                                    <input
+                                        value={(pointForm as typeof pointForm & { address: string }).address}
+                                        onChange={e => setPointForm(f => ({ ...f, address: e.target.value }))}
+                                        placeholder="Toshkent sh., Yunusobod tumani, 5-ko'cha 12-uy"
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-emerald-400"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                                        📍 Kenglik (Latitude)
+                                    </label>
+                                    <input
+                                        value={(pointForm as typeof pointForm & { lat: string }).lat}
+                                        onChange={e => setPointForm(f => ({ ...f, lat: e.target.value }))}
+                                        placeholder="41.2995"
+                                        type="number"
+                                        step="0.0001"
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-emerald-400"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                                        📍 Uzunlik (Longitude)
+                                    </label>
+                                    <input
+                                        value={(pointForm as typeof pointForm & { lng: string }).lng}
+                                        onChange={e => setPointForm(f => ({ ...f, lng: e.target.value }))}
+                                        placeholder="69.2401"
+                                        type="number"
+                                        step="0.0001"
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-emerald-400"
+                                    />
+                                    <p className="text-[10px] text-gray-400 mt-1">
+                                        Google Maps dan nusxalash: O'ng klik → &quot;Bu joy haqida&quot;
+                                    </p>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">

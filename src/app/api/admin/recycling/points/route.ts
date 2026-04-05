@@ -27,6 +27,9 @@ export async function POST(request: Request) {
                 cityUz: body.cityUz,
                 cityRu: body.cityRu || body.cityUz,
                 phone: body.phone,
+                address: body.address || null,
+                lat: body.lat ? Number(body.lat) : null,
+                lng: body.lng ? Number(body.lng) : null,
                 status: body.status || 'planned',
                 color: body.color || 'bg-blue-500',
             }

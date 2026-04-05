@@ -1,39 +1,47 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useLanguage } from '@/lib/contexts/LanguageContext';
 import {
     Recycle, MapPin, Phone, CheckCircle, ChevronDown, ChevronUp,
     ArrowRight, Truck, Package, Leaf, Building2, Scale,
-    Factory, Star, ShieldCheck, Clock, Send
+    Factory, Star, ShieldCheck, Clock, Send, Navigation, Map, AlignLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+// MapPicker ni faqat client side da yuklash (Leaflet SSR ga mos emas)
+const MapPicker = dynamic(() => import('@/components/MapPicker'), { ssr: false, loading: () => (
+    <div className="h-[280px] bg-gray-100 rounded-xl animate-pulse flex items-center justify-center">
+        <span className="text-sm text-gray-400">🗺️ Xarita yuklanmoqda...</span>
+    </div>
+)});
+
 // ─── 12 ta viloyat ma'lumotlari ────────────────────────────────────────────
 const REGIONS = [
-    { id: 1, uz: 'Toshkent (HQ)',   ru: 'Ташкент (HQ)',      city: { uz: 'Toshkent shahri',   ru: 'г. Ташкент' },     phone: '+998 71 234-56-78', status: 'active',  color: 'bg-emerald-500' },
-    { id: 2, uz: 'Samarqand',       ru: 'Самарканд',          city: { uz: 'Samarqand sh.',      ru: 'г. Самарканд' },   phone: '+998 93 234-56-78', status: 'planned', color: 'bg-blue-500'    },
-    { id: 3, uz: 'Buxoro',          ru: 'Бухара',             city: { uz: 'Buxoro sh.',         ru: 'г. Бухара' },      phone: '+998 93 345-67-89', status: 'planned', color: 'bg-purple-500'  },
-    { id: 4, uz: "Qashqadaryo",     ru: 'Кашкадарья',        city: { uz: 'Qarshi sh.',         ru: 'г. Карши' },       phone: '+998 93 456-78-90', status: 'planned', color: 'bg-orange-500'  },
-    { id: 5, uz: 'Surxandaryo',     ru: 'Сурхандарья',       city: { uz: 'Termiz sh.',         ru: 'г. Термез' },      phone: '+998 93 567-89-01', status: 'planned', color: 'bg-red-500'    },
-    { id: 6, uz: 'Navoiy',          ru: 'Навои',              city: { uz: 'Navoiy sh.',         ru: 'г. Навои' },       phone: '+998 93 678-90-12', status: 'planned', color: 'bg-teal-500'    },
-    { id: 7, uz: 'Namangan',        ru: 'Наманган',           city: { uz: 'Namangan sh.',       ru: 'г. Наманган' },    phone: '+998 93 789-01-23', status: 'planned', color: 'bg-indigo-500'  },
-    { id: 8, uz: 'Andijon',         ru: 'Андижан',            city: { uz: 'Andijon sh.',        ru: 'г. Андижан' },     phone: '+998 93 890-12-34', status: 'planned', color: 'bg-pink-500'    },
-    { id: 9, uz: "Farg'ona",        ru: 'Фергана',            city: { uz: "Farg'ona sh.",       ru: 'г. Фергана' },     phone: '+998 93 901-23-45', status: 'planned', color: 'bg-cyan-500'    },
-    { id: 10, uz: 'Xorazm',         ru: 'Хорезм',             city: { uz: 'Urganch sh.',        ru: 'г. Ургенч' },      phone: '+998 93 012-34-56', status: 'planned', color: 'bg-lime-500'    },
-    { id: 11, uz: 'Sirdaryo',       ru: 'Сырдарья',          city: { uz: 'Guliston sh.',       ru: 'г. Гулистан' },    phone: '+998 93 123-45-67', status: 'planned', color: 'bg-yellow-500'  },
-    { id: 12, uz: 'Jizzax',         ru: 'Джизак',             city: { uz: 'Jizzax sh.',         ru: 'г. Джизак' },      phone: '+998 93 234-56-79', status: 'planned', color: 'bg-violet-500'  },
+    { id: 1,  uz: 'Toshkent (HQ)',  ru: 'Ташкент (HQ)',     city: { uz: 'Toshkent shahri',  ru: 'г. Ташкент' },   phone: '+998 71 234-56-78', status: 'active',  color: 'bg-emerald-500', lat: 41.2995, lng: 69.2401 },
+    { id: 2,  uz: 'Samarqand',      ru: 'Самарканд',         city: { uz: 'Samarqand sh.',    ru: 'г. Самарканд' }, phone: '+998 93 234-56-78', status: 'planned', color: 'bg-blue-500',    lat: 39.6542, lng: 66.9597 },
+    { id: 3,  uz: 'Buxoro',         ru: 'Бухара',            city: { uz: 'Buxoro sh.',       ru: 'г. Бухара' },    phone: '+998 93 345-67-89', status: 'planned', color: 'bg-purple-500',  lat: 39.7747, lng: 64.4286 },
+    { id: 4,  uz: 'Qashqadaryo',    ru: 'Кашкадарья',       city: { uz: 'Qarshi sh.',       ru: 'г. Карши' },     phone: '+998 93 456-78-90', status: 'planned', color: 'bg-orange-500',  lat: 38.8600, lng: 65.7911 },
+    { id: 5,  uz: 'Surxandaryo',    ru: 'Сурхандарья',      city: { uz: 'Termiz sh.',       ru: 'г. Термез' },    phone: '+998 93 567-89-01', status: 'planned', color: 'bg-red-500',     lat: 37.2249, lng: 67.2783 },
+    { id: 6,  uz: 'Navoiy',         ru: 'Навои',             city: { uz: 'Navoiy sh.',       ru: 'г. Навои' },     phone: '+998 93 678-90-12', status: 'planned', color: 'bg-teal-500',    lat: 40.0843, lng: 65.3791 },
+    { id: 7,  uz: 'Namangan',       ru: 'Наманган',          city: { uz: 'Namangan sh.',     ru: 'г. Наманган' },  phone: '+998 93 789-01-23', status: 'planned', color: 'bg-indigo-500',  lat: 41.0011, lng: 71.6722 },
+    { id: 8,  uz: 'Andijon',        ru: 'Андижан',           city: { uz: 'Andijon sh.',      ru: 'г. Андижан' },   phone: '+998 93 890-12-34', status: 'planned', color: 'bg-pink-500',    lat: 40.7821, lng: 72.3442 },
+    { id: 9,  uz: "Farg'ona",       ru: 'Фергана',           city: { uz: "Farg'ona sh.",     ru: 'г. Фергана' },   phone: '+998 93 901-23-45', status: 'planned', color: 'bg-cyan-500',    lat: 40.3864, lng: 71.7864 },
+    { id: 10, uz: 'Xorazm',         ru: 'Хорезм',            city: { uz: 'Urganch sh.',      ru: 'г. Ургенч' },    phone: '+998 93 012-34-56', status: 'planned', color: 'bg-lime-500',    lat: 41.5503, lng: 60.6295 },
+    { id: 11, uz: 'Sirdaryo',       ru: 'Сырдарья',         city: { uz: 'Guliston sh.',     ru: 'г. Гулистан' },  phone: '+998 93 123-45-67', status: 'planned', color: 'bg-yellow-500',  lat: 40.4897, lng: 68.7739 },
+    { id: 12, uz: 'Jizzax',         ru: 'Джизак',            city: { uz: 'Jizzax sh.',       ru: 'г. Джизак' },    phone: '+998 93 234-56-79', status: 'planned', color: 'bg-violet-500',  lat: 40.1216, lng: 67.8422 },
 ];
 
 // ─── Qabul qilinadigan materiallar ─────────────────────────────────────────
 const MATERIALS = [
-    { emoji: '📰', uz: 'Gazeta va jurnallar',          ru: 'Газеты и журналы',            price: '800–1 200' },
-    { emoji: '📄', uz: 'Ofis qog\'ozi (A4 va boshqa)', ru: 'Офисная бумага (А4 и др.)',   price: '1 000–1 500' },
-    { emoji: '📦', uz: 'Karton va gofrokarton',        ru: 'Картон и гофрокартон',        price: '600–1 000' },
-    { emoji: '📚', uz: 'Kitob va darsliklar',          ru: 'Книги и учебники',             price: '700–1 100' },
-    { emoji: '🗂️', uz: 'Arxiv hujjatlar',              ru: 'Архивные документы',           price: '900–1 300' },
-    { emoji: '🧻', uz: 'Qadoqlash qog\'ozi',           ru: 'Упаковочная бумага',          price: '500–900'  },
+    { emoji: '📰', uz: 'Gazeta va jurnallar',          ru: 'Газеты и журналы',            price: '800–1 200', priceMin: 800,  priceMax: 1200 },
+    { emoji: '📄', uz: 'Ofis qog\'ozi (A4 va boshqa)', ru: 'Офисная бумага (А4 и др.)',   price: '1 000–1 500', priceMin: 1000, priceMax: 1500 },
+    { emoji: '📦', uz: 'Karton va gofrokarton',        ru: 'Картон и гофрокартон',        price: '600–1 000', priceMin: 600,  priceMax: 1000 },
+    { emoji: '📚', uz: 'Kitob va darsliklar',          ru: 'Книги и учебники',             price: '700–1 100', priceMin: 700,  priceMax: 1100 },
+    { emoji: '🗂️', uz: 'Arxiv hujjatlar',              ru: 'Архивные документы',           price: '900–1 300', priceMin: 900,  priceMax: 1300 },
+    { emoji: '🧻', uz: 'Qadoqlash qog\'ozi',           ru: 'Упаковочная бумага',          price: '500–900',   priceMin: 500,  priceMax: 900  },
 ];
 
 // ─── FAQ ───────────────────────────────────────────────────────────────────
@@ -84,7 +92,19 @@ export default function RecyclingPage() {
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [selectedRegion, setSelectedRegion] = useState('');
-    const [form, setForm] = useState({ name: '', phone: '', volume: '', material: '', pickup: 'base' });
+    const [form, setForm] = useState({
+        name: '', phone: '', volume: '', material: '', pickup: 'base', address: '',
+        pickupLat: '', pickupLng: ''
+    });
+
+    // Pickup manzil rejimi: gps | map | text
+    const [locationMode, setLocationMode] = useState<'gps' | 'map' | 'text'>('text');
+    const [gpsPickupStatus, setGpsPickupStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+
+    // ─── Telefon validatsiya ─────────────────────────────────────────────
+    const phoneRegex = /^\+998[0-9]{9}$/;
+    const isPhoneValid = form.phone.trim() === '' || phoneRegex.test(form.phone.replace(/\s/g, ''));
+    const isPhoneFull  = phoneRegex.test(form.phone.replace(/\s/g, ''));
 
     // ─── Dinamik regionlar (DB dan yuklash, fallback: REGIONS) ──────────
     interface DynRegion {
@@ -95,8 +115,80 @@ export default function RecyclingPage() {
         phone: string;
         status: string;
         color: string;
+        lat?: number | null;
+        lng?: number | null;
     }
     const [dynRegions, setDynRegions] = useState<DynRegion[]>([]);
+
+    // ─── GPS state ───────────────────────────────────────────────────────
+    const [gpsStatus, setGpsStatus] = useState<'idle' | 'loading' | 'found' | 'error'>('idle');
+    const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+    const [nearestPointId, setNearestPointId] = useState<number | null>(null);
+
+    // Haversine formula — yer sferasi bo'yicha masofa (km)
+    const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a =
+            Math.sin(dLat / 2) ** 2 +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLng / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    const distanceTo = (region: DynRegion, coords: { lat: number; lng: number }): number | null => {
+        if (!region.lat || !region.lng) return null;
+        return haversineKm(coords.lat, coords.lng, region.lat, region.lng);
+    };
+
+    const handleGpsDetect = () => {
+        if (!navigator.geolocation) {
+            toast.error(t('Brauzeringiz GPS ni qo\'llamaydi', 'Браузер не поддерживает GPS'));
+            return;
+        }
+        setGpsStatus('loading');
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                setUserCoords(coords);
+                const allRegions = dynRegions.length > 0 ? dynRegions : REGIONS;
+                const withCoords = allRegions.filter(r => r.lat && r.lng && r.status === 'active');
+
+                if (withCoords.length === 0) {
+                    setGpsStatus('found');
+                    toast(t('📍 Joylashuvingiz aniqlandi, ammo koordinatali baza yo\'q', '📍 Местоположение определено, но координат нет'));
+                    return;
+                }
+
+                const nearest = withCoords.reduce((best, r) => {
+                    const d = distanceTo(r, coords)!;
+                    const bd = distanceTo(best, coords)!;
+                    return d < bd ? r : best;
+                });
+
+                setNearestPointId(nearest.id);
+                setSelectedRegion(String(nearest.id));
+                setGpsStatus('found');
+
+                const km = distanceTo(nearest, coords)!;
+                toast.success(t(
+                    `📍 Eng yaqin baza: ${nearest.uz} — ${km.toFixed(0)} km`,
+                    `📍 Ближайшая база: ${nearest.ru} — ${km.toFixed(0)} км`
+                ));
+            },
+            (err) => {
+                setGpsStatus('error');
+                if (err.code === 1) {
+                    toast.error(t('GPS ruxsati berilmadi', 'Доступ к GPS отклонён'));
+                } else {
+                    toast.error(t('Joylashuvni aniqlab bo\'lmadi', 'Не удалось определить местоположение'));
+                }
+            },
+            { timeout: 10000, maximumAge: 60000 }
+        );
+    };
+
 
     useEffect(() => {
         (async () => {
@@ -105,7 +197,12 @@ export default function RecyclingPage() {
                 if (res.ok) {
                     const data = await res.json();
                     if (Array.isArray(data) && data.length > 0) {
-                        setDynRegions(data.map((p: { id: number; regionUz: string; regionRu: string; cityUz: string; cityRu: string; phone: string; status: string; color: string }) => ({
+                        setDynRegions(data.map((p: {
+                            id: number; regionUz: string; regionRu: string;
+                            cityUz: string; cityRu: string; phone: string;
+                            status: string; color: string;
+                            lat?: number | null; lng?: number | null;
+                        }) => ({
                             id: p.id,
                             uz: p.regionUz,
                             ru: p.regionRu,
@@ -113,12 +210,13 @@ export default function RecyclingPage() {
                             phone: p.phone,
                             status: p.status,
                             color: p.color,
+                            lat: p.lat ?? null,
+                            lng: p.lng ?? null,
                         })));
                         return;
                     }
                 }
             } catch { /* fallback */ }
-            // Fallback: hardcoded
             setDynRegions(REGIONS);
         })();
     }, []);
@@ -130,10 +228,40 @@ export default function RecyclingPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!form.name.trim() || !form.phone.trim() || !selectedRegion) {
-            toast.error(t("Barcha maydonlarni to'ldiring", 'Заполните все поля'));
+
+        // Majburiy maydonlar
+        if (!form.name.trim()) {
+            toast.error(t("Ism Familiyani kiriting", 'Введите имя и фамилию'));
             return;
         }
+        if (!form.phone.trim()) {
+            toast.error(t("Telefon raqamini kiriting", 'Введите номер телефона'));
+            return;
+        }
+        if (!isPhoneFull) {
+            toast.error(t("+998XXXXXXXXX formatida kiriting", 'Формат: +998XXXXXXXXX'));
+            return;
+        }
+        if (!selectedRegion) {
+            toast.error(t("Viloyatni tanlang", 'Выберите регион'));
+            return;
+        }
+
+        // Kuryer uchun qo'shimcha tekshiruvlar
+        if (form.pickup === 'pickup') {
+            if (!form.address.trim()) {
+                toast.error(t("Kuryer uchun manzilni kiriting", 'Введите адрес для курьера'));
+                return;
+            }
+            if (form.volume && Number(form.volume) < 200) {
+                toast.error(t(
+                    "Kuryer chaqirish uchun minimal 200 kg bo'lishi kerak",
+                    'Для вызова курьера минимальный объём — 200 кг'
+                ));
+                return;
+            }
+        }
+
         setSubmitting(true);
         try {
             const res = await fetch('/api/recycling', {
@@ -146,13 +274,15 @@ export default function RecyclingPage() {
                     material: form.material || null,
                     volume: form.volume ? Number(form.volume) : null,
                     pickupType: form.pickup,
+                    address: form.pickup === 'pickup' ? form.address : null,
                 }),
             });
             if (res.ok) {
                 setSubmitted(true);
                 toast.success(t("So'rovingiz qabul qilindi! Tez orada bog'lanamiz.", 'Заявка принята! Скоро свяжемся.'));
             } else {
-                toast.error(t('Xatolik yuz berdi, qaytadan urinib ko\'ring', 'Ошибка, попробуйте ещё раз'));
+                const errData = await res.json().catch(() => ({}));
+                toast.error(errData.error || t('Xatolik yuz berdi, qaytadan urinib ko\'ring', 'Ошибка, попробуйте ещё раз'));
             }
         } catch {
             toast.error(t('Server bilan aloqa yo\'q', 'Нет связи с сервером'));
@@ -424,7 +554,7 @@ export default function RecyclingPage() {
                                         {t("2 soat ichida siz bilan bog'lanamiz.", 'Свяжемся с вами в течение 2 часов.')}
                                     </p>
                                     <button
-                                        onClick={() => { setSubmitted(false); setForm({ name: '', phone: '', volume: '', material: '', pickup: 'base' }); setSelectedRegion(''); }}
+                                        onClick={() => { setSubmitted(false); setForm({ name: '', phone: '', volume: '', material: '', pickup: 'base', address: '', pickupLat: '', pickupLng: '' }); setSelectedRegion(''); setLocationMode('text'); setGpsPickupStatus('idle'); }}
                                         className="text-sm font-semibold text-blue-600 hover:underline"
                                     >
                                         {t("Yana so'rov yuborish", 'Отправить ещё заявку')}
@@ -452,6 +582,7 @@ export default function RecyclingPage() {
                                         <div>
                                             <label htmlFor="recycling-phone" className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">
                                                 {t('Telefon', 'Телефон')} *
+                                                {isPhoneFull && <span className="ml-2 text-emerald-500">✓</span>}
                                             </label>
                                             <input
                                                 id="recycling-phone"
@@ -459,26 +590,77 @@ export default function RecyclingPage() {
                                                 onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                                                 type="tel"
                                                 placeholder="+998 90 123-45-67"
-                                                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-400 transition-colors"
+                                                className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-colors ${
+                                                    !isPhoneValid
+                                                        ? 'border-red-300 focus:border-red-400 bg-red-50/30'
+                                                        : isPhoneFull
+                                                        ? 'border-emerald-300 focus:border-emerald-400'
+                                                        : 'border-gray-200 focus:border-emerald-400'
+                                                }`}
                                             />
+                                            {!isPhoneValid && form.phone.length > 4 && (
+                                                <p className="text-[11px] text-red-500 mt-1">⚠ {t('+998XXXXXXXXX formatida kiriting', 'Формат: +998XXXXXXXXX')}</p>
+                                            )}
                                         </div>
                                     </div>
 
                                     <div>
-                                        <label htmlFor="recycling-region" className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">
-                                            {t('Viloyat / Baza', 'Регион / База')} *
-                                        </label>
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <label htmlFor="recycling-region" className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                                {t('Viloyat / Baza', 'Регион / База')} *
+                                            </label>
+                                            <button
+                                                type="button"
+                                                onClick={handleGpsDetect}
+                                                disabled={gpsStatus === 'loading'}
+                                                className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg transition-all ${
+                                                    gpsStatus === 'found'
+                                                        ? 'bg-emerald-100 text-emerald-700'
+                                                        : gpsStatus === 'error'
+                                                        ? 'bg-red-100 text-red-600'
+                                                        : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                                                }`}
+                                            >
+                                                {gpsStatus === 'loading' ? (
+                                                    <span className="animate-spin inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full" />
+                                                ) : (
+                                                    <MapPin size={12} />
+                                                )}
+                                                {gpsStatus === 'loading'
+                                                    ? t('Aniqlanmoqda...', 'Определяю...')
+                                                    : gpsStatus === 'found'
+                                                    ? t('📍 Aniqlandi', '📍 Определено')
+                                                    : t('📍 GPS', '📍 GPS')}
+                                            </button>
+                                        </div>
                                         <select
                                             id="recycling-region"
                                             value={selectedRegion}
-                                            onChange={e => setSelectedRegion(e.target.value)}
-                                            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-400 bg-white transition-colors"
+                                            onChange={e => { setSelectedRegion(e.target.value); setNearestPointId(null); }}
+                                            className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-400 bg-white transition-colors ${
+                                                nearestPointId && selectedRegion === String(nearestPointId)
+                                                    ? 'border-emerald-400 ring-1 ring-emerald-200'
+                                                    : 'border-gray-200'
+                                            }`}
                                         >
                                             <option value="">{t('Viloyatni tanlang...', 'Выберите регион...')}</option>
-                                            {activeRegions.map(r => (
-                                                <option key={r.id} value={r.id}>{t(r.uz, r.ru)}</option>
-                                            ))}
+                                            {activeRegions.map(r => {
+                                                const km = userCoords ? distanceTo(r, userCoords) : null;
+                                                const distLabel = km !== null ? ` — ${km.toFixed(0)} km` : '';
+                                                const isNearest = nearestPointId === r.id;
+                                                return (
+                                                    <option key={r.id} value={r.id}>
+                                                        {isNearest ? '📍 ' : ''}{t(r.uz, r.ru)}{distLabel}
+                                                    </option>
+                                                );
+                                            })}
                                         </select>
+                                        {nearestPointId && (
+                                            <p className="text-[11px] text-emerald-600 mt-1.5 flex items-center gap-1">
+                                                <MapPin size={10} />
+                                                {t('Joylashuvingizga eng yaqin baza avtomatik tanlandi', 'Автоматически выбрана ближайшая к вам база')}
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div className="grid sm:grid-cols-2 gap-4">
@@ -512,6 +694,40 @@ export default function RecyclingPage() {
                                         </div>
                                     </div>
 
+                                    {/* ── Narx Kalkulyatori ── */}
+                                    {(() => {
+                                        const vol = Number(form.volume);
+                                        const mat = MATERIALS.find(m => m.uz === form.material);
+                                        if (!vol || vol <= 0 || !mat) return null;
+                                        const minEarning = vol * mat.priceMin;
+                                        const maxEarning = vol * mat.priceMax;
+                                        const fmt = (n: number) =>
+                                            n >= 1_000_000
+                                                ? `${(n / 1_000_000).toFixed(1)} mln so'm`
+                                                : `${n.toLocaleString('ru-RU')} so'm`;
+                                        return (
+                                            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl px-5 py-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <span className="text-lg">💰</span>
+                                                    <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider">
+                                                        {t('Taxminiy daromad', 'Примерный доход')}
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-2xl font-black text-emerald-700">
+                                                        {fmt(minEarning)}
+                                                    </span>
+                                                    <span className="text-sm text-emerald-500 font-semibold">
+                                                        — {fmt(maxEarning)}
+                                                    </span>
+                                                </div>
+                                                <p className="text-[11px] text-emerald-600/70 mt-1.5">
+                                                    {vol} kg × {mat.priceMin.toLocaleString('ru-RU')}–{mat.priceMax.toLocaleString('ru-RU')} {t("so'm/kg", 'сум/кг')} · {t('Aniq narx operator bilan kelishiladi', 'Точная цена согласовывается с оператором')}
+                                                </p>
+                                            </div>
+                                        );
+                                    })()}
+
                                     <div>
                                         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">{t("Topshirish usuli", 'Способ сдачи')}</p>
                                         <div className="grid grid-cols-2 gap-3">
@@ -529,6 +745,149 @@ export default function RecyclingPage() {
                                                 </button>
                                             ))}
                                         </div>
+
+                                        {/* Kuryer tanlanganda — manzil va ogohlantirma */}
+                                        {form.pickup === 'pickup' && (
+                                            <div className="mt-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+
+                                                {/* ─── 3 ta rejim tugmalari ─── */}
+                                                <div>
+                                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                                                        {t('📦 Makulatura qayerdan olib ketiladi?', '📦 Откуда забрать макулатуру?')}
+                                                    </p>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        {[
+                                                            { id: 'gps' as const,  Icon: Navigation, uz: 'GPS joyi',    ru: 'GPS-позиция',  desc: { uz: "Hozir turgan joyim", ru: "Я здесь сейчас" } },
+                                                            { id: 'map' as const,  Icon: Map,        uz: 'Xaritadan',   ru: 'На карте',    desc: { uz: "Boshqa nuqta", ru: "Другая точка" } },
+                                                            { id: 'text' as const, Icon: AlignLeft,  uz: 'Matn',        ru: 'Текстом',     desc: { uz: "Manzil yozaman", ru: "Напишу адрес" } },
+                                                        ].map(({ id, Icon, uz, ru, desc }) => (
+                                                            <button
+                                                                key={id}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setLocationMode(id);
+                                                                    setForm(f => ({ ...f, address: '', pickupLat: '', pickupLng: '' }));
+                                                                    setGpsPickupStatus('idle');
+                                                                }}
+                                                                className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-center transition-all ${
+                                                                    locationMode === id
+                                                                        ? 'border-emerald-500 bg-emerald-50'
+                                                                        : 'border-gray-100 hover:border-gray-300'
+                                                                }`}
+                                                            >
+                                                                <Icon size={18} className={locationMode === id ? 'text-emerald-600' : 'text-gray-400'} />
+                                                                <span className={`text-xs font-bold ${locationMode === id ? 'text-emerald-700' : 'text-gray-600'}`}>{t(uz, ru)}</span>
+                                                                <span className="text-[10px] text-gray-400">{t(desc.uz, desc.ru)}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* ─── GPS rejimi ─── */}
+                                                {locationMode === 'gps' && (
+                                                    <div className="space-y-2">
+                                                        <button
+                                                            type="button"
+                                                            disabled={gpsPickupStatus === 'loading'}
+                                                            onClick={() => {
+                                                                if (!navigator.geolocation) { toast.error('GPS qo\'llab-quvvatlanmaydi'); return; }
+                                                                setGpsPickupStatus('loading');
+                                                                navigator.geolocation.getCurrentPosition(async (pos) => {
+                                                                    const lat = pos.coords.latitude;
+                                                                    const lng = pos.coords.longitude;
+                                                                    // Reverse geocode
+                                                                    let addr = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                                                                    try {
+                                                                        const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=uz`, { headers: { 'User-Agent': 'Pack24/1.0' } });
+                                                                        const d = await r.json();
+                                                                        if (d.display_name) addr = d.display_name;
+                                                                    } catch { /* fallback */ }
+                                                                    setForm(f => ({ ...f, pickupLat: String(lat), pickupLng: String(lng), address: addr }));
+                                                                    setGpsPickupStatus('done');
+                                                                    toast.success(t('📍 GPS manzil aniqlandi!', '📍 GPS-адрес определён!'));
+                                                                }, () => {
+                                                                    setGpsPickupStatus('error');
+                                                                    toast.error(t('GPS ruxsati berilmadi', 'Доступ к GPS запрещён'));
+                                                                }, { timeout: 10000 });
+                                                            }}
+                                                            className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${
+                                                                gpsPickupStatus === 'done'
+                                                                    ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-300'
+                                                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                                            }`}
+                                                        >
+                                                            {gpsPickupStatus === 'loading' ? (
+                                                                <><span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full inline-block" /> {t('Aniqlanmoqda...', 'Определяю...')}</>
+                                                            ) : gpsPickupStatus === 'done' ? (
+                                                                <><CheckCircle size={16} /> {t('Aniqlandi ✓', 'Определено ✓')}</>
+                                                            ) : (
+                                                                <><Navigation size={16} /> {t('Hozirgi joylashuvni aniqlash', 'Определить моё местоположение')}</>
+                                                            )}
+                                                        </button>
+                                                        {form.address && gpsPickupStatus === 'done' && (
+                                                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-xs text-emerald-700">
+                                                                <p className="font-bold mb-0.5">📍 {t('Aniqlangan manzil:', 'Определённый адрес:')}</p>
+                                                                <p className="leading-relaxed">{form.address}</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* ─── Xaritadan tanlash rejimi ─── */}
+                                                {locationMode === 'map' && (
+                                                    <div className="space-y-2">
+                                                        <p className="text-xs text-gray-500">
+                                                            {t('Xaritaga bosing yoki marker sudrab nuqtani belgilang 👇', 'Нажмите на карту или перетащите маркер 👇')}
+                                                        </p>
+                                                        <MapPicker
+                                                            onSelect={(lat, lng, address) => {
+                                                                setForm(f => ({ ...f, pickupLat: String(lat), pickupLng: String(lng), address }));
+                                                            }}
+                                                        />
+                                                        {form.address && (
+                                                            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 text-xs text-blue-700">
+                                                                <span className="font-bold">📍 </span>{form.address}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* ─── Matn rejimi ─── */}
+                                                {locationMode === 'text' && (
+                                                    <div>
+                                                        <label htmlFor="recycling-address" className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">
+                                                            {t('🏠 To\'liq manzil', '🏠 Полный адрес')} *
+                                                        </label>
+                                                        <textarea
+                                                            id="recycling-address"
+                                                            value={form.address}
+                                                            onChange={e => setForm(f => ({ ...f, address: e.target.value, pickupLat: '', pickupLng: '' }))}
+                                                            rows={2}
+                                                            placeholder={t(
+                                                                "Toshkent sh., Chilonzor t., Bunyodkor ko'ch. 12",
+                                                                'Ташкент, Чиланзарский р-н, ул. Буниодкор, 12'
+                                                            )}
+                                                            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-400 resize-none transition-colors"
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                {/* ─── Ogohlantirma: 200 kg minimum ─── */}
+                                                <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
+                                                    <span className="text-base leading-none mt-0.5">⚠️</span>
+                                                    <span>{t(
+                                                        "Kuryer chaqirish uchun minimal hajm — 200 kg. 50–199 kg uchun yetkazib berish narxi alohida kelishiladi.",
+                                                        "Минимальный объём для вызова курьера — 200 кг. От 50 до 199 кг — стоимость согласовывается отдельно."
+                                                    )}</span>
+                                                </div>
+                                                {form.volume && Number(form.volume) > 0 && Number(form.volume) < 200 && (
+                                                    <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-xs text-red-600 font-semibold">
+                                                        <span>❌</span>
+                                                        {t(`${form.volume} kg kam — kuryer uchun minimal 200 kg kerak`, `${form.volume} кг мало — для курьера минимум 200 кг`)}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
 
                                     <button

@@ -14,6 +14,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
                 cityUz: body.cityUz,
                 cityRu: body.cityRu,
                 phone: body.phone,
+                address: body.address ?? undefined,
+                lat: body.lat !== undefined ? (body.lat ? Number(body.lat) : null) : undefined,
+                lng: body.lng !== undefined ? (body.lng ? Number(body.lng) : null) : undefined,
                 status: body.status,
                 color: body.color,
             }

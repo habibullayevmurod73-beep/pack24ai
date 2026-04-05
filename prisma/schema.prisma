@@ -276,6 +276,8 @@ model RecyclePoint {
   cityRu      String
   phone       String
   address     String?                    // Baza manzili
+  lat         Float?                     // Kenglik (koordinata)
+  lng         Float?                     // Uzunlik (koordinata)
   pricePerKg  Float    @default(800)     // Default narx (so'm/kg) — masul+admin belgilaydi
   status      String   @default("active") // active, planned
   color       String   @default("bg-emerald-500")
@@ -339,7 +341,10 @@ model RecycleRequest {
   material      String?                  // qog'oz, karton, gazeta, jurnal, ofis, kitob, aralash
   volume        Int?                     // Taxminiy hajm (kg)
   pickupType    String       @default("base") // base, pickup
-  address       String?                  // Mijoz manzili (pickup uchun)
+  pickupLocationMode String?               // gps | map | text
+  address       String?                  // Mijoz manzili (pickup uchun) — matn
+  pickupLat     Float?                   // Pickup nuqtasi kenglik
+  pickupLng     Float?                   // Pickup nuqtasi uzunlik
   customerTgId  String?                  // Mijoz Telegram ID (ixtiyoriy)
 
   // Status pipeline: new → dispatched → assigned → en_route → arrived → collecting → collected → confirmed → completed / cancelled / disputed

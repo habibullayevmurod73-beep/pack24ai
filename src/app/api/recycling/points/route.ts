@@ -13,6 +13,9 @@ export async function GET() {
                 cityUz: true,
                 cityRu: true,
                 phone: true,
+                address: true,
+                lat: true,
+                lng: true,
                 status: true,
                 color: true,
             }

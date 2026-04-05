@@ -795,6 +795,55 @@ export const getBot = async () => {
                 return;
             }
 
+            // ─── VIEW_REQ: Masul arizani ko'rish ──────────────────────────
+            if (data.startsWith('view_req_')) {
+                const requestId = parseInt(data.split('_')[2]);
+                const sup = await prisma.supervisor.findUnique({ where: { telegramId: tgId } });
+                if (!sup) { await ctx.answerCbQuery('❌ Ruxsat yo\'q'); return; }
+
+                const req = await prisma.recycleRequest.findUnique({
+                    where: { id: requestId },
+                    include: { point: true, assignedDriver: true },
+                });
+                if (!req) { await ctx.answerCbQuery('Topilmadi'); return; }
+
+                // Hozir online haydovchilarni yangilash
+                const drivers = await prisma.driver.findMany({
+                    where: { supervisorId: sup.id, status: 'active' },
+                    orderBy: [{ isOnline: 'desc' }, { id: 'asc' }],
+                    take: 8,
+                });
+
+                const pickupLabel = req.pickupType === 'pickup' ? '🚛 Kuryer chiqishi' : '🏭 O\'zi olib keladi';
+                const info =
+                    `📋 <b>Ariza #${req.id}</b> — ${getStatusLabel(req.status)}\n\n` +
+                    `👤 ${req.name} | 📞 ${req.phone}\n` +
+                    `📍 ${req.point?.regionUz || '—'}\n` +
+                    `🚚 Usul: ${pickupLabel}\n` +
+                    `${req.address ? `🏠 ${req.address}\n` : ''}` +
+                    `📦 ${req.material || '—'} | ⚖️ ${req.volume ? req.volume + ' kg' : '—'}\n\n` +
+                    (drivers.length > 0
+                        ? `👷 Haydovchi tanlang:`
+                        : `⚠️ Hududingizda faol haydovchi yo'q!\nAdmin bilan bog'laning.`);
+
+                const keyboard = drivers.length > 0
+                    ? [
+                        ...drivers.map(d => [{
+                            text: `${d.isOnline ? '🟢' : '⚫'} ${d.name}`,
+                            callback_data: `assign_${req.id}_${d.id}`,
+                        }]),
+                        [{ text: '🔄 Yangilash', callback_data: `view_req_${req.id}` }],
+                    ]
+                    : [[{ text: '🔄 Qayta tekshirish', callback_data: `view_req_${req.id}` }]];
+
+                await ctx.answerCbQuery('✅');
+                await ctx.editMessageText(info, {
+                    parse_mode: 'HTML',
+                    reply_markup: { inline_keyboard: keyboard },
+                });
+                return;
+            }
+
         } catch (error) {
             console.error('[Bot Callback]', error);
             await ctx.answerCbQuery('Xatolik yuz berdi');
