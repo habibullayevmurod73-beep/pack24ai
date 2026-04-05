@@ -183,7 +183,7 @@ export const getBot = async () => {
         arizaSessions.set(tgId, { step: 'name', name });
         await ctx.reply(
             `♻️ <b>Yangi ariza yuborish</b>\n\n` +
-            `Iltimos, ismingizni kiriting:`,
+            `Iltimos, Ismingiz va Familiyangizni (F.I.SH.) kiriting:`,
             {
                 parse_mode: 'HTML',
                 reply_markup: {
@@ -623,7 +623,11 @@ export const getBot = async () => {
                 if (!req) { await ctx.answerCbQuery('Ariza topilmadi'); return; }
 
                 const matInfo = MAT[materialType] || MAT.mix;
-                const price = req.point?.pricePerKg || matInfo.price;
+                let price = req.point?.pricePerKg || matInfo.price;
+                if (req.pickupType === 'pickup') {
+                    price = price * 0.5; // -50% pickup uchun
+                }
+
                 const effectiveWeight = weight - (weight * discount / 100);
                 const totalAmount = Math.round(effectiveWeight * price);
 
@@ -798,6 +802,42 @@ export const getBot = async () => {
     });
 
     // ════════════════════════════════════════════════════════════════════════
+    // CONTACT HANDLER — Telefon raqamini tugma orqali olish
+    // ════════════════════════════════════════════════════════════════════════
+    bot.on('contact', async (ctx) => {
+        const tgId = ctx.from.id.toString();
+        const contact = ctx.message.contact;
+
+        const ses = arizaSessions.get(tgId);
+        if (ses && ses.step === 'phone') {
+            ses.phone = contact.phone_number;
+            ses.step = 'region';
+
+            // Hududlar ro'yxati
+            const points = await prisma.recyclePoint.findMany({ where: { status: 'active' }, orderBy: { regionUz: 'asc' } });
+            if (points.length === 0) {
+                arizaSessions.delete(tgId);
+                await ctx.reply('❌ Hozircha aktiv yig\'ish hududlari yo\'q. Keyinroq qayta urinib ko\'ring.', { reply_markup: { remove_keyboard: true } });
+                return;
+            }
+
+            const regionButtons = points.map(p =>
+                [btn(`📍 ${p.regionUz} — ${p.cityUz}`, `ariza_region_${p.id}`)]
+            );
+            regionButtons.push([btn('❌ Bekor qilish', 'ariza_cancel')]);
+
+            await ctx.reply(
+                `📍 <b>Hududingizni tanlang:</b>`,
+                { parse_mode: 'HTML', reply_markup: { inline_keyboard: regionButtons } }
+            );
+
+            // Hide the normal reply keyboard
+            await bot.telegram.sendMessage(ctx.chat.id, 'Davom etish...', { reply_markup: { remove_keyboard: true } }).then(m => bot.telegram.deleteMessage(ctx.chat.id, m.message_id)).catch(() => {});
+            return;
+        }
+    });
+
+    // ════════════════════════════════════════════════════════════════════════
     // TEXT HANDLER — Haydovchi kalkulator va shikoyat uchun
     // ════════════════════════════════════════════════════════════════════════
     bot.on('text', async (ctx) => {
@@ -815,14 +855,30 @@ export const getBot = async () => {
 
         // ── ARIZA SESSION: bosqichma-bosqich ─────────────────────────────
         const ses = arizaSessions.get(tgId);
+        if (text === '❌ Bekor qilish' && ses) {
+            arizaSessions.delete(tgId);
+            await ctx.reply('❌ Ariza bekor qilindi.', { reply_markup: customerKeyboard(config.mainButton, process.env.NEXT_PUBLIC_APP_URL || 'https://pack24.uz') });
+            return;
+        }
+
         if (ses) {
             // 1. Ism kiritish
             if (ses.step === 'name') {
                 ses.name = text.trim();
                 ses.step = 'phone';
                 await ctx.reply(
-                    `👤 Ism: <b>${ses.name}</b>\n\n📱 Telefon raqamingizni kiriting:\n<i>Masalan: 998901234567</i>`,
-                    { parse_mode: 'HTML' }
+                    `👤 F.I.SH.: <b>${ses.name}</b>\n\n📱 Iltimos, telefon raqamingizni pastdagi tugma orqali yuboring:\n<i>Yoki raqamni qo'lda kiriting: 998901234567</i>`,
+                    { 
+                        parse_mode: 'HTML',
+                        reply_markup: {
+                            keyboard: [
+                                [{ text: '📱 Kontakt yuborish', request_contact: true }],
+                                [{ text: '❌ Bekor qilish' }]
+                            ],
+                            resize_keyboard: true,
+                            one_time_keyboard: true
+                        }
+                    }
                 );
                 return;
             }
@@ -854,6 +910,9 @@ export const getBot = async () => {
                     `📍 <b>Hududingizni tanlang:</b>`,
                     { parse_mode: 'HTML', reply_markup: { inline_keyboard: regionButtons } }
                 );
+
+                // Hide the normal reply keyboard
+                await bot.telegram.sendMessage(ctx.chat.id, 'Davom etish...', { reply_markup: { remove_keyboard: true } }).then(m => bot.telegram.deleteMessage(ctx.chat.id, m.message_id)).catch(() => {});
                 return;
             }
 
@@ -866,14 +925,17 @@ export const getBot = async () => {
                 await ctx.reply(
                     `📦 Material: <b>${MAT[ses.material || 'mix']?.emoji || '📦'} ${MAT[ses.material || 'mix']?.label || ses.material}</b>\n` +
                     `⚖️ Hajm: <b>${ses.volume || 'ko\'rsatilmagan'} kg</b>\n\n` +
-                    `🏠 <b>Qanday topshirasiz?</b>`,
+                    `🏠 <b>Qanday topshirasiz?</b> 2 ta usul mavjud:\n\n` +
+                    `1️⃣ <b>O'zingiz olib kelsangiz:</b> Pulingizni to'liq (100%) olasiz.\n` +
+                    `2️⃣ <b>Mashina chaqirsangiz:</b> Yo'l kirasi evaziga narxdan <b>50% ushlab qolinadi</b>.\n\n` +
+                    `<i>Qaysi birini tanlaysiz?</i> 👇`,
                     {
                         parse_mode: 'HTML',
                         reply_markup: {
                             inline_keyboard: [
-                                [btn('🚚 Haydovchi kelsin (pickup)', 'ariza_pickup')],
-                                [btn('🏢 O\'zim olib boraman', 'ariza_base')],
-                                [btn('❌ Bekor', 'ariza_cancel')],
+                                [btn('🚚 Mashina chaqirish (-50% narx)', 'ariza_pickup')],
+                                [btn('🏢 O\'zim olib boraman (To\'liq narx)', 'ariza_base')],
+                                [btn('❌ Bekor qilib chiqish', 'ariza_cancel')],
                             ],
                         },
                     }
@@ -934,14 +996,19 @@ export const getBot = async () => {
                 data: { vehicleInfo: `MATERIAL_${requestId}_${weight}_${discount}` },
             });
 
-            const matButtons = Object.entries(MAT).map(([key, m]) =>
-                [btn(`${m.emoji} ${m.label} — ${fmtN(m.price)} so'm/kg`, `mat_${key}_${requestId}`)]
-            );
+            const req = await prisma.recycleRequest.findUnique({ where: { id: requestId }, include: { point: true } });
+            
+            const matButtons = Object.entries(MAT).map(([key, m]) => {
+                let p = req?.point?.pricePerKg || m.price;
+                if (req?.pickupType === 'pickup') p = p * 0.5;
+                return [btn(`${m.emoji} ${m.label} — ${fmtN(p)} so'm/kg`, `mat_${key}_${requestId}`)];
+            });
 
             ctx.reply(
                 `📊 <b>Hisob-kitob:</b>\n\n` +
                 `⚖️ Og'irlik: <b>${weight} kg</b>\n` +
                 `${discount > 0 ? `🏷️ Chegirma: <b>${discount}%</b>\n📊 Hisoblangan: <b>${effectiveWeight.toFixed(1)} kg</b>\n` : ''}` +
+                `${req?.pickupType === 'pickup' ? `🚚 <b>Mashina chaqirilgan (-50% narx qo'llanilgan)</b>\n` : ''}` +
                 `\n📦 <b>Material turini tanlang:</b>`,
                 { parse_mode: 'HTML', reply_markup: { inline_keyboard: matButtons } }
             );
