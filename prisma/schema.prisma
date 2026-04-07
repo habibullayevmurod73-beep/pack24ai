@@ -278,9 +278,11 @@ model RecyclePoint {
   address     String?                    // Baza manzili
   lat         Float?                     // Kenglik (koordinata)
   lng         Float?                     // Uzunlik (koordinata)
-  pricePerKg  Float    @default(800)     // Default narx (so'm/kg) — masul+admin belgilaydi
-  status      String   @default("active") // active, planned
-  color       String   @default("bg-emerald-500")
+  pricePerKg    Float    @default(800)     // Default narx (so'm/kg) — masul+admin belgilaydi
+  status        String   @default("active") // active, planned
+  color         String   @default("bg-emerald-500")
+  workingHours  String   @default("08:00-18:00") // Ish tartibi
+  isAccepting   Boolean  @default(true)    // Hozir qabul qilayaptimi (masul boshqaradi)
 
   requests    RecycleRequest[]
   supervisors Supervisor[]
@@ -300,6 +302,9 @@ model Supervisor {
   pointId      Int?                      // Biriktrilgan baza
   point        RecyclePoint? @relation(fields: [pointId], references: [id])
   isActive     Boolean  @default(true)
+
+  registrationCode String? @unique       // 5 raqamli kod (botda ro'yxatdan o'tish uchun)
+  registeredAt     DateTime?             // Botda ro'yxatdan o'tgan vaqti
 
   drivers      Driver[]
   requests     RecycleRequest[]          // Yo'naltirilgan arizalar
@@ -324,6 +329,9 @@ model Driver {
   vehicleInfo    String?                 // Mashina ma'lumoti
   lastSeenAt     DateTime?
 
+  registrationCode String? @unique       // 5 raqamli kod (botda ro'yxatdan o'tish uchun)
+  registeredAt     DateTime?             // Botda ro'yxatdan o'tgan vaqti
+
   collections    RecycleCollection[]
   assignedRequests RecycleRequest[]
 
@@ -340,12 +348,15 @@ model RecycleRequest {
   point         RecyclePoint @relation(fields: [regionId], references: [id])
   material      String?                  // qog'oz, karton, gazeta, jurnal, ofis, kitob, aralash
   volume        Int?                     // Taxminiy hajm (kg)
+  volumeSize    String?                  // small, medium, large (mashina chaqirishda)
+  photoUrl      String?                  // Makulatura rasmi URL
   pickupType    String       @default("base") // base, pickup
   pickupLocationMode String?               // gps | map | text
   address       String?                  // Mijoz manzili (pickup uchun) — matn
   pickupLat     Float?                   // Pickup nuqtasi kenglik
   pickupLng     Float?                   // Pickup nuqtasi uzunlik
   customerTgId  String?                  // Mijoz Telegram ID (ixtiyoriy)
+  customerLang  String   @default("uz")  // Mijoz tili (uz/ru/en)
 
   // Status pipeline: new → dispatched → assigned → en_route → arrived → collecting → collected → confirmed → completed / cancelled / disputed
   status        String       @default("new")

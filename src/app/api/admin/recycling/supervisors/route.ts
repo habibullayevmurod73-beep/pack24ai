@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+// 5-raqamli unikal kod generatsiya
+async function generateSupervisorCode(): Promise<string> {
+    for (let i = 0; i < 20; i++) {
+        const code = String(Math.floor(10000 + Math.random() * 90000)); // 10000-99999
+        // Haydovchi va masul kodlari bir-biriga to'g'ri kelmasligini tekshirish
+        const existsSup = await prisma.supervisor.findUnique({ where: { registrationCode: code } });
+        const existsDrv = await prisma.driver.findUnique({ where: { registrationCode: code } });
+        if (!existsSup && !existsDrv) return code;
+    }
+    throw new Error('Kod generatsiya qilib bo\'lmadi');
+}
+
 // GET /api/admin/recycling/supervisors — Barcha masul shaxslar
 export async function GET() {
     try {
@@ -27,6 +39,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Ism va telefon majburiy' }, { status: 400 });
         }
 
+        const registrationCode = await generateSupervisorCode();
+
         const supervisor = await prisma.supervisor.create({
             data: {
                 name: body.name.trim(),
@@ -35,6 +49,7 @@ export async function POST(req: NextRequest) {
                 telegramName: body.telegramName || null,
                 pointId: body.pointId ? Number(body.pointId) : null,
                 isActive: body.isActive ?? true,
+                registrationCode,
             },
             include: { point: true },
         });

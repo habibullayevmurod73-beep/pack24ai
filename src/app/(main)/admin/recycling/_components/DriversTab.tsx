@@ -1,9 +1,9 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Phone, Truck, MapPin, User } from 'lucide-react';
+import { Plus, Pencil, Trash2, Phone, Truck, MapPin, User, Copy } from 'lucide-react';
 
-interface Driver { id: number; name: string; phone: string; telegramId: string | null; telegramName: string | null; supervisorId: number | null; supervisor: { id: number; name: string } | null; pointId: number | null; point: { id: number; regionUz: string } | null; status: string; isOnline: boolean; vehicleInfo: string | null; _count?: { collections: number; assignedRequests: number }; }
+interface Driver { id: number; name: string; phone: string; telegramId: string | null; telegramName: string | null; registrationCode: string | null; supervisorId: number | null; supervisor: { id: number; name: string } | null; pointId: number | null; point: { id: number; regionUz: string } | null; status: string; isOnline: boolean; vehicleInfo: string | null; _count?: { collections: number; assignedRequests: number }; }
 interface Supervisor { id: number; name: string; }
 interface Point { id: number; regionUz: string; }
 
@@ -62,11 +62,12 @@ export default function DriversTab({ points, supervisors }: { points: Point[]; s
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                         <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ism *" className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400" />
                         <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="Telefon *" className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400" />
-                        <input value={form.telegramId} onChange={e => setForm({ ...form, telegramId: e.target.value })} placeholder="Telegram ID" className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400" />
+                        <input value={form.telegramId} onChange={e => setForm({ ...form, telegramId: e.target.value })} placeholder="Telegram ID (masalan: 123456789)" className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400" />
                         <select value={form.supervisorId} onChange={e => setForm({ ...form, supervisorId: e.target.value })} title="Masul tanlash" className="border border-gray-200 rounded-xl px-3 py-2 text-sm"><option value="">Masul tanlang</option>{supervisors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
                         <select value={form.pointId} onChange={e => setForm({ ...form, pointId: e.target.value })} title="Baza tanlash" className="border border-gray-200 rounded-xl px-3 py-2 text-sm"><option value="">Baza tanlang</option>{points.map(p => <option key={p.id} value={p.id}>{p.regionUz}</option>)}</select>
                         <input value={form.vehicleInfo} onChange={e => setForm({ ...form, vehicleInfo: e.target.value })} placeholder="Mashina (masalan: Damas)" className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400" />
                     </div>
+                    <p className="text-[10px] text-gray-400">💡 Telegram ID ni topish: Haydovchi @userinfobot ga /start yozsin → ID raqami chiqadi. Yoki Pack24 botga /start yozsa avtomatik ulanadi.</p>
                     <div className="flex gap-2">
                         <button onClick={save} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-sm disabled:opacity-50">{saving ? '...' : editId ? 'Yangilash' : 'Saqlash'}</button>
                         <button onClick={() => { setShowForm(false); setEditId(null); }} className="bg-gray-100 text-gray-600 font-bold px-4 py-2 rounded-xl text-sm">Bekor</button>
@@ -84,6 +85,7 @@ export default function DriversTab({ points, supervisors }: { points: Point[]; s
                                 <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Haydovchi</th>
                                 <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Status</th>
                                 <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase hidden md:table-cell">Masul</th>
+                                <th className="px-4 py-3 text-center text-[10px] font-bold text-gray-500 uppercase">Telegram</th>
                                 <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase hidden lg:table-cell">Baza</th>
                                 <th className="px-4 py-3 text-center text-[10px] font-bold text-gray-500 uppercase">Yig'ishlar</th>
                                 <th className="px-4 py-3 w-20"></th>
@@ -95,6 +97,7 @@ export default function DriversTab({ points, supervisors }: { points: Point[]; s
                                     <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="relative"><div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center text-white text-xs font-bold">{d.name.charAt(0)}</div>{d.isOnline && <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />}</div><div><p className="text-sm font-bold text-gray-800">{d.name}</p><p className="text-[10px] text-gray-400 flex items-center gap-0.5"><Phone size={9} />{d.phone}</p></div></div></td>
                                     <td className="px-4 py-3"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${st.color}`}>{st.label}</span></td>
                                     <td className="px-4 py-3 hidden md:table-cell">{d.supervisor ? <span className="text-xs text-gray-600 flex items-center gap-1"><User size={11} />{d.supervisor.name}</span> : <span className="text-xs text-gray-300">—</span>}</td>
+                                    <td className="px-4 py-3 text-center">{d.telegramId ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">🟢 Ulangan</span> : d.registrationCode ? <button onClick={() => { navigator.clipboard.writeText(d.registrationCode!); toast.success('Kod nusxalandi: ' + d.registrationCode); }} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 hover:bg-amber-200 cursor-pointer inline-flex items-center gap-1" title="Nusxalash"><Copy size={9} />{d.registrationCode}</button> : <span className="text-[10px] text-gray-300">—</span>}</td>
                                     <td className="px-4 py-3 hidden lg:table-cell">{d.point ? <span className="text-xs text-emerald-600 flex items-center gap-1"><MapPin size={11} />{d.point.regionUz}</span> : <span className="text-xs text-gray-300">—</span>}</td>
                                     <td className="px-4 py-3 text-center"><span className="text-sm font-bold text-gray-700">{d._count?.collections ?? 0}</span></td>
                                     <td className="px-4 py-3"><div className="flex gap-1"><button onClick={() => edit(d)} title="Tahrirlash" className="p-1.5 rounded-lg hover:bg-gray-100"><Pencil size={13} className="text-gray-400" /></button><button onClick={() => del(d.id)} title="O'chirish" className="p-1.5 rounded-lg hover:bg-red-50"><Trash2 size={13} className="text-red-400" /></button></div></td>

@@ -3,12 +3,12 @@ import { prisma } from '@/lib/prisma';
 import { sendTelegramMessage } from '@/lib/telegram/bot';
 
 // ─── Yordamchi: Telegram xabar yuborish (shaxsiy chat_id ga) ─────────────────
-async function sendToTelegram(chatId: string, message: string) {
+async function sendToTelegram(chatId: string, message: string, extra?: Record<string, unknown>) {
     try {
         const { getBot } = await import('@/lib/telegram/bot');
         const bot = await getBot();
         if (bot && chatId) {
-            await bot.telegram.sendMessage(chatId, message, { parse_mode: 'HTML' });
+            await bot.telegram.sendMessage(chatId, message, { parse_mode: 'HTML', ...extra });
             return true;
         }
     } catch (e) {
@@ -57,8 +57,9 @@ export async function POST(req: NextRequest) {
                 include: { point: true },
             });
 
-            // Masulga Telegram xabar
+            // Masulga Telegram xabar — inline tugmalar bilan
             if (supervisor.telegramId) {
+                const pickupLabel = request.pickupType === 'pickup' ? '🚛 Kuryer chiqishi' : '🏭 O\'zi olib keladi';
                 const msg =
                     `📋 <b>Yangi ariza yo'naltirildi #${request.id}</b>\n\n` +
                     `👤 Mijoz: ${request.name}\n` +
@@ -67,9 +68,29 @@ export async function POST(req: NextRequest) {
                     `${request.address ? `🏠 Manzil: ${request.address}\n` : ''}` +
                     `📦 Material: ${request.material || 'Ko\'rsatilmagan'}\n` +
                     `⚖️ Taxminiy: ${request.volume ? request.volume + ' kg' : 'Noma\'lum'}\n` +
-                    `🚚 Usul: ${request.pickupType === 'pickup' ? 'Kuryer chiqishi' : 'Bazaga olib keladi'}\n\n` +
-                    `Iltimos, haydovchi tayinlang!`;
-                await sendToTelegram(supervisor.telegramId, msg);
+                    `🚚 Usul: ${pickupLabel}\n\n` +
+                    `👇 Haydovchi tayinlash uchun tugmani bosing:`;
+
+                // Hududdagi haydovchilar ro'yxatini olish
+                const drivers = await prisma.driver.findMany({
+                    where: { supervisorId: supervisor.id, status: 'active' },
+                    orderBy: [{ isOnline: 'desc' }, { name: 'asc' }],
+                    take: 8,
+                });
+
+                const keyboard = drivers.length > 0
+                    ? [
+                        ...drivers.map(d => [{
+                            text: `${d.isOnline ? '🟢' : '⚫'} ${d.name}`,
+                            callback_data: `assign_${request.id}_${d.id}`,
+                        }]),
+                        [{ text: '📋 Batafsil ko\'rish', callback_data: `view_req_${request.id}` }],
+                    ]
+                    : [[{ text: '📋 Batafsil ko\'rish', callback_data: `view_req_${request.id}` }]];
+
+                await sendToTelegram(supervisor.telegramId, msg, {
+                    reply_markup: { inline_keyboard: keyboard },
+                });
             }
 
             // Adminga Telegram xabar
@@ -101,7 +122,7 @@ export async function POST(req: NextRequest) {
                 include: { point: true, assignedDriver: true },
             });
 
-            // Haydovchiga Telegram xabar
+            // Haydovchiga Telegram xabar — inline tugmalar bilan
             if (driver.telegramId) {
                 const msg =
                     `🚚 <b>Yangi ish tayinlandi! #${request.id}</b>\n\n` +
@@ -111,8 +132,15 @@ export async function POST(req: NextRequest) {
                     `${request.address ? `🏠 Manzil: ${request.address}\n` : ''}` +
                     `📦 Material: ${request.material || 'Noma\'lum'}\n` +
                     `⚖️ Taxminiy: ${request.volume ? request.volume + ' kg' : 'Noma\'lum'}\n\n` +
-                    `✅ Qabul qilasizmi?`;
-                await sendToTelegram(driver.telegramId, msg);
+                    `Qabul qilasizmi?`;
+                await sendToTelegram(driver.telegramId, msg, {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '✅ Qabul — yo\'lga chiqaman', callback_data: `enroute_${request.id}` }],
+                            [{ text: '❌ Rad etish', callback_data: `reject_${request.id}` }],
+                        ],
+                    },
+                });
             }
 
             return NextResponse.json(updated);
@@ -197,6 +225,81 @@ export async function POST(req: NextRequest) {
             return NextResponse.json(updated);
         }
 
+        // ─── ACTION: Arizani yakunlash (confirmed → completed) ──────────
+        if (action === 'mark_completed') {
+            const updated = await prisma.recycleRequest.update({
+                where: { id: Number(requestId) },
+                data: {
+                    status: 'completed',
+                    completedAt: new Date(),
+                    completedNote: body.note || null,
+                },
+                include: { assignedDriver: true, supervisor: true },
+            });
+
+            // Haydovchini bo'shatish
+            if (updated.assignedDriverId) {
+                await prisma.driver.update({
+                    where: { id: updated.assignedDriverId },
+                    data: { status: 'active' },
+                });
+            }
+
+            // Mijozga xabar
+            if (request.customerTgId) {
+                await sendToTelegram(
+                    request.customerTgId,
+                    `🟢 <b>Ariza #${request.id} to'liq yakunlandi!</b>\n\n` +
+                    `Rahmat! Makulatura muvaffaqiyatli qabul qilindi.\n` +
+                    `Qayta murojaat qilish uchun /ariza yuboring! ♻️`
+                );
+            }
+
+            // Masulga xabar
+            if (updated.supervisor?.telegramId) {
+                await sendToTelegram(updated.supervisor.telegramId,
+                    `🟢 Ariza #${request.id} — <b>TO'LIQ YAKUNLANDI</b> ✅`
+                );
+            }
+
+            // Admin guruhga
+            await sendTelegramMessage(
+                `🟢 Ariza #${request.id} yakunlandi — ${request.name} | ${request.volume ? request.volume + ' kg' : ''}`
+            );
+
+            return NextResponse.json(updated);
+        }
+
+        // ─── ACTION: Arizani bekor qilish ───────────────────────────────
+        if (action === 'cancel_request') {
+            const updated = await prisma.recycleRequest.update({
+                where: { id: Number(requestId) },
+                data: {
+                    status: 'cancelled',
+                    completedNote: body.note || 'Bekor qilindi',
+                },
+            });
+
+            // Haydovchini bo'shatish
+            if (request.assignedDriverId) {
+                await prisma.driver.update({
+                    where: { id: request.assignedDriverId },
+                    data: { status: 'active' },
+                });
+            }
+
+            // Mijozga xabar
+            if (request.customerTgId) {
+                await sendToTelegram(
+                    request.customerTgId,
+                    `🔴 <b>Ariza #${request.id} bekor qilindi.</b>\n\n` +
+                    `${body.note ? `Sabab: ${body.note}\n\n` : ''}` +
+                    `Savollar uchun: /help`
+                );
+            }
+
+            return NextResponse.json(updated);
+        }
 
         return NextResponse.json({ error: 'Noto\'g\'ri action' }, { status: 400 });
     } catch (error) {

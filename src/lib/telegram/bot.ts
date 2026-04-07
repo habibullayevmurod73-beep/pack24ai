@@ -33,6 +33,9 @@ interface ComplaintSession {
 }
 const complaintSessions = new Map<string, ComplaintSession>();
 
+// Ro'yxatdan o'tish sessiyasi (kod kiritish)
+const registrationSessions = new Set<string>();
+
 // ─── Rol-based persistent keyboard ──────────────────────────────────────────
 function customerKeyboard(mainButton?: string, appUrl?: string) {
     const rows: any[][] = [];
@@ -154,15 +157,27 @@ export const getBot = async () => {
         }
 
         // ── YANGI FOYDALANUVCHI ──
+        // 1. Asosiy klaviaturani chiqarish (pastki qismda)
         await ctx.reply(
             `🏭 <b>Pack24 — Qadoqlash Yechimlari</b>\n\n` +
-            `Salom, <b>${name}</b>! \n\n` +
-            `Biz orqali siz:\n` +
-            `📦 Qadoqlash mahsulotlarini buyurtma qilishingiz\n` +
-            `♻️ Makulaturani topshirib pul ishlashingiz\n` +
-            `📊 Buyurtmalaringizni kuzatishingiz mumkin\n\n` +
-            `Boshlash uchun quyidagi tugmalardan foydalaning 👇`,
+            `Salom, <b>${name}</b>! tizimga xush kelibsiz.`,
             { parse_mode: 'HTML', reply_markup: customerKeyboard(config.mainButton, appUrl) }
+        );
+
+        // 2. Inline tugmalarni chiqarish
+        await ctx.reply(
+            `Sizga qanday yordam bera olamiz?\n` +
+            `📦 Qadoqlash mahsulotlarini buyurtma qiling\n` +
+            `♻️ Makulaturani topshirib pul ishlang\n\n` +
+            `👇 Yoki xodim bo'lsangiz, kod bilan kiring:`,
+            {
+                parse_mode: 'HTML',
+                reply_markup: {
+                    inline_keyboard: [
+                        [btn('🔑 Kod bilan kirish (haydovchi/masul)', 'register_code')],
+                    ],
+                },
+            }
         );
     });
 
@@ -377,6 +392,33 @@ export const getBot = async () => {
                 return;
             }
 
+            // ── RO'YXATDAN O'TISH (KOD BILAN) ───────────────────────────
+            if (data === 'register_code') {
+                registrationSessions.add(tgId);
+                await ctx.answerCbQuery('🔑');
+                await ctx.editMessageText(
+                    `🔑 <b>Kod bilan ro'yxatdan o'tish</b>\n\n` +
+                    `Admin sizga bergan <b>5 raqamli kodni</b> kiriting:\n\n` +
+                    `<i>Masalan: 48271</i>`,
+                    {
+                        parse_mode: 'HTML',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [btn('❌ Bekor qilish', 'register_cancel')],
+                            ],
+                        },
+                    }
+                );
+                return;
+            }
+
+            if (data === 'register_cancel') {
+                registrationSessions.delete(tgId);
+                await ctx.answerCbQuery('❌ Bekor qilindi');
+                await ctx.editMessageText('❌ Bekor qilindi.\n\n/start — Bosh menyuga qaytish');
+                return;
+            }
+
             if (data.startsWith('ariza_region_')) {
                 const regionId = parseInt(data.split('_')[2]);
                 const ses = arizaSessions.get(tgId);
@@ -577,21 +619,103 @@ export const getBot = async () => {
             if (data.startsWith('confirm_')) {
                 const collectionId = parseInt(data.split('_')[1]);
                 await prisma.recycleCollection.update({ where: { id: collectionId }, data: { customerConfirmed: true } });
-                const coll = await prisma.recycleCollection.findUnique({ where: { id: collectionId }, include: { request: true } });
-                if (coll) await prisma.recycleRequest.update({ where: { id: coll.requestId }, data: { status: 'confirmed', confirmedAt: new Date() } });
+                const coll = await prisma.recycleCollection.findUnique({
+                    where: { id: collectionId },
+                    include: { request: { include: { supervisor: true } }, driver: true },
+                });
+                if (coll) {
+                    await prisma.recycleRequest.update({ where: { id: coll.requestId }, data: { status: 'confirmed', confirmedAt: new Date() } });
 
-                await ctx.answerCbQuery('✅ Tasdiqlandi!');
-                await ctx.editMessageText(`✅ <b>Tasdiqlandi!</b>\n\nRahmat! Ma'lumotlar to'g'ri deb tasdiqlandi.\nTo'lov tez orada amalga oshiriladi. ♻️`, { parse_mode: 'HTML' });
+                    await ctx.answerCbQuery('✅ Tasdiqlandi!');
+                    await ctx.editMessageText(
+                        `✅ <b>Tasdiqlandi!</b>\n\n` +
+                        `📋 Ariza #${coll.requestId}\n` +
+                        `💵 Summa: <b>${fmtN(coll.totalAmount)} so'm</b>\n\n` +
+                        `Rahmat! To'lov tez orada amalga oshiriladi. ♻️`,
+                        { parse_mode: 'HTML' }
+                    );
+
+                    // ── MAS'ULGA TO'LOV TUGMALARI YUBORILADI ──
+                    if (coll.request.supervisor?.telegramId) {
+                        const matInfo = MAT[coll.materialType || 'mix'] || MAT.mix;
+                        await bot.telegram.sendMessage(coll.request.supervisor.telegramId,
+                            `✅ <b>Mijoz tasdiqladi! Ariza #${coll.requestId}</b>\n\n` +
+                            `${matInfo.emoji} ${matInfo.label}\n` +
+                            `⚖️ ${coll.actualWeight} kg${coll.discountPercent > 0 ? ` → ${coll.effectiveWeight.toFixed(1)} kg (-${coll.discountPercent}%)` : ''}\n` +
+                            `💵 <b>${fmtN(coll.totalAmount)} so'm</b>\n` +
+                            `🚚 Haydovchi: ${coll.driver.name}\n` +
+                            `👤 Mijoz: ${coll.request.name} | ${coll.request.phone}\n\n` +
+                            `💰 <b>To'lovni amalga oshiring:</b>`,
+                            {
+                                parse_mode: 'HTML',
+                                reply_markup: {
+                                    inline_keyboard: [
+                                        [btn(`💵 Mijozga to'lash (${fmtN(coll.totalAmount)} so'm)`, `pay_cust_${coll.id}`)],
+                                        [btn(`🚚 Haydovchiga to'lash (${fmtN(Math.round(coll.totalAmount * 0.1))} so'm)`, `pay_drv_${coll.id}`)],
+                                        [btn(`💰 Ikkalasiga to'lash`, `pay_both_${coll.id}`)],
+                                    ],
+                                },
+                            }
+                        );
+                    }
+
+                    // Haydovchiga ham xabar
+                    if (coll.driver.telegramId) {
+                        await bot.telegram.sendMessage(coll.driver.telegramId,
+                            `✅ <b>Mijoz tasdiqladi!</b>\n\n📋 Ariza #${coll.requestId}\n💵 ${fmtN(coll.totalAmount)} so'm\n\nTo'lov mas'ul tomonidan amalga oshiriladi.`,
+                            { parse_mode: 'HTML' }
+                        );
+                    }
+                } else {
+                    await ctx.answerCbQuery('✅ Tasdiqlandi!');
+                    await ctx.editMessageText(`✅ <b>Tasdiqlandi!</b>\n\nRahmat! ♻️`, { parse_mode: 'HTML' });
+                }
             }
 
             if (data.startsWith('deny_')) {
                 const collectionId = parseInt(data.split('_')[1]);
                 await prisma.recycleCollection.update({ where: { id: collectionId }, data: { customerConfirmed: false } });
-                const coll = await prisma.recycleCollection.findUnique({ where: { id: collectionId }, include: { request: true } });
-                if (coll) await prisma.recycleRequest.update({ where: { id: coll.requestId }, data: { status: 'disputed' } });
+                const coll = await prisma.recycleCollection.findUnique({
+                    where: { id: collectionId },
+                    include: { request: { include: { supervisor: true } }, driver: true },
+                });
+                if (coll) {
+                    await prisma.recycleRequest.update({ where: { id: coll.requestId }, data: { status: 'disputed' } });
 
-                await ctx.answerCbQuery('❌ Inkor qilindi');
-                await ctx.editMessageText(`❌ <b>Inkor qilindi!</b>\n\nMa'lumotlar noto'g'ri deb belgilandi.\nMasul shaxs siz bilan bog'lanadi.\n\nShikoyat uchun /shikoyat buyrug'ini yuboring.`, { parse_mode: 'HTML' });
+                    await ctx.answerCbQuery('❌ Inkor qilindi');
+                    await ctx.editMessageText(
+                        `❌ <b>Inkor qilindi!</b>\n\n` +
+                        `📋 Ariza #${coll.requestId}\n\n` +
+                        `Ma'lumotlar noto'g'ri deb belgilandi.\n` +
+                        `Mas'ul shaxs siz bilan bog'lanadi.\n\n` +
+                        `Shikoyat uchun /shikoyat buyrug'ini yuboring.`,
+                        { parse_mode: 'HTML' }
+                    );
+
+                    // Mas'ulga xabar
+                    if (coll.request.supervisor?.telegramId) {
+                        await bot.telegram.sendMessage(coll.request.supervisor.telegramId,
+                            `⚠️ <b>Mijoz INKOR qildi! Ariza #${coll.requestId}</b>\n\n` +
+                            `👤 Mijoz: ${coll.request.name} | ${coll.request.phone}\n` +
+                            `🚚 Haydovchi: ${coll.driver.name}\n` +
+                            `⚖️ ${coll.actualWeight} kg → ${fmtN(coll.totalAmount)} so'm\n\n` +
+                            `❗ Mijoz ma'lumotlarni noto'g'ri deb belgiladi.\n` +
+                            `Iltimos, mijoz bilan bog'lanib muammoni hal qiling.`,
+                            { parse_mode: 'HTML' }
+                        );
+                    }
+
+                    // Haydovchiga xabar
+                    if (coll.driver.telegramId) {
+                        await bot.telegram.sendMessage(coll.driver.telegramId,
+                            `⚠️ <b>Mijoz inkor qildi!</b>\n\n📋 Ariza #${coll.requestId}\n❗ Mijoz ma'lumotlarni noto'g'ri deb belgiladi.\nMas'ul siz bilan bog'lanadi.`,
+                            { parse_mode: 'HTML' }
+                        );
+                    }
+                } else {
+                    await ctx.answerCbQuery('❌ Inkor qilindi');
+                    await ctx.editMessageText(`❌ <b>Inkor qilindi!</b>\n\nMas'ul siz bilan bog'lanadi.`, { parse_mode: 'HTML' });
+                }
             }
 
             // ── Mijoz: Shikoyat darajasi tanlash ────────────────────────────
@@ -623,59 +747,244 @@ export const getBot = async () => {
                 if (!req) { await ctx.answerCbQuery('Ariza topilmadi'); return; }
 
                 const matInfo = MAT[materialType] || MAT.mix;
-                let price = req.point?.pricePerKg || matInfo.price;
-                if (req.pickupType === 'pickup') {
-                    price = price * 0.5; // -50% pickup uchun
-                }
+                const basePrice = req.point?.pricePerKg || matInfo.price;
+                const isPickup = req.pickupType === 'pickup';
+                const finalPrice = isPickup ? basePrice * 0.5 : basePrice;
 
                 const effectiveWeight = weight - (weight * discount / 100);
-                const totalAmount = Math.round(effectiveWeight * price);
+                const totalAmount = Math.round(effectiveWeight * finalPrice);
+                const fullAmount = Math.round(effectiveWeight * basePrice); // to'liq narx (agar pickup bo'lmasa)
 
                 const collection = await prisma.recycleCollection.create({
-                    data: { requestId, driverId: driver.id, actualWeight: weight, discountPercent: discount, effectiveWeight, pricePerKg: price, totalAmount, materialType, collectedAt: new Date() },
+                    data: { requestId, driverId: driver.id, actualWeight: weight, discountPercent: discount, effectiveWeight, pricePerKg: finalPrice, totalAmount, materialType, collectedAt: new Date() },
                 });
                 await prisma.recycleRequest.update({ where: { id: requestId }, data: { status: 'collected', collectedAt: new Date() } });
                 await prisma.driver.update({ where: { id: driver.id }, data: { vehicleInfo: null, status: 'active' } });
 
+                // ── HAYDOVCHIGA NATIJA ──
                 await ctx.answerCbQuery('✅ Yig\'ish yakunlandi!');
                 await ctx.editMessageText(
                     `✅ <b>Yig'ish yakunlandi! #${requestId}</b>\n\n` +
                     `${matInfo.emoji} ${matInfo.label}\n` +
-                    `⚖️ ${weight} kg${discount > 0 ? ` → ${effectiveWeight.toFixed(1)} kg (${discount}%)` : ''}\n` +
-                    `💰 ${fmtN(price)} so'm/kg\n━━━━━━━━━━━━━━━━━━\n💵 <b>Jami: ${fmtN(totalAmount)} so'm</b>`,
-                    { parse_mode: 'HTML' }
+                    `⚖️ Og'irlik: ${weight} kg\n` +
+                    `${discount > 0 ? `🏷️ Chegirma: ${discount}% (sifat/namlik) → ${effectiveWeight.toFixed(1)} kg\n` : ''}` +
+                    `💰 Narx: ${fmtN(basePrice)} so'm/kg\n` +
+                    `${isPickup ? `🚚 Mashina xizmati: -50% → ${fmtN(finalPrice)} so'm/kg\n` : ''}` +
+                    `━━━━━━━━━━━━━━━━━━\n` +
+                    `💵 <b>Jami: ${fmtN(totalAmount)} so'm</b>\n\n` +
+                    `⏳ Mijoz tasdiqlashini kuting...\n` +
+                    `<i>Agar mijoz tasdiqlay olmasa, pastdagi tugmani bosing.</i>`,
+                    {
+                        parse_mode: 'HTML',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [btn('🔄 Qo\'lda yakunlash (mijoz tasdiqlamasa)', `force_${collection.id}`)],
+                            ],
+                        },
+                    }
                 );
 
-                // Mijozga xabar
+                // ── MIJOZGA BATAFSIL HISOB-KITOB ──
                 if (req.customerTgId) {
-                    await bot.telegram.sendMessage(req.customerTgId,
-                        `📦 <b>Makulatura yig'ildi! #${requestId}</b>\n\n` +
+                    let customerMsg =
+                        `📊 <b>Makulatura hisob-kitobi — Ariza #${requestId}</b>\n\n` +
                         `${matInfo.emoji} Material: <b>${matInfo.label}</b>\n` +
-                        `⚖️ Og'irlik: <b>${weight} kg</b>\n` +
-                        `${discount > 0 ? `🏷️ Chegirma: <b>${discount}%</b> → ${effectiveWeight.toFixed(1)} kg\n` : ''}` +
-                        `💰 Narx: <b>${fmtN(price)} so'm/kg</b>\n━━━━━━━━━━━━━━━━━━\n` +
-                        `💵 Jami: <b>${fmtN(totalAmount)} so'm</b>\n\nMa'lumotlar to'g'rimi?`,
-                        { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[btn('✅ Tasdiqlash', `confirm_${collection.id}`), btn('❌ Inkor qilish', `deny_${collection.id}`)]] } }
-                    );
+                        `⚖️ Tortilgan og'irlik: <b>${weight} kg</b>\n`;
+
+                    if (discount > 0) {
+                        customerMsg +=
+                            `\n🏷️ <b>Sifat chegirmasi: ${discount}%</b>\n` +
+                            `   <i>(Sabab: namlik, ifloslik yoki sifat pastligi)</i>\n` +
+                            `   ${weight} kg × ${discount}% = -${(weight * discount / 100).toFixed(1)} kg\n` +
+                            `   📊 Hisoblangan og'irlik: <b>${effectiveWeight.toFixed(1)} kg</b>\n`;
+                    }
+
+                    customerMsg += `\n💰 Bazaviy narx: <b>${fmtN(basePrice)} so'm/kg</b>\n`;
+
+                    if (isPickup) {
+                        customerMsg +=
+                            `\n🚚 <b>Mashina xizmati uchun komisssiya: -50%</b>\n` +
+                            `   <i>Siz mashina chaqirgansiz, shuning uchun narxdan 50% ushlab qolinadi.</i>\n` +
+                            `   ${fmtN(basePrice)} → <b>${fmtN(finalPrice)} so'm/kg</b>\n`;
+                    }
+
+                    customerMsg +=
+                        `\n━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                        `💵 <b>Sizga to'lanadigan summa: ${fmtN(totalAmount)} so'm</b>\n`;
+
+                    if (isPickup && discount > 0) {
+                        customerMsg +=
+                            `\n📋 <i>Hisob: ${effectiveWeight.toFixed(1)} kg × ${fmtN(finalPrice)} = ${fmtN(totalAmount)} so'm</i>\n` +
+                            `<i>(Agar o'zingiz olib kelsangiz: ${fmtN(fullAmount)} so'm bo'lardi)</i>\n`;
+                    } else if (isPickup) {
+                        customerMsg +=
+                            `\n📋 <i>Hisob: ${weight} kg × ${fmtN(finalPrice)} = ${fmtN(totalAmount)} so'm</i>\n` +
+                            `<i>(Agar o'zingiz olib kelsangiz: ${fmtN(fullAmount)} so'm bo'lardi)</i>\n`;
+                    }
+
+                    customerMsg +=
+                        `\n⚠️ <b>Iltimos, ma'lumotlarni tekshiring va tasdiqlang!</b>\n` +
+                        `<i>Tasdiqlangandan keyingina to'lov amalga oshiriladi.</i>`;
+
+                    await bot.telegram.sendMessage(req.customerTgId, customerMsg, {
+                        parse_mode: 'HTML',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [btn('✅ Tasdiqlash — to\'g\'ri', `confirm_${collection.id}`)],
+                                [btn('❌ Inkor qilish — noto\'g\'ri', `deny_${collection.id}`)],
+                            ],
+                        },
+                    });
                 }
 
-                // Masulga xabar + to'lov tugmasi
+                // ── MASULGA XABAR (to'lov tugmalarisiz — faqat ma'lumot) ──
                 if (req.supervisor?.telegramId) {
                     await bot.telegram.sendMessage(req.supervisor.telegramId,
                         `📦 <b>Ariza #${requestId} — yig'ildi</b>\n\n` +
                         `${matInfo.emoji} ${matInfo.label}\n` +
-                        `⚖️ ${weight} kg${discount > 0 ? ` → ${effectiveWeight.toFixed(1)} kg (${discount}%)` : ''}\n` +
+                        `⚖️ ${weight} kg${discount > 0 ? ` → ${effectiveWeight.toFixed(1)} kg (-${discount}%)` : ''}\n` +
+                        `${isPickup ? `🚚 Mashina: -50% → ${fmtN(finalPrice)} so'm/kg\n` : `💰 ${fmtN(basePrice)} so'm/kg\n`}` +
                         `💵 <b>${fmtN(totalAmount)} so'm</b>\n` +
                         `🚚 Haydovchi: ${driver.name}\n` +
                         `👤 Mijoz: ${req.name} | ${req.phone}\n\n` +
-                        `Mijoz tasdiqlashini kuting yoki to'lovni boshlang:`,
-                        { parse_mode: 'HTML', reply_markup: { inline_keyboard: [
-                            [btn(`💵 Mijozga to'lash`, `pay_cust_${collection.id}`)],
-                            [btn(`🚚 Haydovchiga to'lash (10%)`, `pay_drv_${collection.id}`)],
-                            [btn(`💰 Ikkalasiga to'lash`, `pay_both_${collection.id}`)],
-                        ] } }
+                        `⏳ <b>Mijoz tasdiqlashini kutmoqda...</b>\n` +
+                        `<i>Tasdiqlangandan keyin to'lov tugmalari paydo bo'ladi.</i>`,
+                        { parse_mode: 'HTML' }
                     );
                 }
+            }
+
+            // ── Haydovchi: Qo'lda yakunlash (mijoz tasdiqlamasa) ─────────
+            if (data.startsWith('force_') && !data.startsWith('force_yes_') && !data.startsWith('force_skip_') && !data.startsWith('force_back_')) {
+                const collectionId = parseInt(data.replace('force_', ''));
+                const driver = await prisma.driver.findUnique({ where: { telegramId: tgId } });
+                if (!driver) { await ctx.answerCbQuery('❌ Ruxsat yo\'q'); return; }
+
+                const coll = await prisma.recycleCollection.findUnique({
+                    where: { id: collectionId },
+                    include: { request: true },
+                });
+                if (!coll) { await ctx.answerCbQuery('Topilmadi'); return; }
+
+                // Tekshirish: bu haydovchining ishi ekanligiga
+                if (coll.driverId !== driver.id) {
+                    await ctx.answerCbQuery('❌ Bu sizning ishingiz emas'); return;
+                }
+
+                await ctx.answerCbQuery('⚠️');
+                await ctx.editMessageText(
+                    `⚠️ <b>Qo'lda yakunlash — Ariza #${coll.requestId}</b>\n\n` +
+                    `Mijozni habarnoma tasdiqlashi haqida ogohlantirdingizmi?\n\n` +
+                    `<i>Mijozga yig'ish natijasi va to'lov summasi haqida aytganmisiz?</i>`,
+                    {
+                        parse_mode: 'HTML',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [btn('✅ Ha, ogohlantirdim', `force_yes_${collectionId}`)],
+                                [btn('⏭ O\'tkazib yuborish', `force_skip_${collectionId}`)],
+                                [btn('🔙 Orqaga', `force_back_${collectionId}`)],
+                            ],
+                        },
+                    }
+                );
+            }
+
+            // ── Haydovchi: Ha, mijozni ogohlantirdim → to'lovga o'tish ───
+            if (data.startsWith('force_yes_') || data.startsWith('force_skip_')) {
+                const isNotified = data.startsWith('force_yes_');
+                const collectionId = parseInt(data.split('_')[2]);
+                const driver = await prisma.driver.findUnique({ where: { telegramId: tgId } });
+                if (!driver) { await ctx.answerCbQuery('❌ Ruxsat yo\'q'); return; }
+
+                const coll = await prisma.recycleCollection.findUnique({
+                    where: { id: collectionId },
+                    include: { request: { include: { supervisor: true } }, driver: true },
+                });
+                if (!coll) { await ctx.answerCbQuery('Topilmadi'); return; }
+                if (coll.driverId !== driver.id) {
+                    await ctx.answerCbQuery('❌ Bu sizning ishingiz emas'); return;
+                }
+
+                // Kunfirmatsiyasiz tasdiqlash
+                await prisma.recycleCollection.update({
+                    where: { id: collectionId },
+                    data: { customerConfirmed: true, customerComment: isNotified ? 'Haydovchi ogohlantirdi (qo\'lda)' : 'Qo\'lda yakunlandi (o\'tkazib yuborildi)' },
+                });
+                await prisma.recycleRequest.update({
+                    where: { id: coll.requestId },
+                    data: { status: 'confirmed', confirmedAt: new Date() },
+                });
+
+                const notifyLabel = isNotified ? '✅ Mijoz ogohlantirilgan' : '⏭ O\'tkazib yuborilgan';
+                await ctx.answerCbQuery('✅ Qabul qilindi!');
+                await ctx.editMessageText(
+                    `✅ <b>Qo'lda yakunlandi! #${coll.requestId}</b>\n\n` +
+                    `${notifyLabel}\n` +
+                    `💵 <b>${fmtN(coll.totalAmount)} so'm</b>\n\n` +
+                    `Mas'ulga to'lov tugmalari yuborildi.`,
+                    { parse_mode: 'HTML' }
+                );
+
+                // ── MAS'ULGA TO'LOV TUGMALARI ──
+                if (coll.request.supervisor?.telegramId) {
+                    const matInfo = MAT[coll.materialType || 'mix'] || MAT.mix;
+                    await bot.telegram.sendMessage(coll.request.supervisor.telegramId,
+                        `🔄 <b>Haydovchi qo'lda yakunladi — Ariza #${coll.requestId}</b>\n\n` +
+                        `${notifyLabel}\n` +
+                        `${matInfo.emoji} ${matInfo.label}\n` +
+                        `⚖️ ${coll.actualWeight} kg${coll.discountPercent > 0 ? ` → ${coll.effectiveWeight.toFixed(1)} kg (-${coll.discountPercent}%)` : ''}\n` +
+                        `💵 <b>${fmtN(coll.totalAmount)} so'm</b>\n` +
+                        `🚚 Haydovchi: ${coll.driver.name}\n` +
+                        `👤 Mijoz: ${coll.request.name} | ${coll.request.phone}\n\n` +
+                        `💰 <b>To'lovni amalga oshiring:</b>`,
+                        {
+                            parse_mode: 'HTML',
+                            reply_markup: {
+                                inline_keyboard: [
+                                    [btn(`💵 Mijozga to'lash (${fmtN(coll.totalAmount)} so'm)`, `pay_cust_${coll.id}`)],
+                                    [btn(`🚚 Haydovchiga to'lash (${fmtN(Math.round(coll.totalAmount * 0.1))} so'm)`, `pay_drv_${coll.id}`)],
+                                    [btn(`💰 Ikkalasiga to'lash`, `pay_both_${coll.id}`)],
+                                ],
+                            },
+                        }
+                    );
+                }
+            }
+
+            // ── Haydovchi: Orqaga qaytish ────────────────────────────────
+            if (data.startsWith('force_back_')) {
+                const collectionId = parseInt(data.replace('force_back_', ''));
+                const coll = await prisma.recycleCollection.findUnique({
+                    where: { id: collectionId },
+                    include: { request: { include: { point: true } } },
+                });
+                if (!coll) { await ctx.answerCbQuery('Topilmadi'); return; }
+
+                const matInfo = MAT[coll.materialType || 'mix'] || MAT.mix;
+                const isPickup = coll.request.pickupType === 'pickup';
+                const basePrice = coll.request.point?.pricePerKg || matInfo.price;
+
+                await ctx.answerCbQuery('🔙');
+                await ctx.editMessageText(
+                    `✅ <b>Yig'ish yakunlandi! #${coll.requestId}</b>\n\n` +
+                    `${matInfo.emoji} ${matInfo.label}\n` +
+                    `⚖️ Og'irlik: ${coll.actualWeight} kg\n` +
+                    `${coll.discountPercent > 0 ? `🏷️ Chegirma: ${coll.discountPercent}% → ${coll.effectiveWeight.toFixed(1)} kg\n` : ''}` +
+                    `💰 Narx: ${fmtN(basePrice)} so'm/kg\n` +
+                    `${isPickup ? `🚚 Mashina xizmati: -50% → ${fmtN(coll.pricePerKg)} so'm/kg\n` : ''}` +
+                    `━━━━━━━━━━━━━━━━━━\n` +
+                    `💵 <b>Jami: ${fmtN(coll.totalAmount)} so'm</b>\n\n` +
+                    `⏳ Mijoz tasdiqlashini kuting...\n` +
+                    `<i>Agar mijoz tasdiqlay olmasa, pastdagi tugmani bosing.</i>`,
+                    {
+                        parse_mode: 'HTML',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [btn('🔄 Qo\'lda yakunlash (mijoz tasdiqlamasa)', `force_${collectionId}`)],
+                            ],
+                        },
+                    }
+                );
             }
 
             // ── Masul: To'lovni tasdiqlash ──────────────────────────────────
@@ -698,13 +1007,28 @@ export const getBot = async () => {
 
                 await prisma.recycleCollection.update({
                     where: { id: collectionId },
-                    data: { paymentStatus, paymentToCustomer: payToCust ?? undefined, paymentToDriver: payToDrv ?? undefined, paidBy: sup.name },
+                    data: { paymentStatus, paymentToCustomer: payToCust ?? undefined, paymentToDriver: payToDrv ?? undefined, paidBy: sup.name, paidAt: new Date() },
                 });
+
+                // Arizani yakunlash — to'lov bo'lgach completed ga o'tkazish
+                await prisma.recycleRequest.update({
+                    where: { id: coll.requestId },
+                    data: { status: 'completed', completedAt: new Date() },
+                });
+
+                // Haydovchini bo'shatish
+                if (coll.driver) {
+                    await prisma.driver.update({
+                        where: { id: coll.driver.id },
+                        data: { status: 'active' },
+                    });
+                }
+
                 await ctx.answerCbQuery('✅ To\'lov amalga oshirildi!');
                 const icon  = payType === 'pay_cust' ? '👤' : payType === 'pay_drv' ? '🚚' : '💰';
                 const label = payType === 'pay_cust' ? 'Mijozga' : payType === 'pay_drv' ? 'Haydovchiga' : 'Ikkalasiga';
                 await ctx.editMessageText(
-                    `✅ <b>To'lov amalga oshirildi!</b>\n\n${icon} ${label}: <b>${fmtN(payToCust ?? payToDrv ?? 0)} so'm</b>\n👷 Tasdiqladi: ${sup.name}\n📋 Ariza #${coll.requestId}`,
+                    `✅ <b>To'lov amalga oshirildi!</b>\n\n${icon} ${label}: <b>${fmtN(payToCust ?? payToDrv ?? 0)} so'm</b>\n👷 Tasdiqladi: ${sup.name}\n📋 Ariza #${coll.requestId}\n\n🟢 <b>Ariza yakunlandi!</b>`,
                     { parse_mode: 'HTML' }
                 );
 
@@ -895,6 +1219,93 @@ export const getBot = async () => {
 
         // Agar /buyruq bo'lsa — skip
         if (text.startsWith('/')) return;
+
+        // ── RO'YXATDAN O'TISH: Kod tekshirish ─────────────────────────
+        if (registrationSessions.has(tgId)) {
+            const code = text.trim();
+
+            // 5 raqamli kod formatini tekshirish
+            if (!/^\d{5}$/.test(code)) {
+                await ctx.reply(
+                    `❌ Noto'g'ri format!\n\n5 ta raqam kiriting.\n<i>Masalan: 48271</i>`,
+                    { parse_mode: 'HTML' }
+                );
+                return;
+            }
+
+            // Haydovchi bazadan qidirish
+            const driver = await prisma.driver.findFirst({ where: { registrationCode: code } });
+            if (driver) {
+                // Agar allaqachon boshqa kishi ulangan bo'lsa
+                if (driver.telegramId && driver.telegramId !== tgId) {
+                    await ctx.reply(`❌ Bu kod boshqa foydalanuvchiga ulangan.\nAdmin bilan bog'laning.`);
+                    registrationSessions.delete(tgId);
+                    return;
+                }
+
+                await prisma.driver.update({
+                    where: { id: driver.id },
+                    data: {
+                        telegramId: tgId,
+                        telegramName: ctx.from.username || ctx.from.first_name || null,
+                        registeredAt: new Date(),
+                        isOnline: true,
+                        lastSeenAt: new Date(),
+                    },
+                });
+                registrationSessions.delete(tgId);
+
+                await ctx.reply(
+                    `✅ <b>Muvaffaqiyatli ro'yxatdan o'tdingiz!</b>\n\n` +
+                    `🚚 Siz <b>Haydovchi</b> sifatida tizimga ulangingiz.\n` +
+                    `👤 Ism: <b>${driver.name}</b>\n` +
+                    `📞 Telefon: <b>${driver.phone}</b>\n\n` +
+                    `Endi quyidagi tugmalar orqali ishlang 👇`,
+                    { parse_mode: 'HTML', reply_markup: driverKeyboard() }
+                );
+                return;
+            }
+
+            // Masul bazadan qidirish
+            const supervisor = await prisma.supervisor.findFirst({ where: { registrationCode: code } });
+            if (supervisor) {
+                if (supervisor.telegramId && supervisor.telegramId !== tgId) {
+                    await ctx.reply(`❌ Bu kod boshqa foydalanuvchiga ulangan.\nAdmin bilan bog'laning.`);
+                    registrationSessions.delete(tgId);
+                    return;
+                }
+
+                await prisma.supervisor.update({
+                    where: { id: supervisor.id },
+                    data: {
+                        telegramId: tgId,
+                        telegramName: ctx.from.username || ctx.from.first_name || null,
+                        registeredAt: new Date(),
+                    },
+                });
+                registrationSessions.delete(tgId);
+
+                await ctx.reply(
+                    `✅ <b>Muvaffaqiyatli ro'yxatdan o'tdingiz!</b>\n\n` +
+                    `👷 Siz <b>Masul shaxs</b> sifatida tizimga ulangingiz.\n` +
+                    `👤 Ism: <b>${supervisor.name}</b>\n` +
+                    `📞 Telefon: <b>${supervisor.phone}</b>\n\n` +
+                    `Endi quyidagi tugmalar orqali boshqaring 👇`,
+                    { parse_mode: 'HTML', reply_markup: supervisorKeyboard() }
+                );
+                return;
+            }
+
+            // Topilmadi
+            await ctx.reply(
+                `❌ <b>Kod topilmadi!</b>\n\n` +
+                `<code>${code}</code> raqami bazada mavjud emas.\n\n` +
+                `Tekshiring va qayta kiriting yoki admin bilan bog'laning.\n` +
+                `Bekor qilish: /start`,
+                { parse_mode: 'HTML' }
+            );
+            return;
+        }
 
         // ── "♻️ Ariza yuborish" tugmasi ─────────────────────────────────
         if (text === '♻️ Ariza yuborish') {
@@ -1128,7 +1539,7 @@ export const getBot = async () => {
                         `📍 ${r.address || '—'}\n` +
                         `📊 ${getStatusLabel(r.status)}`,
                         { parse_mode: 'HTML', reply_markup: { inline_keyboard: [
-                            r.status === 'assigned' ? [btn('🚚 Yo\'lga chiqdim', `en_route_${r.id}`)] :
+                            r.status === 'assigned' ? [btn('🚚 Yo\'lga chiqdim', `enroute_${r.id}`)] :
                             r.status === 'en_route' ? [btn('📍 Yetib keldim', `arrived_${r.id}`)] :
                             r.status === 'arrived' ? [btn('📦 Yig\'ish boshlash', `collecting_${r.id}`)] :
                             [],

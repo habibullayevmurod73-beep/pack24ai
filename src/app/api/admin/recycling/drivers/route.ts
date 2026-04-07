@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+// 5-raqamli unikal kod generatsiya
+async function generateDriverCode(): Promise<string> {
+    for (let i = 0; i < 20; i++) {
+        const code = String(Math.floor(10000 + Math.random() * 90000)); // 10000-99999
+        const exists = await prisma.driver.findUnique({ where: { registrationCode: code } });
+        if (!exists) return code;
+    }
+    throw new Error('Kod generatsiya qilib bo\'lmadi');
+}
+
 // GET /api/admin/recycling/drivers — Barcha haydovchilar
 export async function GET(req: NextRequest) {
     try {
@@ -39,6 +49,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Ism va telefon majburiy' }, { status: 400 });
         }
 
+        const registrationCode = await generateDriverCode();
+
         const driver = await prisma.driver.create({
             data: {
                 name: body.name.trim(),
@@ -49,6 +61,7 @@ export async function POST(req: NextRequest) {
                 pointId: body.pointId ? Number(body.pointId) : null,
                 vehicleInfo: body.vehicleInfo || null,
                 status: body.status || 'active',
+                registrationCode,
             },
             include: { supervisor: true, point: true },
         });
