@@ -172,6 +172,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             hasDropdown: true,
             subItems: [
                 { name: 'Telegram bot', href: '/admin/platforms/telegram' },
+                { name: 'Telegram Botlar (3x)', href: '/admin/platforms/bots', badge: 'NEW' },
                 { name: 'Veb-sayt', href: '/admin/platforms/website' },
                 { name: 'QR katalog', href: '/admin/platforms/qr', badge: 'PRO' }
             ]

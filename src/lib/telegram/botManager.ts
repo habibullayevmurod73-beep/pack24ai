@@ -6,17 +6,26 @@ let customerBot: Telegraf | null = null;
 let driverBot: Telegraf | null = null;
 let adminBot: Telegraf | null = null;
 
+// ─── Token olish yordamchisi ──────────────────────────────────────────────────
+async function getCustomerToken(): Promise<string | null> {
+    // 1. Env dan
+    if (process.env.CUSTOMER_BOT_TOKEN) return process.env.CUSTOMER_BOT_TOKEN;
+    // 2. Bazadan (fallback)
+    const config = await prisma.telegramConfig.findFirst();
+    return config?.botToken || null;
+}
+
 // ─── Asosiy mijozlar botini olish ─────────────────────────────────────────────
 export async function getCustomerBot(): Promise<Telegraf | null> {
     if (customerBot) return customerBot;
 
-    const config = await prisma.telegramConfig.findFirst();
-    if (!config?.botToken) {
-        console.warn('[BotManager] Customer Bot Token topilmadi (TelegramConfig)');
+    const token = await getCustomerToken();
+    if (!token) {
+        console.warn('[BotManager] Customer Bot Token topilmadi');
         return null;
     }
 
-    customerBot = new Telegraf(config.botToken);
+    customerBot = new Telegraf(token);
     return customerBot;
 }
 
@@ -55,4 +64,32 @@ export async function getAllBots() {
         driver: await getDriverBot(),
         admin: await getAdminBot(),
     };
+}
+
+// ─── Bot tokenlar ro'yxati (admin sahifa uchun) ──────────────────────────────
+export async function getBotStatuses() {
+    const customerToken = await getCustomerToken();
+    return [
+        {
+            name: 'Customer Bot',
+            username: '@Pack24AI_bot',
+            envKey: 'CUSTOMER_BOT_TOKEN',
+            hasToken: !!customerToken,
+            description: 'Mijozlar — katalog, makulatura ariza, AI assistent',
+        },
+        {
+            name: 'Driver Bot',
+            username: '@pack24MX_bot',
+            envKey: 'DRIVER_BOT_TOKEN',
+            hasToken: !!process.env.DRIVER_BOT_TOKEN,
+            description: 'Haydovchilar — topshiriqlar, kalkulyator, online/offline',
+        },
+        {
+            name: 'Admin Bot',
+            username: '@pack24AUP_bot',
+            envKey: 'ADMIN_BOT_TOKEN',
+            hasToken: !!process.env.ADMIN_BOT_TOKEN,
+            description: 'Masullar — arizalar, haydovchi tayinlash, to\'lovlar',
+        },
+    ];
 }

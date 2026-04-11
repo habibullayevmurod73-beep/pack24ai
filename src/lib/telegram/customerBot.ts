@@ -66,13 +66,18 @@ let customerBotInstance: Telegraf | null = null;
 export async function initCustomerBot(): Promise<Telegraf | null> {
     if (customerBotInstance) return customerBotInstance;
 
-    const config = await prisma.telegramConfig.findFirst();
-    if (!config?.botToken) {
-        console.warn('[CustomerBot] Token topilmadi');
+    // Token: avval env dan, keyin bazadan (fallback)
+    let token = process.env.CUSTOMER_BOT_TOKEN;
+    if (!token) {
+        const config = await prisma.telegramConfig.findFirst();
+        token = config?.botToken || '';
+    }
+    if (!token) {
+        console.warn('[CustomerBot] CUSTOMER_BOT_TOKEN topilmadi (.env yoki TelegramConfig)');
         return null;
     }
 
-    const bot = new Telegraf(config.botToken);
+    const bot = new Telegraf(token);
 
     // ─── Commands menu ────────────────────────────────────────────────────
     await bot.telegram.setMyCommands([

@@ -1,0 +1,28 @@
+import { NextResponse } from 'next/server';
+import { initAdminBot } from '@/lib/telegram/adminBot';
+
+export const dynamic = 'force-dynamic';
+
+// Handle POST requests from Telegram Webhook (Admin Bot — @pack24AUP_bot)
+export async function POST(request: Request) {
+    try {
+        const bot = await initAdminBot();
+
+        if (!bot) {
+            return NextResponse.json({ error: 'Admin Bot not configured' }, { status: 503 });
+        }
+
+        const body = await request.json();
+        await bot.handleUpdate(body);
+
+        return NextResponse.json({ ok: true });
+    } catch (error) {
+        console.error('[Webhook/Admin] Error:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+}
+
+// Handle GET requests (verify webhook status)
+export async function GET() {
+    return NextResponse.json({ status: 'Admin Bot Webhook Active', bot: '@pack24AUP_bot' });
+}
