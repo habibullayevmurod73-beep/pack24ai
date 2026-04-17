@@ -1,10 +1,16 @@
 import { Telegraf } from 'telegraf';
 import { prisma } from '@/lib/prisma';
 
-// ─── Bot instancelari ─────────────────────────────────────────────────────────
-let customerBot: Telegraf | null = null;
-let driverBot: Telegraf | null = null;
-let adminBot: Telegraf | null = null;
+// ─── Bot instancelari (Hot-reload himoyasi bilan) ─────────────────────────────
+const globalForBots = globalThis as unknown as {
+    customerBot?: Telegraf | null;
+    driverBot?: Telegraf | null;
+    adminBot?: Telegraf | null;
+};
+
+let customerBot = globalForBots.customerBot || null;
+let driverBot = globalForBots.driverBot || null;
+let adminBot = globalForBots.adminBot || null;
 
 // ─── Token olish yordamchisi ──────────────────────────────────────────────────
 async function getCustomerToken(): Promise<string | null> {
@@ -26,6 +32,7 @@ export async function getCustomerBot(): Promise<Telegraf | null> {
     }
 
     customerBot = new Telegraf(token);
+    if (process.env.NODE_ENV !== 'production') globalForBots.customerBot = customerBot;
     return customerBot;
 }
 
@@ -40,6 +47,7 @@ export async function getDriverBot(): Promise<Telegraf | null> {
     }
 
     driverBot = new Telegraf(token);
+    if (process.env.NODE_ENV !== 'production') globalForBots.driverBot = driverBot;
     return driverBot;
 }
 
@@ -54,6 +62,7 @@ export async function getAdminBot(): Promise<Telegraf | null> {
     }
 
     adminBot = new Telegraf(token);
+    if (process.env.NODE_ENV !== 'production') globalForBots.adminBot = adminBot;
     return adminBot;
 }
 
