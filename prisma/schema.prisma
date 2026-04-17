@@ -27,8 +27,13 @@ model User {
   address       String?                         // Mijoz manzili
   notes         String?                         // Admin eslatmalari
 
+  // Eco & Gamification
+  ecoPoints           Int      @default(0)      // Mijoz yig'gan eko-ballar
+  totalRecycledWeight Float    @default(0)      // Jami topshirgan makulatura hajmi (kg)
+
   orders            Order[]                     // Mijoz buyurtmalari
   pushSubscriptions PushSubscription[]          // Push notification subscriptionlar
+  recycleRequests   RecycleRequest[]            // Mijoz topshirgan makulatura arizalari
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -357,6 +362,10 @@ model RecycleRequest {
   pickupLng     Float?                   // Pickup nuqtasi uzunlik
   customerTgId  String?                  // Mijoz Telegram ID (ixtiyoriy)
   customerLang  String   @default("uz")  // Mijoz tili (uz/ru/en)
+
+  // Dashboard & Gamification
+  userId        Int?                     // Sayt/B2B foydalanuvchisi
+  user          User?                    @relation(fields: [userId], references: [id])
 
   // Status pipeline: new → dispatched → assigned → en_route → arrived → collecting → collected → confirmed → completed / cancelled / disputed
   status        String       @default("new")
