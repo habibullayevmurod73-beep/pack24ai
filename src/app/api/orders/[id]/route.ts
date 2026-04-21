@@ -1,6 +1,29 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getBot } from '@/lib/telegram/bot';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+
+async function canAccessOrder(order: {
+    userId: number | null;
+    contactPhone: string | null;
+}) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+        return false;
+    }
+
+    if (session.user.role === 'admin') {
+        return true;
+    }
+
+    const sessionUserId = Number(session.user.id);
+    if (Number.isFinite(sessionUserId) && order.userId === sessionUserId) {
+        return true;
+    }
+
+    return Boolean(session.user.phone && order.contactPhone === session.user.phone);
+}
 
 export async function GET(
     request: Request,
@@ -21,6 +44,10 @@ export async function GET(
 
         if (!order) {
             return NextResponse.json({ error: 'Not Found' }, { status: 404 });
+        }
+
+        if (!(await canAccessOrder(order))) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
         // gallery endi Prisma Json tipida — parse kerak emas
@@ -81,6 +108,10 @@ export async function PATCH(
         const order = await prisma.order.findUnique({ where: { id: parseInt(id) } });
         if (!order) {
             return NextResponse.json({ error: 'Buyurtma topilmadi' }, { status: 404 });
+        }
+
+        if (!(await canAccessOrder(order))) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
         if (action === 'cancel') {

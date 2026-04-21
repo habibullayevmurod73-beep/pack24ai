@@ -12,6 +12,71 @@ export const t: Texts = {
         ru: '🏭 <b>Pack24 — Упаковочные Решения</b>\n\nЗдравствуйте! Выберите язык 👇',
         en: '🏭 <b>Pack24 — Packaging Solutions</b>\n\nHello! Choose your language 👇',
     },
+
+    // ─── Yangi ro'yxatdan o'tish oqimi ──────────────────────────────────
+    reg_ask_phone: {
+        uz: '📱 <b>Telefon raqamingizni yuboring</b>\n\nQuyidagi tugmani bosing yoki raqamni yozing:\n<i>Masalan: +998901234567</i>',
+        ru: '📱 <b>Отправьте номер телефона</b>\n\nНажмите кнопку ниже или введите вручную:\n<i>Например: +998901234567</i>',
+        en: '📱 <b>Send your phone number</b>\n\nTap the button below or type manually:\n<i>Example: +998901234567</i>',
+    },
+    reg_ask_name: {
+        uz: '👤 <b>F.I.Sh. kiriting</b>\n\nIsmingiz va familiyangizni to\'liq yozing:\n<i>Masalan: Alisher Karimov</i>',
+        ru: '👤 <b>Введите ФИО</b>\n\nВведите полное имя и фамилию:\n<i>Например: Алишер Каримов</i>',
+        en: '👤 <b>Enter your Full Name</b>\n\nType your first and last name:\n<i>Example: Alisher Karimov</i>',
+    },
+    reg_code_sent: {
+        uz: '🎉 <b>Tabriklaymiz, {name}!</b>\n\nSizning Pack24 shaxsiy kabinetingiz yaratildi.\n\n🔑 <b>Kirish kodi: <code>{code}</code></b>\n\n📱 Telefon: <b>{phone}</b>\n\n━━━━━━━━━━━━━━━━━━━━\n🌐 Shaxsiy kabinetga kirish:\n<b>pack24.ai</b> → Kirish → Telefon + Kod\n━━━━━━━━━━━━━━━━━━━━\n\n⚠️ Ushbu kodni hech kimga bermang!',
+        ru: '🎉 <b>Поздравляем, {name}!</b>\n\nВаш личный кабинет Pack24 создан.\n\n🔑 <b>Код входа: <code>{code}</code></b>\n\n📱 Телефон: <b>{phone}</b>\n\n━━━━━━━━━━━━━━━━━━━━\n🌐 Войти в личный кабинет:\n<b>pack24.ai</b> → Войти → Телефон + Код\n━━━━━━━━━━━━━━━━━━━━\n\n⚠️ Не передавайте этот код никому!',
+        en: '🎉 <b>Congratulations, {name}!</b>\n\nYour Pack24 personal cabinet has been created.\n\n🔑 <b>Login code: <code>{code}</code></b>\n\n📱 Phone: <b>{phone}</b>\n\n━━━━━━━━━━━━━━━━━━━━\n🌐 Access your cabinet:\n<b>pack24.ai</b> → Login → Phone + Code\n━━━━━━━━━━━━━━━━━━━━\n\n⚠️ Never share this code!',
+    },
+    reg_already_exists: {
+        uz: '👋 <b>Xush kelibsiz qaytadan, {name}!</b>\n\n📱 Telefon: <b>{phone}</b>\n🔑 Kirish kodingiz: <code>{code}</code>\n\n🌐 <b>pack24.ai</b> saytida shaxsiy kabinetingizga kiring.',
+        ru: '👋 <b>С возвращением, {name}!</b>\n\n📱 Телефон: <b>{phone}</b>\n🔑 Ваш код входа: <code>{code}</code>\n\n🌐 Войдите в личный кабинет на <b>pack24.ai</b>',
+        en: '👋 <b>Welcome back, {name}!</b>\n\n📱 Phone: <b>{phone}</b>\n🔑 Your login code: <code>{code}</code>\n\n🌐 Access your cabinet at <b>pack24.ai</b>',
+    },
+    reg_phone_taken: {
+        uz: '❌ Bu telefon raqam allaqachon ro\'yxatdan o\'tgan.\n\n/start ni bosing va kabinetingizga kiring.',
+        ru: '❌ Этот номер телефона уже зарегистрирован.\n\nНажмите /start для входа в кабинет.',
+        en: '❌ This phone number is already registered.\n\nPress /start to access your cabinet.',
+    },
+    reg_name_too_short: {
+        uz: '❌ Ism juda qisqa. Iltimos, to\'liq F.I.Sh. kiriting (kamida 3 harf).',
+        ru: '❌ Имя слишком короткое. Пожалуйста, введите полное ФИО (минимум 3 символа).',
+        en: '❌ Name is too short. Please enter your full name (at least 3 characters).',
+    },
+
+    // ─── Shaxsiy kabinet ─────────────────────────────────────────────────
+    cabinet_menu: {
+        uz: '🏠 <b>Shaxsiy kabinet</b>\n\n👤 {name}\n📱 {phone}\n⭐ Eko-ballar: <b>{points}</b>\n\nNimani qilmoqchisiz? 👇',
+        ru: '🏠 <b>Личный кабинет</b>\n\n👤 {name}\n📱 {phone}\n⭐ Эко-баллы: <b>{points}</b>\n\nЧто хотите сделать? 👇',
+        en: '🏠 <b>Personal Cabinet</b>\n\n👤 {name}\n📱 {phone}\n⭐ Eco points: <b>{points}</b>\n\nWhat would you like to do? 👇',
+    },
+    cabinet_btn_orders: {
+        uz: '📦 Buyurtmalarim',
+        ru: '📦 Мои заказы',
+        en: '📦 My Orders',
+    },
+    cabinet_btn_recycling: {
+        uz: '♻️ Makulatura tarixi',
+        ru: '♻️ История макулатуры',
+        en: '♻️ Recycling History',
+    },
+    cabinet_btn_referral: {
+        uz: '👥 Referral dastur',
+        ru: '👥 Реферальная программа',
+        en: '👥 Referral Program',
+    },
+    cabinet_btn_settings: {
+        uz: '⚙️ Sozlamalar',
+        ru: '⚙️ Настройки',
+        en: '⚙️ Settings',
+    },
+    cabinet_btn_code: {
+        uz: '🔑 Kirish kodimni ko\'rish',
+        ru: '🔑 Показать код входа',
+        en: '🔑 Show login code',
+    },
+
     register_name: {
         uz: '👤 Iltimos, <b>Ismingiz va Familiyangizni</b> kiriting:\n<i>Masalan: Alisher Karimov</i>',
         ru: '👤 Пожалуйста, введите <b>Имя и Фамилию</b>:\n<i>Например: Алишер Каримов</i>',
@@ -34,6 +99,11 @@ export const t: Texts = {
     },
 
     // ─── Bosh menyu tugmalari ────────────────────────────────────────────
+    btn_open_app: {
+        uz: '🌐 Pack24 ni ochish',
+        ru: '🌐 Открыть Pack24',
+        en: '🌐 Open Pack24',
+    },
     btn_catalog: {
         uz: '📦 Mahsulotlar katalogi',
         ru: '📦 Каталог продукции',
@@ -185,9 +255,29 @@ export const t: Texts = {
     // ═══════════════════════════════════════════════════════════════════════
 
     drv_welcome: {
-        uz: '🚚 <b>Pack24 — Haydovchi boti</b>\n\n5 raqamli kodingizni kiriting 👇\n<i>Admin bergan kod</i>',
-        ru: '🚚 <b>Pack24 — Бот водителя</b>\n\nВведите 5-значный код 👇\n<i>Код от администратора</i>',
-        en: '🚚 <b>Pack24 — Driver Bot</b>\n\nEnter your 5-digit code 👇\n<i>Code from admin</i>',
+        uz: '🚚 <b>Pack24 — Haydovchi boti</b>\n\nXush kelibsiz! Ro\'yxatdan o\'tish uchun telefon raqamingizni ulashing 👇',
+        ru: '🚚 <b>Pack24 — Бот водителя</b>\n\nДобро пожаловать! Поделитесь номером телефона для регистрации 👇',
+        en: '🚚 <b>Pack24 — Driver Bot</b>\n\nWelcome! Share your phone number to register 👇',
+    },
+    drv_share_phone: {
+        uz: '📱 Kontaktni ulashish',
+        ru: '📱 Поделиться контактом',
+        en: '📱 Share Contact',
+    },
+    drv_not_in_db: {
+        uz: '❌ <b>Raqamingiz tizimda topilmadi!</b>\n\nAdmin bilan bog\'laning:\n📞 +998 88 055-78-88',
+        ru: '❌ <b>Номер не найден в системе!</b>\n\nСвяжитесь с администратором:\n📞 +998 88 055-78-88',
+        en: '❌ <b>Phone not found in system!</b>\n\nContact admin:\n📞 +998 88 055-78-88',
+    },
+    drv_already_registered: {
+        uz: '⚠️ Bu telefon raqam boshqa Telegram akkauntga bog\'langan.\nAdmin bilan bog\'laning.',
+        ru: '⚠️ Этот номер привязан к другому аккаунту Telegram.\nОбратитесь к администратору.',
+        en: '⚠️ This phone is linked to another Telegram account.\nContact admin.',
+    },
+    drv_code_sent: {
+        uz: '✅ <b>Muvaffaqiyatli ro\'yxatdan o\'tdingiz!</b>\n\n👤 {name}\n\n🔑 <b>Sizning verifikatsion kodingiz:</b>\n\n<code>{code}</code>\n\n📌 Bu kodni xotirada saqlang — keyinchalik kerak bo\'lishi mumkin.\n\nAdmin panelda ham ko\'rinadi ✓',
+        ru: '✅ <b>Успешно зарегистрированы!</b>\n\n👤 {name}\n\n🔑 <b>Ваш верификационный код:</b>\n\n<code>{code}</code>\n\n📌 Сохраните этот код — он может понадобиться позже.\n\nТакже виден в панели администратора ✓',
+        en: '✅ <b>Successfully registered!</b>\n\n👤 {name}\n\n🔑 <b>Your verification code:</b>\n\n<code>{code}</code>\n\n📌 Save this code — you may need it later.\n\nAlso visible in admin panel ✓',
     },
     drv_registered: {
         uz: '✅ <b>Muvaffaqiyatli!</b>\n\n🚚 Siz haydovchi sifatida ro\'yxatdan o\'tdingiz.\n👤 {name}\n\nQuyidagi tugmalar orqali ishlang 👇',
@@ -285,9 +375,29 @@ export const t: Texts = {
     // ═══════════════════════════════════════════════════════════════════════
 
     adm_welcome: {
-        uz: '👷 <b>Pack24 — Masul boti</b>\n\n5 raqamli kodingizni kiriting 👇\n<i>Admin bergan kod</i>',
-        ru: '👷 <b>Pack24 — Бот ответственного</b>\n\nВведите 5-значный код 👇\n<i>Код от администратора</i>',
-        en: '👷 <b>Pack24 — Supervisor Bot</b>\n\nEnter your 5-digit code 👇\n<i>Code from admin</i>',
+        uz: '👷 <b>Pack24 — Masul boti</b>\n\nXush kelibsiz! Ro\'yxatdan o\'tish uchun telefon raqamingizni ulashing 👇',
+        ru: '👷 <b>Pack24 — Бот ответственного</b>\n\nДобро пожаловать! Поделитесь номером телефона для регистрации 👇',
+        en: '👷 <b>Pack24 — Supervisor Bot</b>\n\nWelcome! Share your phone number to register 👇',
+    },
+    adm_share_phone: {
+        uz: '📱 Kontaktni ulashish',
+        ru: '📱 Поделиться контактом',
+        en: '📱 Share Contact',
+    },
+    adm_not_in_db: {
+        uz: '❌ <b>Raqamingiz tizimda topilmadi!</b>\n\nAdmin bilan bog\'laning:\n📞 +998 88 055-78-88',
+        ru: '❌ <b>Номер не найден в системе!</b>\n\nСвяжитесь с администратором:\n📞 +998 88 055-78-88',
+        en: '❌ <b>Phone not found in system!</b>\n\nContact admin:\n📞 +998 88 055-78-88',
+    },
+    adm_already_registered: {
+        uz: '⚠️ Bu telefon raqam boshqa Telegram akkauntga bog\'langan.\nAdmin bilan bog\'laning.',
+        ru: '⚠️ Этот номер привязан к другому аккаунту Telegram.\nОбратитесь к администратору.',
+        en: '⚠️ This phone is linked to another Telegram account.\nContact admin.',
+    },
+    adm_code_sent: {
+        uz: '✅ <b>Muvaffaqiyatli ro\'yxatdan o\'tdingiz!</b>\n\n👤 {name}\n🏭 Punkt: {point}\n\n🔑 <b>Sizning verifikatsion kodingiz:</b>\n\n<code>{code}</code>\n\n📌 Bu kodni xotirada saqlang.\n\nAdmin panelda ham ko\'rinadi ✓',
+        ru: '✅ <b>Успешно зарегистрированы!</b>\n\n👤 {name}\n🏭 Пункт: {point}\n\n🔑 <b>Ваш верификационный код:</b>\n\n<code>{code}</code>\n\n📌 Сохраните этот код.\n\nТакже виден в панели администратора ✓',
+        en: '✅ <b>Successfully registered!</b>\n\n👤 {name}\n🏭 Point: {point}\n\n🔑 <b>Your verification code:</b>\n\n<code>{code}</code>\n\n📌 Save this code.\n\nAlso visible in admin panel ✓',
     },
     adm_registered: {
         uz: '✅ <b>Muvaffaqiyatli!</b>\n\n👷 Siz masul sifatida ro\'yxatdan o\'tdingiz.\n👤 {name}\n🏭 Punkt: {point}\n\nQuyidagi tugmalar orqali ishlang 👇',

@@ -1,26 +1,16 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
-
-// Oddiy hash (bcrypt o'rniga — bcrypt server-side ma'qul, lekin serverless da bazan muammo)
-// Production da: npm install bcryptjs va shu bilan almashtiring
-function hashPassword(password: string): string {
-    // MUHIM: qavs operator precedence uchun zarur
-    return crypto
-        .createHash('sha256')
-        .update(password + (process.env.AUTH_SECRET ?? ''))
-        .digest('hex');
-}
-
-function verifyPassword(password: string, hash: string): boolean {
-    return hashPassword(password) === hash;
-}
+import {
+    isValidPhone,
+    normalizePhone,
+    verifyPassword,
+} from '@/lib/userAuth';
 
 // POST /api/auth/login
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { phone, password } = body;
+        const { phone, password } = body as { phone?: string; password?: string };
 
         // Validatsiya
         if (!phone || !password) {
@@ -30,9 +20,8 @@ export async function POST(request: Request) {
             );
         }
 
-        const cleanPhone = phone.replace(/\s/g, '');
-        const phoneRegex = /^\+998[0-9]{9}$/;
-        if (!phoneRegex.test(cleanPhone)) {
+        const cleanPhone = normalizePhone(phone);
+        if (!isValidPhone(cleanPhone)) {
             return NextResponse.json(
                 { error: "Telefon formati: +998901234567" },
                 { status: 400 }
@@ -59,18 +48,27 @@ export async function POST(request: Request) {
         }
 
         // Parolni tekshirish
-        if (!verifyPassword(password, user.passwordHash)) {
+        const passwordCheck = await verifyPassword(password, user.passwordHash);
+        if (!passwordCheck.valid) {
             return NextResponse.json(
                 { error: "Parol noto'g'ri" },
                 { status: 401 }
             );
         }
 
-        // Muvaffaqiyatli login
+        if (passwordCheck.needsRehash && passwordCheck.nextHash) {
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { passwordHash: passwordCheck.nextHash },
+            });
+        }
+
+        // Legacy API: browser auth endi NextAuth credentials orqali ishlashi kerak.
         const { passwordHash: _, ...safeUser } = user;
         return NextResponse.json({
             success: true,
             user: safeUser,
+            deprecated: true,
         });
 
     } catch (error) {

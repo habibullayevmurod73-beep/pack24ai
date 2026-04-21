@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendTelegramMessage, getBot } from '@/lib/telegram/bot';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 // Telegraf inline keyboard tipi
 type IKBtn = { text: string; callback_data: string };
@@ -28,6 +30,8 @@ async function sendToChat(chatId: string, message: string, inlineKeyboard?: IKBt
 export async function POST(request: Request) {
     try {
         const body = await request.json();
+        const session = await getServerSession(authOptions);
+        const userId = Number(session?.user?.id);
 
         // ─── Majburiy maydonlar tekshiruvi ───────────────────────────────
         if (!body.name?.trim()) {
@@ -80,6 +84,7 @@ export async function POST(request: Request) {
                 pickupLat:         body.pickupLat ? Number(body.pickupLat) : null,
                 pickupLng:         body.pickupLng ? Number(body.pickupLng) : null,
                 customerTgId:      body.customerTgId || null,
+                userId:            Number.isFinite(userId) ? userId : null,
                 // Avto-dispatch
                 ...(supervisor ? {
                     supervisorId: supervisor.id,

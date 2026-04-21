@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import {
+    ADMIN_AUTH_COOKIE,
+    ADMIN_TOKEN_MAX_AGE_MS,
+} from '@/lib/adminAuthShared';
 
 /**
  * HMAC-SHA256 imzoli token yaratish
@@ -32,15 +36,15 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Timing-safe taqqoslash (timing attack oldini olish uchun)
-        const usernameMatch = username
+        // Timing-safe taqqoslash, uzunlik teng bo'lmasa xato tashlamasligi uchun tekshiramiz
+        const usernameMatch = username && username.length === adminUsername.length
             ? crypto.timingSafeEqual(
                 Buffer.from(username),
                 Buffer.from(adminUsername)
               )
             : false;
 
-        const passwordMatch = password
+        const passwordMatch = password && password.length === adminPassword.length
             ? crypto.timingSafeEqual(
                 Buffer.from(password),
                 Buffer.from(adminPassword)
@@ -61,11 +65,11 @@ export async function POST(req: NextRequest) {
         const res = NextResponse.json({ ok: true });
 
         // HttpOnly cookie — JS o'qiy olmaydi (XSS ga chidamli)
-        res.cookies.set('admin_auth', token, {
+        res.cookies.set(ADMIN_AUTH_COOKIE, token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',
-            maxAge: 8 * 60 * 60, // 8 soat
+            maxAge: ADMIN_TOKEN_MAX_AGE_MS / 1000,
             path: '/',
         });
 

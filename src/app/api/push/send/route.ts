@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { verifyAdminAuth } from '@/lib/adminAuth';
 
 // ─── Yordamchi: web-push paketini dinamik yuklash ─────────────────────────────
 // npm install web-push @types/web-push — keyin to'liq ishlaydi
@@ -24,11 +25,9 @@ interface PushSub {
 // ─── POST /api/push/send — Barcha yoki muayyan userlarga push yuborish ────────
 // Body: { title, body, url?, icon?, userId? }
 export async function POST(req: NextRequest) {
-    // Admin autentifikatsiyasi
-    const adminAuth = req.cookies.get('admin_auth')?.value
-        || req.headers.get('x-admin-auth');
-    if (adminAuth !== 'authenticated') {
-        return NextResponse.json({ error: 'Ruxsat yo\'q' }, { status: 401 });
+    const authError = await verifyAdminAuth(req);
+    if (authError) {
+        return authError;
     }
 
     try {
@@ -111,10 +110,9 @@ export async function POST(req: NextRequest) {
 
 // ─── GET /api/push/send — Subscription statistika ────────────────────────────
 export async function GET(req: NextRequest) {
-    const adminAuth = req.cookies.get('admin_auth')?.value
-        || req.headers.get('x-admin-auth');
-    if (adminAuth !== 'authenticated') {
-        return NextResponse.json({ error: 'Ruxsat yo\'q' }, { status: 401 });
+    const authError = await verifyAdminAuth(req);
+    if (authError) {
+        return authError;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

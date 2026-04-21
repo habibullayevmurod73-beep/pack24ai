@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
+import {
+    ADMIN_AUTH_COOKIE,
+    ADMIN_AUTH_HEADER,
+    validateAdminToken,
+} from '@/lib/adminAuthShared';
 
 /**
  * Admin API uchun autentifikatsiya tekshiruvi.
@@ -18,9 +22,7 @@ import crypto from 'crypto';
  * ```
  */
 
-const TOKEN_MAX_AGE_MS = 8 * 60 * 60 * 1000; // 8 soat
-
-export function verifyAdminAuth(req: NextRequest): NextResponse | null {
+export async function verifyAdminAuth(req: NextRequest): Promise<NextResponse | null> {
     const adminSecret = process.env.ADMIN_SECRET;
     if (!adminSecret) {
         console.error('[adminAuth] ADMIN_SECRET env mavjud emas!');
@@ -30,7 +32,10 @@ export function verifyAdminAuth(req: NextRequest): NextResponse | null {
         );
     }
 
-    const token = req.cookies.get('admin_auth')?.value;
+    const token =
+        req.cookies.get(ADMIN_AUTH_COOKIE)?.value ??
+        req.headers.get(ADMIN_AUTH_HEADER);
+
     if (!token) {
         return NextResponse.json(
             { error: 'Avtorizatsiya talab etiladi' },
@@ -38,47 +43,17 @@ export function verifyAdminAuth(req: NextRequest): NextResponse | null {
         );
     }
 
-    // Token formati: admin_<timestamp>_<hmac>
-    const parts = token.split('_');
-    if (parts.length < 3 || parts[0] !== 'admin') {
-        return NextResponse.json(
-            { error: 'Noto\'g\'ri token formati' },
-            { status: 401 }
-        );
-    }
-
-    const timestamp = parts[1];
-    const receivedHmac = parts.slice(2).join('_');
-
-    // Muddati tekshirish
-    const tokenAge = Date.now() - parseInt(timestamp);
-    if (isNaN(tokenAge) || tokenAge > TOKEN_MAX_AGE_MS) {
-        return NextResponse.json(
-            { error: 'Sessiya muddati tugagan. Qaytadan kiring.' },
-            { status: 401 }
-        );
-    }
-
-    // HMAC tekshirish
-    const expectedHmac = crypto
-        .createHmac('sha256', adminSecret)
-        .update(`admin_${timestamp}`)
-        .digest('hex');
-
-    try {
-        const isValid = crypto.timingSafeEqual(
-            Buffer.from(receivedHmac, 'hex'),
-            Buffer.from(expectedHmac, 'hex')
-        );
-        if (!isValid) {
+    const validation = await validateAdminToken(token, adminSecret);
+    if (!validation.valid) {
+        if (validation.reason === 'expired') {
             return NextResponse.json(
-                { error: 'Noto\'g\'ri token' },
+                { error: 'Sessiya muddati tugagan. Qaytadan kiring.' },
                 { status: 401 }
             );
         }
-    } catch {
+
         return NextResponse.json(
-            { error: 'Token validatsiya xatosi' },
+            { error: "Noto'g'ri yoki buzilgan admin token" },
             { status: 401 }
         );
     }

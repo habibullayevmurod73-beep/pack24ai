@@ -3,6 +3,19 @@ import { prisma } from '@/lib/prisma';
 import { Lang, getText, formatText } from './i18n';
 import { haversineDistance } from './geo';
 import { notifyAdmin } from './notifier';
+import {
+    btn,
+    customerMainKeyboard,
+    langSelectKeyboard,
+    sharePhoneKeyboard,
+    shareLocationKeyboard,
+    recycleMethodKeyboard,
+    volumeKeyboard,
+    photoOrSkipKeyboard,
+    customerConfirmKeyboard,
+    cabinetMenuKeyboard,
+} from './keyboards';
+import bcrypt from 'bcryptjs';
 
 // ─── Material narxlari (so'm/kg) ─────────────────────────────────────────────
 const MAT: Record<string, { label: Record<Lang, string>; emoji: string; price: number }> = {
@@ -19,10 +32,13 @@ const fmtN = (n: number) => n.toLocaleString('ru-RU');
 
 // ─── Session types ────────────────────────────────────────────────────────────
 interface CustomerSession {
-    step: 'lang' | 'name' | 'phone' | 'menu' | 'location' | 'choose_method' | 'volume' | 'photo' | 'done';
+    step: 'lang' | 'reg_phone' | 'reg_otp' | 'reg_name' | 'menu' | 'location' | 'choose_method' | 'volume' | 'photo' | 'done';
     lang: Lang;
     name?: string;
     phone?: string;
+    otpCode?: string;          // Telegramga yuborilgan OTP (session ichida)
+    otpExpiry?: number;        // Unix timestamp (ms)
+    otpAttempts?: number;
     lat?: number;
     lng?: number;
     pickupType?: 'base' | 'pickup';
@@ -32,14 +48,15 @@ interface CustomerSession {
 const sessions = new Map<string, CustomerSession>();
 const registrationSessions = new Set<string>();
 
-// ─── Inline button helper ─────────────────────────────────────────────────────
-function btn(text: string, data: string) {
-    return { text, callback_data: data };
+// ─── OTP generatsiya (6 raqam) ────────────────────────────────────────────────
+function generateOtp(): string {
+    return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-// ─── Mijoz til olish ─────────────────────────────────────────────────────────
+// ─── Mijoz tilini olish ───────────────────────────────────────────────────────
 async function getUserLang(tgId: string): Promise<Lang> {
-    // So'nggi arizadan tilni olish
+    const user = await prisma.user.findFirst({ where: { telegramId: tgId }, select: { id: true } });
+    if (user) return 'uz'; // registered users default uz
     const req = await prisma.recycleRequest.findFirst({
         where: { customerTgId: tgId },
         orderBy: { createdAt: 'desc' },
@@ -48,17 +65,28 @@ async function getUserLang(tgId: string): Promise<Lang> {
     return (req?.customerLang as Lang) || 'uz';
 }
 
-// ─── Bosh menyu klaviaturasi ──────────────────────────────────────────────────
-function mainKeyboard(lang: Lang) {
-    return {
-        keyboard: [
-            [{ text: getText('btn_catalog', lang) }, { text: getText('btn_recycle', lang) }],
-            [{ text: getText('btn_ai', lang) }, { text: getText('btn_contact', lang) }],
-            [{ text: getText('btn_my_requests', lang) }, { text: getText('btn_settings', lang) }],
-        ],
-        resize_keyboard: true,
-    };
+// ─── Foydalanuvchini Telegram ID bilan topish ────────────────────────────────
+async function getUserByTgId(tgId: string) {
+    return prisma.user.findFirst({ where: { telegramId: tgId } });
 }
+
+// ─── Yagona 5 raqamli kod generatsiya (User uchun) ──────────────────────────
+async function generateUniqueUserCode(): Promise<string> {
+    for (let attempt = 0; attempt < 30; attempt++) {
+        const code = String(Math.floor(10000 + Math.random() * 90000));
+        const exists = await prisma.user.findFirst({ where: { telegramCode: code } });
+        if (!exists) return code;
+    }
+    return String(Date.now()).slice(-5);
+}
+
+// ─── Telefon raqamini normallashtirish ──────────────────────────────────────
+function normalizePhone(phone: string): string {
+    let p = phone.replace(/[^\d+]/g, '');
+    if (!p.startsWith('+')) p = '+' + p;
+    return p;
+}
+
 
 // ─── Customer Bot init ────────────────────────────────────────────────────────
 let customerBotInstance: Telegraf | null = null;
@@ -93,44 +121,38 @@ export async function initCustomerBot(): Promise<Telegraf | null> {
     });
 
     // ══════════════════════════════════════════════════════════════════════
-    // /start — Tilni tanlash yoki bosh menyu
+    // /start — Shaxsiy kabinet yoki ro'yxatdan o'tish
     // ══════════════════════════════════════════════════════════════════════
     bot.start(async (ctx) => {
         const tgId = ctx.from.id.toString();
 
-        // Qaytgan foydalanuvchini tekshirish
-        const existingReq = await prisma.recycleRequest.findFirst({
-            where: { customerTgId: tgId },
-            orderBy: { createdAt: 'desc' },
-        });
-
-        if (existingReq) {
-            const lang = (existingReq.customerLang as Lang) || 'uz';
-            const name = existingReq.name || ctx.from.first_name;
+        // 1. Telegram ID bilan ro'yxatdan o'tgan foydalanuvchi
+        const user = await getUserByTgId(tgId);
+        if (user) {
+            const lang = (sessions.get(tgId)?.lang || 'uz') as Lang;
+            sessions.set(tgId, { step: 'menu', lang });
             await ctx.reply(
-                `🏭 <b>Pack24</b>\n\n` +
-                (lang === 'uz' ? `Salom, <b>${name}</b>! Xush kelibsiz qaytadan 👋` :
-                 lang === 'ru' ? `Привет, <b>${name}</b>! Добро пожаловать обратно 👋` :
-                 `Hello, <b>${name}</b>! Welcome back 👋`),
-                { parse_mode: 'HTML', reply_markup: mainKeyboard(lang) }
+                formatText('cabinet_menu', lang, {
+                    name: user.name,
+                    phone: user.phone,
+                    points: String(user.ecoPoints),
+                }),
+                { parse_mode: 'HTML', reply_markup: cabinetMenuKeyboard(lang) }
+            );
+            await ctx.reply(
+                lang === 'uz' ? '⬇️ Yoki quyidagi xizmatlardan foydalaning:' :
+                lang === 'ru' ? '⬇️ Или воспользуйтесь услугами:' :
+                '⬇️ Or use our services below:',
+                { reply_markup: customerMainKeyboard(lang) }
             );
             return;
         }
 
-        // Yangi foydalanuvchi — til tanlash
+        // 2. Yangi foydalanuvchi — til tanlash
         sessions.set(tgId, { step: 'lang', lang: 'uz' });
         await ctx.reply(
             getText('welcome', 'uz'),
-            {
-                parse_mode: 'HTML',
-                reply_markup: {
-                    inline_keyboard: [
-                        [btn('🇺🇿 O\'zbekcha', 'lang_uz')],
-                        [btn('🇷🇺 Русский', 'lang_ru')],
-                        [btn('🇬🇧 English', 'lang_en')],
-                    ],
-                },
-            }
+            { parse_mode: 'HTML', reply_markup: langSelectKeyboard() }
         );
     });
 
@@ -143,43 +165,112 @@ export async function initCustomerBot(): Promise<Telegraf | null> {
         const tgId = ctx.from.id.toString();
 
         try {
-            // ── TIL TANLASH ─────────────────────────────────────────────
+            // ── TIL TANLASH → Telefon so'rash ────────────────────────────
             if (data.startsWith('lang_')) {
                 const lang = data.replace('lang_', '') as Lang;
-                const ses = sessions.get(tgId) || { step: 'lang' as const, lang };
-                ses.lang = lang;
-                ses.step = 'name';
+                const ses: CustomerSession = { step: 'reg_phone', lang };
                 sessions.set(tgId, ses);
 
                 await ctx.answerCbQuery('✅');
-                await ctx.editMessageText(
-                    getText('register_name', lang),
-                    { parse_mode: 'HTML' }
-                );
+                await ctx.editMessageText(getText('reg_ask_phone', lang), { parse_mode: 'HTML' });
+                await ctx.reply('👇', { reply_markup: sharePhoneKeyboard(lang) });
                 return;
             }
 
-            // ── RO'YXATDAN O'TISH (xodim kodi) ─────────────────────────
-            if (data === 'register_code') {
-                registrationSessions.add(tgId);
-                const lang = (sessions.get(tgId)?.lang) || await getUserLang(tgId) || 'uz';
-                await ctx.answerCbQuery('🔑');
-                await ctx.editMessageText(
-                    lang === 'uz' ? '🔑 <b>Kod bilan ro\'yxatdan o\'tish</b>\n\nAdmin sizga bergan <b>5 raqamli kodni</b> kiriting:\n<i>Masalan: 48271</i>' :
-                    lang === 'ru' ? '🔑 <b>Вход по коду</b>\n\nВведите <b>5-значный код</b>, выданный администратором:\n<i>Например: 48271</i>' :
-                    '🔑 <b>Login with code</b>\n\nEnter the <b>5-digit code</b> given by admin:\n<i>Example: 48271</i>',
-                    {
-                        parse_mode: 'HTML',
-                        reply_markup: { inline_keyboard: [[btn('❌', 'register_cancel')]] },
+            // ── KABINET TUGMALARI ────────────────────────────────────────
+            if (data.startsWith('cab_')) {
+                const user = await getUserByTgId(tgId);
+                const lang = (sessions.get(tgId)?.lang || 'uz') as Lang;
+
+                if (!user) {
+                    await ctx.answerCbQuery('❌');
+                    return;
+                }
+
+                if (data === 'cab_show_code') {
+                    await ctx.answerCbQuery('🔑');
+                    await ctx.reply(
+                        lang === 'uz'
+                            ? `🔑 <b>Kirish kodingiz:</b> <code>${user.telegramCode || '—'}</code>\n\n📱 Telefon: <b>${user.phone}</b>\n\n🌐 <b>pack24.ai</b> saytida ushbu kod va telefon bilan kiring.`
+                            : lang === 'ru'
+                            ? `🔑 <b>Ваш код входа:</b> <code>${user.telegramCode || '—'}</code>\n\n📱 Телефон: <b>${user.phone}</b>\n\n🌐 Войдите на <b>pack24.ai</b> с этим кодом и телефоном.`
+                            : `🔑 <b>Your login code:</b> <code>${user.telegramCode || '—'}</code>\n\n📱 Phone: <b>${user.phone}</b>\n\n🌐 Use this code at <b>pack24.ai</b> to login.`,
+                        { parse_mode: 'HTML' }
+                    );
+                    return;
+                }
+
+                if (data === 'cab_recycling') {
+                    await ctx.answerCbQuery('♻️');
+                    const reqs = await prisma.recycleRequest.findMany({
+                        where: { customerTgId: tgId },
+                        orderBy: { createdAt: 'desc' },
+                        take: 5,
+                        include: { point: true },
+                    });
+                    if (reqs.length === 0) {
+                        await ctx.reply(lang === 'uz' ? '♻️ Hali makulatura topshirmadingiz.' : '♻️ Нет истории сдачи макулатуры.');
+                        return;
                     }
-                );
+                    const stMap: Record<string, string> = { new: '🔵', dispatched: '📋', assigned: '🚚', en_route: '🚚', arrived: '📍', collecting: '⚖️', completed: '✅', cancelled: '❌' };
+                    const list = reqs.map(r => `${stMap[r.status] || '⚪'} <b>#${r.id}</b> — ${r.point?.regionUz || '—'} — ${new Date(r.createdAt).toLocaleDateString('ru-RU')}`).join('\n');
+                    await ctx.reply(`♻️ <b>${lang === 'uz' ? 'Makulatura tarixi' : 'История макулатуры'}:</b>\n\n${list}`, { parse_mode: 'HTML' });
+                    return;
+                }
+
+                if (data === 'cab_orders') {
+                    await ctx.answerCbQuery('📦');
+                    const orders = await prisma.order.findMany({
+                        where: { userId: user.id },
+                        orderBy: { createdAt: 'desc' },
+                        take: 5,
+                    });
+                    if (orders.length === 0) {
+                        await ctx.reply(lang === 'uz' ? '📦 Hali buyurtma bermagansiz.' : '📦 Нет заказов.');
+                        return;
+                    }
+                    const list = orders.map(o => `📦 <b>#${o.id}</b> — ${o.status} — ${o.totalAmount.toLocaleString('ru-RU')} so'm — ${new Date(o.createdAt).toLocaleDateString('ru-RU')}`).join('\n');
+                    await ctx.reply(`📦 <b>${lang === 'uz' ? 'Buyurtmalaringiz' : 'Ваши заказы'}:</b>\n\n${list}`, { parse_mode: 'HTML' });
+                    return;
+                }
+
+                if (data === 'cab_referral') {
+                    await ctx.answerCbQuery('👥');
+                    const refCount = await prisma.user.count({ where: { referredById: user.id } });
+                    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pack24.ai';
+                    await ctx.reply(
+                        lang === 'uz'
+                            ? `👥 <b>Referral dastur</b>\n\nSizning kod: <code>${user.referralCode || '—'}</code>\nTaklif qilganlar: <b>${refCount} kishi</b>\n\n🔗 Havola: ${appUrl}/referral?ref=${user.referralCode || ''}`
+                            : `👥 <b>Реферальная программа</b>\n\nВаш код: <code>${user.referralCode || '—'}</code>\nПриглашено: <b>${refCount} чел.</b>\n\n🔗 Ссылка: ${appUrl}/referral?ref=${user.referralCode || ''}`,
+                        { parse_mode: 'HTML', link_preview_options: { is_disabled: true } }
+                    );
+                    return;
+                }
+
+                if (data === 'cab_settings') {
+                    await ctx.answerCbQuery('⚙️');
+                    await ctx.reply(
+                        lang === 'uz'
+                            ? `⚙️ <b>Sozlamalar</b>\n\n👤 Ism: <b>${user.name}</b>\n📱 Telefon: <b>${user.phone}</b>\n🌐 Til: O\'zbek\n\n✏️ O\'zgartirish uchun <b>pack24.ai</b> saytiga kiring.`
+                            : `⚙️ <b>Настройки</b>\n\n👤 Имя: <b>${user.name}</b>\n📱 Телефон: <b>${user.phone}</b>\n\n✏️ Для изменений войдите на <b>pack24.ai</b>`,
+                        { parse_mode: 'HTML' }
+                    );
+                    return;
+                }
+
+                await ctx.answerCbQuery();
                 return;
             }
 
-            if (data === 'register_cancel') {
+            // ── BEKOR QILISH ─────────────────────────────────────────────
+            if (data === 'reg_cancel' || data === 'register_cancel') {
                 registrationSessions.delete(tgId);
+                sessions.delete(tgId);
                 await ctx.answerCbQuery('❌');
-                await ctx.editMessageText('❌ /start');
+                const lang = (sessions.get(tgId)?.lang || 'uz') as Lang;
+                await ctx.editMessageText(
+                    lang === 'ru' ? '❌ Отменено. Нажмите /start чтобы начать заново.' : '❌ Bekor qilindi. Qayta boshlash uchun /start bosing.'
+                );
                 return;
             }
 
@@ -276,17 +367,7 @@ export async function initCustomerBot(): Promise<Telegraf | null> {
                 const lang = ses.lang;
                 await ctx.editMessageText(
                     getText('truck_volume', lang),
-                    {
-                        parse_mode: 'HTML',
-                        reply_markup: {
-                            inline_keyboard: [
-                                [btn(getText('vol_small', lang), 'vol_small')],
-                                [btn(getText('vol_medium', lang), 'vol_medium')],
-                                [btn(getText('vol_large', lang), 'vol_large')],
-                                [btn(getText('cancel', lang), 'recycle_cancel')],
-                            ],
-                        },
-                    }
+                    { parse_mode: 'HTML', reply_markup: volumeKeyboard(lang) }
                 );
                 return;
             }
@@ -302,15 +383,7 @@ export async function initCustomerBot(): Promise<Telegraf | null> {
                 await ctx.answerCbQuery('✅');
                 await ctx.editMessageText(
                     getText('truck_photo', lang),
-                    {
-                        parse_mode: 'HTML',
-                        reply_markup: {
-                            inline_keyboard: [
-                                [btn(getText('btn_skip_photo', lang), 'skip_photo')],
-                                [btn(getText('cancel', lang), 'recycle_cancel')],
-                            ],
-                        },
-                    }
+                    { parse_mode: 'HTML', reply_markup: photoOrSkipKeyboard(lang) }
                 );
                 return;
             }
@@ -334,6 +407,120 @@ export async function initCustomerBot(): Promise<Telegraf | null> {
                 return;
             }
 
+            // ── MIJOZ: HISOB-KITOBNI TASDIQLASH ────────────────────────
+            if (data.startsWith('cust_confirm_')) {
+                const collId = parseInt(data.replace('cust_confirm_', ''));
+                const collection = await prisma.recycleCollection.findUnique({
+                    where: { id: collId },
+                    include: { request: true, driver: true },
+                });
+                if (!collection) {
+                    await ctx.answerCbQuery('❌ Topilmadi');
+                    return;
+                }
+
+                const lang = (collection.request.customerLang as Lang) || 'uz';
+
+                await prisma.recycleCollection.update({
+                    where: { id: collId },
+                    data: { customerConfirmed: true },
+                });
+
+                await prisma.recycleRequest.update({
+                    where: { id: collection.requestId },
+                    data: { status: 'confirmed', confirmedAt: new Date() },
+                });
+
+                await ctx.answerCbQuery('✅');
+                await ctx.editMessageText(
+                    lang === 'uz'
+                        ? `✅ <b>Tasdiqlandi!</b>\n\n⚖️ Og'irlik: <b>${collection.actualWeight} kg</b>\n💰 Jami: <b>${collection.totalAmount.toLocaleString('ru-RU')} so'm</b>\n\nTo'lov masul tomonidan amalga oshiriladi. ♻️`
+                        : lang === 'ru'
+                        ? `✅ <b>Подтверждено!</b>\n\n⚖️ Вес: <b>${collection.actualWeight} кг</b>\n💰 Итого: <b>${collection.totalAmount.toLocaleString('ru-RU')} сум</b>\n\nОплата будет произведена ответственным. ♻️`
+                        : `✅ <b>Confirmed!</b>\n\n⚖️ Weight: <b>${collection.actualWeight} kg</b>\n💰 Total: <b>${collection.totalAmount.toLocaleString('ru-RU')} UZS</b>\n\nPayment will be made by the supervisor. ♻️`,
+                    { parse_mode: 'HTML' }
+                );
+
+                // Masulga xabar yuborish (customerTgId bo'yicha supervisor topish)
+                if (collection.request.supervisorId) {
+                    const sup = await prisma.supervisor.findUnique({
+                        where: { id: collection.request.supervisorId },
+                    });
+                    if (sup?.telegramId) {
+                        await notifyAdmin(
+                            sup.telegramId,
+                            `✅ <b>Mijoz tasdiqladi — Ariza #${collection.requestId}</b>\n\n` +
+                            `👤 ${collection.request.name}\n` +
+                            `⚖️ ${collection.actualWeight} kg → ${collection.effectiveWeight} kg\n` +
+                            `💰 ${collection.totalAmount.toLocaleString('ru-RU')} so'm\n\n` +
+                            `To'lovni tasdiqlang 👇`,
+                            {
+                                reply_markup: {
+                                    inline_keyboard: [
+                                        [{ text: '✅ To\'lovni tasdiqlash', callback_data: `approve_payment_${collId}` }],
+                                    ],
+                                },
+                            }
+                        );
+                    }
+                }
+                return;
+            }
+
+            // ── MIJOZ: HISOB-KITOBNI INKOR QILISH ──────────────────────
+            if (data.startsWith('cust_reject_')) {
+                const collId = parseInt(data.replace('cust_reject_', ''));
+                const collection = await prisma.recycleCollection.findUnique({
+                    where: { id: collId },
+                    include: { request: true, driver: true },
+                });
+                if (!collection) {
+                    await ctx.answerCbQuery('❌ Topilmadi');
+                    return;
+                }
+
+                const lang = (collection.request.customerLang as Lang) || 'uz';
+
+                await prisma.recycleCollection.update({
+                    where: { id: collId },
+                    data: { customerConfirmed: false },
+                });
+
+                await prisma.recycleRequest.update({
+                    where: { id: collection.requestId },
+                    data: { status: 'disputed' },
+                });
+
+                await ctx.answerCbQuery('❌');
+                await ctx.editMessageText(
+                    lang === 'uz'
+                        ? `❌ <b>Inkor qildingiz.</b>\n\nMasul bilan bog'lanib muammoni hal qiladi. Tez orada siz bilan aloqaga chiqiladi.`
+                        : lang === 'ru'
+                        ? `❌ <b>Вы отклонили.</b>\n\nОтветственный свяжется с вами для решения вопроса.`
+                        : `❌ <b>Rejected.</b>\n\nThe supervisor will contact you to resolve the issue.`,
+                    { parse_mode: 'HTML' }
+                );
+
+                // Masulga xabar
+                if (collection.request.supervisorId) {
+                    const sup = await prisma.supervisor.findUnique({
+                        where: { id: collection.request.supervisorId },
+                    });
+                    if (sup?.telegramId) {
+                        await notifyAdmin(
+                            sup.telegramId,
+                            `⚠️ <b>Mijoz inkor qildi — Ariza #${collection.requestId}</b>\n\n` +
+                            `👤 ${collection.request.name} (${collection.request.phone})\n` +
+                            `🚚 Haydovchi: ${collection.driver?.name || '—'}\n` +
+                            `⚖️ ${collection.actualWeight} kg → ${collection.effectiveWeight} kg\n` +
+                            `💰 ${collection.totalAmount.toLocaleString('ru-RU')} so'm\n\n` +
+                            `Mijoz bilan bog'laning va muammoni hal qiling.`
+                        );
+                    }
+                }
+                return;
+            }
+
         } catch (err) {
             console.error('[CustomerBot] Callback error:', err);
             await ctx.answerCbQuery('❌ Xatolik').catch(() => {});
@@ -343,28 +530,114 @@ export async function initCustomerBot(): Promise<Telegraf | null> {
     // ══════════════════════════════════════════════════════════════════════
     // CONTACT HANDLER
     // ══════════════════════════════════════════════════════════════════════
+    // CONTACT HANDLER — Telefon raqami
+    // ══════════════════════════════════════════════════════════════════════
     bot.on('contact', async (ctx) => {
         const tgId = ctx.from.id.toString();
-        const ses = sessions.get(tgId);
-        if (ses?.step === 'phone') {
-            ses.phone = ctx.message.contact.phone_number;
-            ses.step = 'menu';
+        let ses = sessions.get(tgId);
+
+        // Session yo'q yoki noto'g'ri step — session tiklash
+        if (!ses || !['reg_phone', 'menu'].includes(ses.step)) {
+            // Ro'yxatdan o'tgan foydalanuvchi tekshirish
+            const existingUser = await getUserByTgId(tgId);
+            if (existingUser) {
+                const lang: Lang = 'uz';
+                sessions.set(tgId, { step: 'menu', lang });
+                await ctx.reply(
+                    formatText('cabinet_menu', lang, {
+                        name: existingUser.name,
+                        phone: existingUser.phone,
+                        points: String(existingUser.ecoPoints),
+                    }),
+                    { parse_mode: 'HTML', reply_markup: customerMainKeyboard(lang) }
+                );
+                return;
+            }
+            // Yangi foydalanuvchi — reg_phone stepiga o'tkazish
+            const lang: Lang = 'uz';
+            ses = { step: 'reg_phone', lang };
+            sessions.set(tgId, ses);
+        }
+
+        // ── Ro'yxatdan o'tish: telefon qabul qilish ──────────────────────
+        if (ses?.step === 'reg_phone') {
+            let phone = normalizePhone(ctx.message.contact.phone_number);
+            const lang = ses.lang;
+
+            // Faqat o'z raqami bo'lishi kerak
+            if (
+                ctx.message.contact.user_id &&
+                ctx.message.contact.user_id !== ctx.from.id
+            ) {
+                await ctx.reply(
+                    lang === 'ru' ? '❌ Пожалуйста, отправьте только свой номер телефона.' : '❌ Iltimos, faqat o\'z raqamingizni yuboring.',
+                    { reply_markup: sharePhoneKeyboard(lang) }
+                );
+                return;
+            }
+
+            // Telefon allaqachon ro'yxatdan o'tganmi?
+            const existing = await prisma.user.findFirst({ where: { phone } });
+            if (existing) {
+                if (existing.telegramId && existing.telegramId !== tgId) {
+                    await ctx.reply(getText('reg_phone_taken', lang), {
+                        parse_mode: 'HTML',
+                        reply_markup: { remove_keyboard: true },
+                    });
+                    sessions.delete(tgId);
+                    return;
+                }
+                // Xuddi shu odam qayta ulanmoqda — telegramId yangilash
+                if (!existing.telegramId) {
+                    await prisma.user.update({ where: { id: existing.id }, data: { telegramId: tgId } });
+                }
+                ses.step = 'menu';
+                sessions.set(tgId, { ...ses, phone });
+                await ctx.reply(
+                    formatText('reg_already_exists', lang, {
+                        name: existing.name,
+                        phone,
+                        code: existing.telegramCode || '—',
+                    }),
+                    { parse_mode: 'HTML', reply_markup: customerMainKeyboard(lang) }
+                );
+                return;
+            }
+
+            // ── OTP generatsiya va Telegram orqali yuborish ──────────────
+            const otp = generateOtp();
+            const expiry = Date.now() + 5 * 60 * 1000; // 5 daqiqa
+
+            ses.phone = phone;
+            ses.step = 'reg_otp';
+            ses.otpCode = otp;
+            ses.otpExpiry = expiry;
+            ses.otpAttempts = 0;
+            sessions.set(tgId, ses);
+
+            // Klaviaturani olib tashlash
             await ctx.reply(
-                getText('register_success', ses.lang),
-                { parse_mode: 'HTML', reply_markup: mainKeyboard(ses.lang) }
+                lang === 'ru' ? '⏳ Отправляю код подтверждения...' : '⏳ Tasdiqlash kodi yuborilmoqda...',
+                { reply_markup: { remove_keyboard: true } }
             );
 
-            // Inline tugma — xodim uchun
+            // OTP xabar
             await ctx.reply(
-                getText('register_code_btn', ses.lang),
+                `🔐 <b>${lang === 'ru' ? 'Код подтверждения' : lang === 'en' ? 'Verification Code' : 'Tasdiqlash kodi'}</b>\n\n` +
+                `${lang === 'ru' ? 'Ваш код:' : lang === 'en' ? 'Your code:' : 'Sizning kodingiz:'}\n\n` +
+                `<code>${otp}</code>\n\n` +
+                `${lang === 'ru' ? '⏱ Действует 5 минут' : lang === 'en' ? '⏱ Valid for 5 minutes' : '⏱ 5 daqiqa amal qiladi'}\n\n` +
+                `${lang === 'ru' ? '✏️ Введите этот код:' : lang === 'en' ? '✏️ Enter this code:' : '✏️ Ushbu kodni kiriting:'}`,
                 {
                     parse_mode: 'HTML',
                     reply_markup: {
-                        inline_keyboard: [[btn(getText('register_code_btn', ses.lang), 'register_code')]],
+                        inline_keyboard: [[
+                            { text: lang === 'ru' ? '❌ Отмена' : '❌ Bekor qilish', callback_data: 'reg_cancel' },
+                        ]],
                     },
                 }
             );
-            sessions.delete(tgId);
+            return;
         }
     });
 
@@ -383,16 +656,7 @@ export async function initCustomerBot(): Promise<Telegraf | null> {
 
         await ctx.reply(
             getText('recycle_choose', lang),
-            {
-                parse_mode: 'HTML',
-                reply_markup: {
-                    inline_keyboard: [
-                        [btn(getText('btn_self_delivery', lang), 'recycle_self')],
-                        [btn(getText('btn_call_truck', lang), 'recycle_truck')],
-                        [btn(getText('cancel', lang), 'recycle_cancel')],
-                    ],
-                },
-            }
+            { parse_mode: 'HTML', reply_markup: recycleMethodKeyboard(lang) }
         );
     });
 
@@ -420,52 +684,130 @@ export async function initCustomerBot(): Promise<Telegraf | null> {
 
         if (text.startsWith('/')) return;
 
-        // ── Xodim kodi ──────────────────────────────────────────────
-        if (registrationSessions.has(tgId)) {
-            await handleRegistrationCode(ctx, tgId, text.trim());
-            return;
-        }
-
-        // ── Session: ism kiritish ───────────────────────────────────
+        // ── Ro'yxatdan o'tish: OTP kodi tekshirish ───────────────────
         const ses = sessions.get(tgId);
-        if (ses?.step === 'name') {
-            ses.name = text.trim();
-            ses.step = 'phone';
-            const lang = ses.lang;
-            await ctx.reply(
-                getText('register_phone', lang),
-                {
-                    parse_mode: 'HTML',
-                    reply_markup: {
-                        keyboard: [
-                            [{ text: getText('share_contact', lang), request_contact: true }],
-                            [{ text: getText('cancel', lang) }],
-                        ],
-                        resize_keyboard: true,
-                        one_time_keyboard: true,
-                    },
-                }
-            );
-            return;
-        }
 
-        if (ses?.step === 'phone') {
-            const phone = text.replace(/[^0-9+]/g, '');
-            if (phone.length < 9) {
-                await ctx.reply('❌ Min 9 ta raqam!');
+        if (ses?.step === 'reg_otp') {
+            const lang = ses.lang;
+            const input = text.trim();
+
+            // Faqat 6 raqam
+            if (!/^\d{6}$/.test(input)) {
+                await ctx.reply(
+                    lang === 'ru' ? '❌ Код должен состоять из 6 цифр. Попробуйте ещё раз:' : '❌ Kod 6 raqamdan iborat bo\'lishi kerak. Qayta kiriting:'
+                );
                 return;
             }
-            ses.phone = phone;
-            ses.step = 'menu';
-            await ctx.reply(getText('register_success', ses.lang), {
-                parse_mode: 'HTML',
-                reply_markup: mainKeyboard(ses.lang),
-            });
+
+            // Muddati tugaganmi?
+            if (!ses.otpCode || !ses.otpExpiry || Date.now() > ses.otpExpiry) {
+                sessions.delete(tgId);
+                await ctx.reply(
+                    lang === 'ru'
+                        ? '❌ Код истёк. Нажмите /start и попробуйте снова.'
+                        : '❌ Kod muddati tugadi. /start ni bosib qayta urinib ko\'ring.',
+                    { reply_markup: { remove_keyboard: true } }
+                );
+                return;
+            }
+
+            // Urinishlar chegarasi
+            const attempts = (ses.otpAttempts || 0) + 1;
+            if (input !== ses.otpCode) {
+                if (attempts >= 5) {
+                    sessions.delete(tgId);
+                    await ctx.reply(
+                        lang === 'ru'
+                            ? '❌ Слишком много попыток. Нажмите /start и начните заново.'
+                            : '❌ Juda ko\'p noto\'g\'ri urinish. /start ni bosib qayta boshlang.',
+                        { reply_markup: { remove_keyboard: true } }
+                    );
+                    return;
+                }
+                ses.otpAttempts = attempts;
+                sessions.set(tgId, ses);
+                await ctx.reply(
+                    lang === 'ru'
+                        ? `❌ Неверный код. Осталось попыток: ${5 - attempts}`
+                        : `❌ Noto'g'ri kod. Qolgan urinish: ${5 - attempts}`
+                );
+                return;
+            }
+
+            // ✅ OTP to'g'ri — ism so'rash
+            ses.step = 'reg_name';
+            ses.otpCode = undefined;
+            ses.otpExpiry = undefined;
+            ses.otpAttempts = 0;
+            sessions.set(tgId, ses);
+
             await ctx.reply(
-                ses.lang === 'uz' ? '👇 Xodim bo\'lsangiz:' : ses.lang === 'ru' ? '👇 Если вы сотрудник:' : '👇 If you are staff:',
-                { reply_markup: { inline_keyboard: [[btn(getText('register_code_btn', ses.lang), 'register_code')]] } }
+                `✅ <b>${lang === 'ru' ? 'Телефон подтверждён!' : lang === 'en' ? 'Phone verified!' : 'Telefon tasdiqlandi!'}</b>\n\n` +
+                getText('reg_ask_name', lang),
+                { parse_mode: 'HTML' }
             );
-            sessions.delete(tgId);
+            return;
+        }
+
+        // ── Ro'yxatdan o'tish: F.I.Sh. kiritish ─────────────────────
+        if (ses?.step === 'reg_name') {
+            const name = text.trim();
+            const lang = ses.lang;
+
+            if (name.length < 3) {
+                await ctx.reply(getText('reg_name_too_short', lang), { parse_mode: 'HTML' });
+                return;
+            }
+
+            if (!ses.phone) {
+                // Ism bosqichida telefon yo'q — qayta so'rash
+                ses.step = 'reg_phone';
+                sessions.set(tgId, ses);
+                await ctx.reply(getText('reg_ask_phone', lang), {
+                    parse_mode: 'HTML',
+                    reply_markup: sharePhoneKeyboard(lang),
+                });
+                return;
+            }
+
+            // ── Hisob yaratish ────────────────────────────────────────
+            try {
+                const code = await generateUniqueUserCode();
+                const passwordHash = await bcrypt.hash(code, 10);
+                const referralCode = `P${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+                await prisma.user.create({
+                    data: {
+                        name,
+                        phone: ses.phone,
+                        passwordHash,
+                        telegramId: tgId,
+                        telegramCode: code,
+                        telegramVerifiedAt: new Date(),
+                        referralCode,
+                        role: 'user',
+                    },
+                });
+
+                ses.step = 'menu';
+                sessions.set(tgId, { ...ses, name });
+
+                // Kod yuborish
+                await ctx.reply(
+                    formatText('reg_code_sent', lang, { name, code, phone: ses.phone }),
+                    { parse_mode: 'HTML', reply_markup: customerMainKeyboard(lang) }
+                );
+
+                console.log(`[CustomerBot] ✅ Yangi foydalanuvchi: ${name} | ${ses.phone} | Kod: ${code}`);
+            } catch (err: any) {
+                if (err?.code === 'P2002') {
+                    // Unique constraint — telefon allaqachon bor
+                    await ctx.reply(getText('reg_phone_taken', lang), { parse_mode: 'HTML' });
+                } else {
+                    console.error('[CustomerBot] Hisob yaratish xatosi:', err);
+                    await ctx.reply(lang === 'uz' ? '❌ Xatolik yuz berdi. Qayta urinib ko\'ring.' : '❌ Ошибка. Попробуйте ещё раз.');
+                }
+            }
             return;
         }
 
@@ -477,18 +819,7 @@ export async function initCustomerBot(): Promise<Telegraf | null> {
             sessions.set(tgId, { step: 'location', lang });
             await ctx.reply(
                 getText('recycle_start', lang),
-                {
-                    parse_mode: 'HTML',
-                    reply_markup: {
-                        keyboard: [
-                            [{ text: getText('location_gps', lang), request_location: true }],
-                            [{ text: getText('location_text', lang) }],
-                            [{ text: getText('cancel', lang) }],
-                        ],
-                        resize_keyboard: true,
-                        one_time_keyboard: true,
-                    },
-                }
+                { parse_mode: 'HTML', reply_markup: shareLocationKeyboard(lang) }
             );
             return;
         }
@@ -512,13 +843,15 @@ export async function initCustomerBot(): Promise<Telegraf | null> {
 
         // 📞 Bog'lanish
         if (text === getText('btn_contact', lang) || text === getText('btn_contact', 'uz') || text === getText('btn_contact', 'ru') || text === getText('btn_contact', 'en')) {
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pack24.ai';
+            const domain = appUrl.replace('https://', '').replace('http://', '');
             await ctx.reply(
                 lang === 'uz'
-                    ? '📞 <b>Bog\'lanish</b>\n\n☎️ Telefon: +998 XX XXX XX XX\n💬 Telegram: @pack24uz\n🌐 Sayt: pack24.uz'
+                    ? `📞 <b>Bog'lanish</b>\n\n☎️ Telefon: <a href="tel:+998880557888">+998 88 055-78-88</a>\n☎️ Telefon: <a href="tel:+998951050052">+998 95 105-00-52</a>\n✉️ Email: sales@pack24.uz\n💬 Telegram: @pack24uz\n🌐 Sayt: ${domain}`
                     : lang === 'ru'
-                    ? '📞 <b>Контакты</b>\n\n☎️ Телефон: +998 XX XXX XX XX\n💬 Telegram: @pack24uz\n🌐 Сайт: pack24.uz'
-                    : '📞 <b>Contact Us</b>\n\n☎️ Phone: +998 XX XXX XX XX\n💬 Telegram: @pack24uz\n🌐 Website: pack24.uz',
-                { parse_mode: 'HTML' }
+                    ? `📞 <b>Контакты</b>\n\n☎️ Телефон: <a href="tel:+998880557888">+998 88 055-78-88</a>\n☎️ Телефон: <a href="tel:+998951050052">+998 95 105-00-52</a>\n✉️ Email: sales@pack24.uz\n💬 Telegram: @pack24uz\n🌐 Сайт: ${domain}`
+                    : `📞 <b>Contact Us</b>\n\n☎️ Phone: <a href="tel:+998880557888">+998 88 055-78-88</a>\n☎️ Phone: <a href="tel:+998951050052">+998 95 105-00-52</a>\n✉️ Email: sales@pack24.uz\n💬 Telegram: @pack24uz\n🌐 Website: ${domain}`,
+                { parse_mode: 'HTML', link_preview_options: { is_disabled: true } }
             );
             return;
         }
@@ -628,6 +961,9 @@ export async function initCustomerBot(): Promise<Telegraf | null> {
             return;
         }
 
+        // Eng yaqin punktning birinchi aktiv masulini topish
+        const supervisorForPoint = nearestPoint.supervisors[0] ?? null;
+
         // Arizani bazaga yozish
         const request = await prisma.recycleRequest.create({
             data: {
@@ -642,13 +978,15 @@ export async function initCustomerBot(): Promise<Telegraf | null> {
                 volumeSize: ses.volumeSize || null,
                 photoUrl: photoUrl || null,
                 status: 'new',
+                supervisorId: supervisorForPoint?.id ?? null,
+                dispatchedAt: supervisorForPoint ? new Date() : null,
             },
         });
 
         await ctx.reply(getText('truck_request_sent', lang), { parse_mode: 'HTML' });
 
         // Masulga xabar
-        const sup = nearestPoint.supervisors[0];
+        const sup = supervisorForPoint;
         if (sup?.telegramId) {
             const volLabel = ses.volumeSize === 'small' ? '📦 Kichik' : ses.volumeSize === 'medium' ? '📦📦 O\'rta' : '📦📦📦 Katta';
             const adminMsg =

@@ -2,10 +2,18 @@ import { Telegraf, Context } from 'telegraf';
 import { prisma } from '@/lib/prisma';
 import { Lang, getText, formatText } from './i18n';
 import { notifyCustomer, notifyAdmin } from './notifier';
+import {
+    btn,
+    driverMainKeyboard,
+    driverSharePhoneKeyboard,
+    taskActionKeyboard,
+    calcConfirmKeyboard,
+    customerConfirmKeyboard,
+} from './keyboards';
 
 // ─── Session types ────────────────────────────────────────────────────────────
 interface DriverSession {
-    step: 'code' | 'menu' | 'weight' | 'discount';
+    step: 'phone' | 'menu' | 'weight' | 'discount';
     lang: Lang;
     driverId?: number;
     activeRequestId?: number;
@@ -16,9 +24,16 @@ interface DriverSession {
 const sessions = new Map<string, DriverSession>();
 const fmtN = (n: number) => n.toLocaleString('ru-RU');
 
-// ─── Inline button helper ─────────────────────────────────────────────────────
-function btn(text: string, data: string) {
-    return { text, callback_data: data };
+// ─── Yagona 5 raqamli kod generatsiya ────────────────────────────────────────
+async function generateUniqueDriverCode(): Promise<string> {
+    for (let attempt = 0; attempt < 20; attempt++) {
+        const code = String(Math.floor(10000 + Math.random() * 90000));
+        const exists = await prisma.driver.findFirst({ where: { registrationCode: code } })
+            || await prisma.supervisor.findFirst({ where: { registrationCode: code } });
+        if (!exists) return code;
+    }
+    // Fallback: timestamp bazali
+    return String(Date.now()).slice(-5);
 }
 
 // ─── Haydovchini bazadan olish ────────────────────────────────────────────────
@@ -26,17 +41,6 @@ async function getDriver(tgId: string) {
     return prisma.driver.findFirst({ where: { telegramId: tgId } });
 }
 
-// ─── Haydovchi bosh menyu ─────────────────────────────────────────────────────
-function driverKeyboard(lang: Lang, isOnline: boolean) {
-    return {
-        keyboard: [
-            [{ text: getText('drv_btn_tasks', lang) }],
-            [{ text: isOnline ? getText('drv_btn_offline', lang) : getText('drv_btn_online', lang) }],
-            [{ text: getText('drv_btn_report', lang) }, { text: getText('drv_btn_profile', lang) }],
-        ],
-        resize_keyboard: true,
-    };
-}
 
 // ─── Driver Bot init ──────────────────────────────────────────────────────────
 let driverBotInstance: Telegraf | null = null;
@@ -66,25 +70,27 @@ export async function initDriverBot(): Promise<Telegraf | null> {
     });
 
     // ══════════════════════════════════════════════════════════════════════
-    // /start — Kod bilan kirish yoki bosh menyu
+    // /start — Telefon orqali ro'yxatdan o'tish yoki bosh menyu
     // ══════════════════════════════════════════════════════════════════════
     bot.start(async (ctx) => {
         const tgId = ctx.from.id.toString();
         const driver = await getDriver(tgId);
 
         if (driver) {
-            // Qaytgan haydovchi
             const lang: Lang = 'uz';
             await ctx.reply(
                 formatText('drv_registered', lang, { name: driver.name }),
-                { parse_mode: 'HTML', reply_markup: driverKeyboard(lang, driver.isOnline) }
+                { parse_mode: 'HTML', reply_markup: driverMainKeyboard(driver.isOnline, lang) }
             );
             return;
         }
 
-        // Yangi foydalanuvchi — kod so'rash
-        sessions.set(tgId, { step: 'code', lang: 'uz' });
-        await ctx.reply(getText('drv_welcome', 'uz'), { parse_mode: 'HTML' });
+        // Yangi foydalanuvchi — telefon so'rash
+        sessions.set(tgId, { step: 'phone', lang: 'uz' });
+        await ctx.reply(getText('drv_welcome', 'uz'), {
+            parse_mode: 'HTML',
+            reply_markup: driverSharePhoneKeyboard(),
+        });
     });
 
     // ══════════════════════════════════════════════════════════════════════
@@ -335,16 +341,7 @@ export async function initDriverBot(): Promise<Telegraf | null> {
                             discount: String(discount),
                             total: fmtN(Math.round(totalAmount)),
                         }),
-                        {
-                            reply_markup: {
-                                inline_keyboard: [
-                                    [
-                                        btn('✅ Tasdiqlayman', `cust_confirm_${collection.id}`),
-                                        btn('❌ Inkor qilaman', `cust_reject_${collection.id}`),
-                                    ],
-                                ],
-                            },
-                        }
+                        { reply_markup: customerConfirmKeyboard(collection.id, lang as Lang) }
                     );
                 }
 
@@ -367,6 +364,112 @@ export async function initDriverBot(): Promise<Telegraf | null> {
     });
 
     // ══════════════════════════════════════════════════════════════════════
+    // CONTACT HANDLER — Telefon raqami ulashilganda
+    // ══════════════════════════════════════════════════════════════════════
+    bot.on('contact', async (ctx) => {
+        const tgId = ctx.from.id.toString();
+
+        // Faqat o'z kontaktini qabul qilish
+        if (ctx.message.contact.user_id && ctx.message.contact.user_id !== ctx.from.id) {
+            await ctx.reply('❌ Iltimos, faqat o\'z telefon raqamingizni ulashing.', {
+                reply_markup: driverSharePhoneKeyboard(),
+            });
+            return;
+        }
+
+        let phone = ctx.message.contact.phone_number.replace(/[^0-9+]/g, '');
+        if (!phone.startsWith('+')) phone = '+' + phone;
+
+        try {
+            // Haydovchini telefon raqami bilan topish
+            const driver = await prisma.driver.findFirst({
+                where: {
+                    OR: [
+                        { phone },
+                        { phone: phone.replace('+', '') },
+                        { phone: phone.replace('+998', '0') },
+                        { phone: phone.slice(-9) },
+                    ],
+                },
+                include: { point: true, supervisor: true },
+            });
+
+            if (!driver) {
+                await ctx.reply(
+                    `❌ <b>Raqamingiz tizimda topilmadi!</b>\n\n` +
+                    `📱 Telefon: <code>${phone}</code>\n\n` +
+                    `Bu bot faqat <b>ro'yxatdan o'tgan haydovchilar</b> uchun.\n\n` +
+                    `📋 Haydovchi bo'lish uchun:\n` +
+                    `1️⃣ Masul xodim sizni tizimga qo'shishi kerak\n` +
+                    `2️⃣ Keyin qaytib kelib /start bosing\n\n` +
+                    `📞 Bog'lanish: <a href="tel:+998880557888">+998 88 055-78-88</a>`,
+                    { parse_mode: 'HTML', reply_markup: { remove_keyboard: true } }
+                );
+                sessions.delete(tgId);
+                return;
+            }
+
+            // Boshqa akkauntga ulanganmi?
+            if (driver.telegramId && driver.telegramId !== tgId) {
+                await ctx.reply(getText('drv_already_registered', 'uz'), {
+                    parse_mode: 'HTML',
+                    reply_markup: { remove_keyboard: true },
+                });
+                return;
+            }
+
+            // Yangi 5-raqamli kod generatsiya
+            const code = await generateUniqueDriverCode();
+
+            // Bazaga saqlash
+            await prisma.driver.update({
+                where: { id: driver.id },
+                data: {
+                    telegramId: tgId,
+                    telegramName: ctx.from.username || ctx.from.first_name || null,
+                    registeredAt: new Date(),
+                    registrationCode: code,
+                    isOnline: true,
+                    lastSeenAt: new Date(),
+                    status: 'active',
+                },
+            });
+
+            sessions.delete(tgId);
+
+            // Foydalanuvchiga kod yuborish
+            await ctx.reply(
+                formatText('drv_code_sent', 'uz', { name: driver.name, code }),
+                {
+                    parse_mode: 'HTML',
+                    reply_markup: driverMainKeyboard(true, 'uz'),
+                }
+            );
+
+            // Masulga xabar yuborish (agar bog'langan bo'lsa)
+            if (driver.supervisor?.telegramId) {
+                await notifyAdmin(
+                    driver.supervisor.telegramId,
+                    `🆕 <b>Haydovchi ro'yxatdan o'tdi!</b>\n\n` +
+                    `👤 ${driver.name}\n` +
+                    `📞 ${driver.phone}\n` +
+                    `🏭 Punkt: ${driver.point?.regionUz || '—'}\n` +
+                    `🔑 Verifikatsion kod: <code>${code}</code>\n` +
+                    `🕐 ${new Date().toLocaleString('ru-RU')}`
+                );
+            }
+
+            console.log(`[DriverBot] ✅ Haydovchi ro'yxatdan o'tdi: ${driver.name} | Kod: ${code}`);
+
+        } catch (err) {
+            console.error('[DriverBot] Contact handler xatolik:', err);
+            await ctx.reply('❌ Xatolik yuz berdi. Qayta urinib ko\'ring.', {
+                reply_markup: { remove_keyboard: true },
+            });
+        }
+    });
+
+    // ══════════════════════════════════════════════════════════════════════
     // TEXT HANDLER
     // ══════════════════════════════════════════════════════════════════════
     bot.on('text', async (ctx) => {
@@ -377,47 +480,13 @@ export async function initDriverBot(): Promise<Telegraf | null> {
 
         const ses = sessions.get(tgId);
 
-        // ── KOD BILAN RO'YXATDAN O'TISH ────────────────────────────────
-        if (ses?.step === 'code' || !(await getDriver(tgId))) {
-            const code = text.trim();
-            if (!/^\d{5}$/.test(code)) {
-                await ctx.reply('❌ 5 ta raqam kiriting! <i>Masalan: 48271</i>', { parse_mode: 'HTML' });
-                return;
-            }
-
-            const driver = await prisma.driver.findFirst({ where: { registrationCode: code } });
-            if (!driver) {
-                await ctx.reply(`❌ <b>Kod topilmadi!</b>\n<code>${code}</code> — bazada yo'q.\n\n/start`, { parse_mode: 'HTML' });
-                return;
-            }
-            if (driver.telegramId && driver.telegramId !== tgId) {
-                await ctx.reply('❌ Bu kod boshqa foydalanuvchiga ulangan.');
-                return;
-            }
-
-            await prisma.driver.update({
-                where: { id: driver.id },
-                data: {
-                    telegramId: tgId,
-                    telegramName: ctx.from.username || ctx.from.first_name || null,
-                    registeredAt: new Date(),
-                    isOnline: true,
-                    lastSeenAt: new Date(),
-                },
-            });
-
-            sessions.delete(tgId);
-            await ctx.reply(
-                formatText('drv_registered', 'uz', { name: driver.name }),
-                { parse_mode: 'HTML', reply_markup: driverKeyboard('uz', true) }
-            );
-            return;
-        }
-
-        // Haydovchini tekshirish
+        // Ro'yxatdan o'tmagan foydalanuvchi — /start ga yo'naltirish
         const driver = await getDriver(tgId);
         if (!driver) {
-            await ctx.reply(getText('drv_not_registered', 'uz'), { parse_mode: 'HTML' });
+            await ctx.reply(
+                '❌ Siz haydovchi sifatida ro\'yxatdan o\'tmagansiz.\n\n/start bosing va telefon raqamingizni ulashing.',
+                { parse_mode: 'HTML' }
+            );
             return;
         }
 
@@ -466,15 +535,7 @@ export async function initDriverBot(): Promise<Telegraf | null> {
                     price: fmtN(pricePerKg),
                     total: fmtN(Math.round(totalAmount)),
                 }),
-                {
-                    parse_mode: 'HTML',
-                    reply_markup: {
-                        inline_keyboard: [
-                            [btn('✅ Tasdiqlash', `confirm_calc_${reqId}`)],
-                            [btn('❌ Bekor qilish', 'calc_cancel')],
-                        ],
-                    },
-                }
+                { parse_mode: 'HTML', reply_markup: calcConfirmKeyboard(reqId) }
             );
 
             // Sessionga discount saqlash (confirm_calc da ishlatiladi)
@@ -544,7 +605,7 @@ export async function initDriverBot(): Promise<Telegraf | null> {
             });
             await ctx.reply('🟢 Siz endi <b>online</b>siz!', {
                 parse_mode: 'HTML',
-                reply_markup: driverKeyboard(lang, true),
+                reply_markup: driverMainKeyboard(true, lang),
             });
             return;
         }
@@ -556,7 +617,7 @@ export async function initDriverBot(): Promise<Telegraf | null> {
             });
             await ctx.reply('🔴 Siz endi <b>offline</b>siz.', {
                 parse_mode: 'HTML',
-                reply_markup: driverKeyboard(lang, false),
+                reply_markup: driverMainKeyboard(false, lang),
             });
             return;
         }

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 // ─── Telegram helper ──────────────────────────────────────────────────────────
 async function sendTelegramNotification(order: {
@@ -58,6 +60,8 @@ async function sendTelegramNotification(order: {
 // ─── POST /api/orders — Buyurtma yaratish ────────────────────────────────────
 export async function POST(req: NextRequest) {
     try {
+        const session = await getServerSession(authOptions);
+        const sessionUserId = Number(session?.user?.id);
         const body = await req.json();
         const {
             telegramUserId,
@@ -113,8 +117,9 @@ export async function POST(req: NextRequest) {
         const order = await prisma.order.create({
             data: {
                 telegramUserId: telegramUserId?.toString() ?? null,
-                customerName:    customerName ?? null,
-                contactPhone:    contactPhone ?? null,
+                userId:          Number.isFinite(sessionUserId) ? sessionUserId : null,
+                customerName:    customerName ?? session?.user?.name ?? null,
+                contactPhone:    contactPhone ?? session?.user?.phone ?? null,
                 shippingAddress: shippingAddress ?? null,
                 shippingLocation: shippingLocation ?? null,
                 comment:         comment ?? null,
@@ -152,12 +157,31 @@ export async function POST(req: NextRequest) {
 // ─── GET /api/orders — Buyurtmalarni olish ───────────────────────────────────
 export async function GET(request: Request) {
     try {
+        const session = await getServerSession(authOptions);
+        const sessionUserId = Number(session?.user?.id);
+        const isAdmin = session?.user?.role === 'admin';
         const { searchParams } = new URL(request.url);
         const telegramUserId = searchParams.get('telegramUserId');
         const contactPhone   = searchParams.get('contactPhone');
         const where: Record<string, unknown> = {};
         if (telegramUserId) where.telegramUserId = telegramUserId;
-        if (contactPhone)   where.contactPhone = contactPhone;
+        if (contactPhone) {
+            if (!isAdmin && session?.user?.phone !== contactPhone) {
+                return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+            }
+            where.contactPhone = contactPhone;
+        }
+
+        if (!telegramUserId && !contactPhone) {
+            if (!Number.isFinite(sessionUserId)) {
+                return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+            }
+
+            where.OR = [
+                { userId: sessionUserId },
+                ...(session?.user?.phone ? [{ contactPhone: session.user.phone }] : []),
+            ];
+        }
 
         // Draft buyurtmalarni ko'rsatmaslik
         if (!telegramUserId) {

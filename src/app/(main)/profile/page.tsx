@@ -6,11 +6,13 @@ import { useLanguage } from '@/lib/contexts/LanguageContext';
 import { useCurrencySafe } from '@/lib/contexts/CurrencyContext';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import {
     LogOut, Package, User as UserIcon, Settings, Heart,
     ShoppingCart, ChevronRight, MapPin, Star, Loader2, Clock,
-    Phone, Shield, Bell, Gift, TrendingUp, type LucideIcon
+    Phone, Shield, Bell, Gift, TrendingUp, MessageCircle,
+    KeyRound, Copy, CheckCircle2, type LucideIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
@@ -31,6 +33,7 @@ type OnStatsReady = (stats: { totalSpent: number; orderCount: number }) => void;
 
 export default function ProfilePage() {
     const { user, isAuthenticated, logout, orders } = useAuthStore();
+    const { status } = useSession();
     const cartItems = useCartStore(s => s.items);
     const { language } = useLanguage();
     const { format } = useCurrencySafe();
@@ -40,25 +43,44 @@ export default function ProfilePage() {
     const [totalSpent, setTotalSpent] = useState(0);
     const [orderCount, setOrderCount] = useState(0);
     const [saving, setSaving] = useState(false);
+    const [fullUser, setFullUser] = useState<{ telegramId?: string | null; telegramVerifiedAt?: string | null; telegramCode?: string | null; ecoPoints?: number; referralCode?: string | null } | null>(null);
+    const [codeCopied, setCodeCopied] = useState(false);
 
     const t = (uz: string, ru: string) => language === 'ru' ? ru : uz;
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            if (!useAuthStore.getState().isAuthenticated) router.push('/login');
-        }, 100);
-        return () => clearTimeout(timer);
-    }, [isAuthenticated, router]);
+        if (status === 'unauthenticated') {
+            router.push('/login');
+        }
+    }, [router, status]);
 
     useEffect(() => {
         if (user) setEditName(user.name);
     }, [user]);
 
-    if (!user) return (
+    useEffect(() => {
+        if (user) {
+            fetch('/api/auth/me')
+                .then(r => r.ok ? r.json() : null)
+                .then(d => d && setFullUser(d))
+                .catch(() => {});
+        }
+    }, [user]);
+
+    const copyCode = (code: string) => {
+        navigator.clipboard.writeText(code).then(() => {
+            setCodeCopied(true);
+            setTimeout(() => setCodeCopied(false), 2000);
+        });
+    };
+
+    if (status === 'loading' || (status === 'authenticated' && !user)) return (
         <div className="min-h-screen flex items-center justify-center">
             <div className="animate-spin h-8 w-8 border-4 border-blue-500 rounded-full border-t-transparent" />
         </div>
     );
+
+    if (!user) return null;
 
     const cartTotal  = cartItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
 
@@ -79,11 +101,21 @@ export default function ProfilePage() {
                         </div>
                         <div className="flex-1 pb-1">
                             <h1 className="text-2xl font-extrabold text-white">{user.name}</h1>
-                            <div className="flex items-center gap-3 mt-1">
+                            <div className="flex items-center gap-3 mt-1 flex-wrap">
                                 <span className="text-blue-200 text-sm flex items-center gap-1"><Phone size={12} />{user.phone}</span>
                                 <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full font-bold">
                                     {user.role === 'admin' ? '👑 Admin' : '⭐ Mijoz'}
                                 </span>
+                                {fullUser?.telegramId && (
+                                    <span className="text-[10px] bg-blue-500/30 text-white px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                        <MessageCircle size={9} /> Telegram
+                                    </span>
+                                )}
+                                {(fullUser?.ecoPoints ?? 0) > 0 && (
+                                    <span className="text-[10px] bg-green-500/30 text-white px-2 py-0.5 rounded-full font-bold">
+                                        🌱 {fullUser?.ecoPoints} ball
+                                    </span>
+                                )}
                             </div>
                         </div>
                         <div className="hidden sm:grid grid-cols-2 gap-3 pb-1">
@@ -224,7 +256,7 @@ export default function ProfilePage() {
                                                 const res = await fetch('/api/auth/me', {
                                                     method: 'PATCH',
                                                     headers: { 'Content-Type': 'application/json' },
-                                                    body: JSON.stringify({ phone: user.phone, name: editName.trim() }),
+                                                    body: JSON.stringify({ name: editName.trim() }),
                                                 });
                                                 if (!res.ok) {
                                                     const err = await res.json();
@@ -246,6 +278,84 @@ export default function ProfilePage() {
                                         {saving ? t("Saqlanmoqda...", "Сохраняется...") : t("Saqlash", "Сохранить")}
                                     </button>
                                 </div>
+                            </div>
+
+                            {/* Telegram holati */}
+                            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+                                <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                    <MessageCircle size={16} className="text-blue-500" />
+                                    {t("Telegram hisobi", "Telegram аккаунт")}
+                                </h3>
+
+                                {fullUser?.telegramId ? (
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-2 text-green-600">
+                                            <CheckCircle2 size={16} />
+                                            <span className="text-sm font-semibold">
+                                                {t("Telegram ulangan", "Telegram подключён")}
+                                            </span>
+                                        </div>
+                                        {fullUser?.telegramVerifiedAt && (
+                                            <p className="text-xs text-gray-400">
+                                                {t("Tasdiqlangan", "Подтверждено")}:{' '}
+                                                {new Date(fullUser.telegramVerifiedAt).toLocaleDateString('uz-UZ')}
+                                            </p>
+                                        )}
+
+                                        {/* Kirish kodi */}
+                                        <div className="bg-gray-50 rounded-xl p-4">
+                                            <p className="text-xs text-gray-500 mb-2 font-semibold uppercase tracking-wider">
+                                                {t("Telegram kirish kodi", "Код входа Telegram")}
+                                            </p>
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex-1 flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                                                    <KeyRound size={14} className="text-gray-400" />
+                                                    <span className="font-mono text-lg font-bold tracking-widest text-gray-800">
+                                                        {fullUser?.telegramCode
+                                                            ? fullUser.telegramCode
+                                                            : '• • • • •'}
+                                                    </span>
+                                                </div>
+                                                {fullUser?.telegramCode && (
+                                                    <button
+                                                        onClick={() => copyCode(fullUser.telegramCode!)}
+                                                        className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-lg transition-colors"
+                                                    >
+                                                        {codeCopied ? (
+                                                            <><CheckCircle2 size={13} /> {t("Nusxalandi", "Скопировано")}</>
+                                                        ) : (
+                                                            <><Copy size={13} /> {t("Nusxalash", "Копировать")}</>
+                                                        )}
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-gray-400 mt-2">
+                                                {t(
+                                                    "Bu kod bilan saytga kirish mumkin (parol o'rniga)",
+                                                    "Этот код можно использовать вместо пароля"
+                                                )}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <p className="text-sm text-gray-500">
+                                            {t(
+                                                "Telegram hisobingiz hali ulanmagan. Botdan ro'yxatdan o'ting.",
+                                                "Telegram аккаунт ещё не подключён. Зарегистрируйтесь через бот."
+                                            )}
+                                        </p>
+                                        <a
+                                            href="https://t.me/Pack24AI_bot"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-[#064E3B] hover:bg-[#053d2e] px-4 py-2.5 rounded-xl transition-colors"
+                                        >
+                                            <MessageCircle size={15} />
+                                            @Pack24AI_bot orqali ulash
+                                        </a>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Quick links */}
@@ -304,7 +414,7 @@ function ProfileOrdersList({ user, language, format, t, onStatsReady }: {
     const fetchOrders = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/orders?contactPhone=${encodeURIComponent(user.phone)}`);
+            const res = await fetch('/api/orders');
             if (res.ok) {
                 const data = await res.json();
                 setDbOrders(data);
@@ -319,7 +429,7 @@ function ProfileOrdersList({ user, language, format, t, onStatsReady }: {
         } finally {
             setLoading(false);
         }
-    }, [user.phone]);
+    }, []);
 
     useEffect(() => { fetchOrders(); }, [fetchOrders]);
 

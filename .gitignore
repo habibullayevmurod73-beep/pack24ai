@@ -39,9 +39,14 @@ dev.db
 *.db
 prisma/dev.db
 prisma/*.db-journal
+*.db-journal
 
 # Backup fayllar
 *.bak
+
+# Test/debug scripts
+test-*.js
+test-*.ts
 
 # vercel
 .vercel

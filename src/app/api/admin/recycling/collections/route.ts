@@ -70,33 +70,60 @@ export async function POST(req: NextRequest) {
         const effectiveWeight = weight - (weight * discount / 100);
         const totalAmount = Math.round(effectiveWeight * price);
 
-        const collection = await prisma.recycleCollection.create({
-            data: {
-                requestId: Number(requestId),
-                driverId: Number(driverId),
-                actualWeight: weight,
-                discountPercent: discount,
-                effectiveWeight,
-                pricePerKg: price,
-                totalAmount,
-                discountReason: discountReason || null,
-                materialType: materialType || null,
-                notes: notes || null,
-                collectedAt: new Date(),
-            },
-            include: {
-                request: { include: { point: true } },
-                driver: true,
-            },
-        });
+        const collection = await prisma.$transaction(async (tx) => {
+            const existingCollection = await tx.recycleCollection.findFirst({
+                where: { requestId: Number(requestId) },
+                select: { id: true },
+            });
 
-        // Ariza statusini yangilash
-        await prisma.recycleRequest.update({
-            where: { id: Number(requestId) },
-            data: {
-                status: 'collected',
-                collectedAt: new Date(),
-            },
+            if (existingCollection) {
+                throw new Error('COLLECTION_ALREADY_EXISTS');
+            }
+
+            const createdCollection = await tx.recycleCollection.create({
+                data: {
+                    requestId: Number(requestId),
+                    driverId: Number(driverId),
+                    actualWeight: weight,
+                    discountPercent: discount,
+                    effectiveWeight,
+                    pricePerKg: price,
+                    totalAmount,
+                    discountReason: discountReason || null,
+                    materialType: materialType || null,
+                    notes: notes || null,
+                    collectedAt: new Date(),
+                },
+                include: {
+                    request: { include: { point: true } },
+                    driver: true,
+                },
+            });
+
+            const updatedRequest = await tx.recycleRequest.update({
+                where: { id: Number(requestId) },
+                data: {
+                    status: 'collected',
+                    collectedAt: new Date(),
+                },
+                select: { userId: true },
+            });
+
+            if (updatedRequest.userId) {
+                await tx.user.update({
+                    where: { id: updatedRequest.userId },
+                    data: {
+                        totalRecycledWeight: {
+                            increment: effectiveWeight,
+                        },
+                        ecoPoints: {
+                            increment: Math.max(1, Math.round(effectiveWeight)),
+                        },
+                    },
+                });
+            }
+
+            return createdCollection;
         });
 
         // Mijozga Telegram xabar (ixtiyoriy)
@@ -136,6 +163,13 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json(collection, { status: 201 });
     } catch (error) {
+        if (error instanceof Error && error.message === 'COLLECTION_ALREADY_EXISTS') {
+            return NextResponse.json(
+                { error: 'Bu ariza uchun yig\'ish hisobi allaqachon yaratilgan' },
+                { status: 409 }
+            );
+        }
+
         console.error('[Collections POST]', error);
         return NextResponse.json({ error: 'Server xatosi' }, { status: 500 });
     }

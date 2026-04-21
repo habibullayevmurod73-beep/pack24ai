@@ -5,7 +5,7 @@ import { AlertTriangle, MessageCircle, CheckCircle, Clock } from 'lucide-react';
 
 interface Complaint { id: number; requestId: number; fromPhone: string; fromName: string; level: string; message: string; status: string; response: string | null; respondedBy: string | null; resolvedAt: string | null; request: { name: string; phone: string; point: { regionUz: string } | null; assignedDriver: { name: string } | null }; createdAt: string; }
 
-const STATUS_MAP: Record<string, { label: string; icon: React.ElementType; color: string }> = { open: { label: 'Ochiq', icon: AlertTriangle, color: 'bg-red-100 text-red-700' }, in_progress: { label: 'Ko\'rib chiqilmoqda', icon: Clock, color: 'bg-amber-100 text-amber-700' }, resolved: { label: 'Hal qilindi', icon: CheckCircle, color: 'bg-emerald-100 text-emerald-700' }, closed: { label: 'Yopildi', icon: CheckCircle, color: 'bg-gray-100 text-gray-600' } };
+const STATUS_MAP: Record<string, { label: string; icon: React.FC<{ size?: number; className?: string }>; color: string }> = { open: { label: 'Ochiq', icon: AlertTriangle, color: 'bg-red-100 text-red-700' }, in_progress: { label: 'Ko\'rib chiqilmoqda', icon: Clock, color: 'bg-amber-100 text-amber-700' }, resolved: { label: 'Hal qilindi', icon: CheckCircle, color: 'bg-emerald-100 text-emerald-700' }, closed: { label: 'Yopildi', icon: CheckCircle, color: 'bg-gray-100 text-gray-600' } };
 
 export default function ComplaintsTab() {
     const [items, setItems] = useState<Complaint[]>([]);

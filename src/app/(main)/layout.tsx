@@ -1,5 +1,6 @@
 import GoogleAnalytics from "@/components/GoogleAnalytics";
 import GlobalAIWrapper from "@/components/GlobalAIWrapper";
+import AuthSessionProvider from "@/components/AuthSessionProvider";
 import { LanguageProvider } from "@/lib/contexts/LanguageContext";
 import { CurrencyProvider } from "@/lib/contexts/CurrencyContext";
 import Navbar from "@/components/Navbar";
@@ -10,16 +11,18 @@ export default function MainLayout({ children }: Readonly<{ children: React.Reac
     return (
         <>
             <GoogleAnalytics />
-            <LanguageProvider>
-                <CurrencyProvider>
-                    <Navbar />
-                    <GlobalAIWrapper />
-                    <main className="flex-grow">
-                        {children}
-                    </main>
-                    <Footer />
-                </CurrencyProvider>
-            </LanguageProvider>
+            <AuthSessionProvider>
+                <LanguageProvider>
+                    <CurrencyProvider>
+                        <Navbar />
+                        <GlobalAIWrapper />
+                        <main className="flex-grow">
+                            {children}
+                        </main>
+                        <Footer />
+                    </CurrencyProvider>
+                </LanguageProvider>
+            </AuthSessionProvider>
             <Toaster richColors position="bottom-right" closeButton duration={3000} />
         </>
     );

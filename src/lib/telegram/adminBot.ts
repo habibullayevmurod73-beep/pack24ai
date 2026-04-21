@@ -2,10 +2,20 @@ import { Telegraf, Context } from 'telegraf';
 import { prisma } from '@/lib/prisma';
 import { Lang, getText, formatText } from './i18n';
 import { notifyCustomer, notifyDriver } from './notifier';
+import {
+    btn,
+    supervisorMainKeyboard,
+    supervisorSharePhoneKeyboard,
+    assignDriverKeyboard,
+    paymentApproveKeyboard,
+    pointToggleKeyboard,
+    reportPeriodKeyboard,
+    backKeyboard,
+} from './keyboards';
 
 // ─── Session types ────────────────────────────────────────────────────────────
 interface AdminSession {
-    step: 'code' | 'menu';
+    step: 'phone' | 'menu';
     lang: Lang;
     supervisorId?: number;
 }
@@ -13,9 +23,15 @@ interface AdminSession {
 const sessions = new Map<string, AdminSession>();
 const fmtN = (n: number) => n.toLocaleString('ru-RU');
 
-// ─── Inline button helper ─────────────────────────────────────────────────────
-function btn(text: string, data: string) {
-    return { text, callback_data: data };
+// ─── Yagona 5 raqamli kod generatsiya ────────────────────────────────────────
+async function generateUniqueSupCode(): Promise<string> {
+    for (let attempt = 0; attempt < 20; attempt++) {
+        const code = String(Math.floor(10000 + Math.random() * 90000));
+        const exists = await prisma.supervisor.findFirst({ where: { registrationCode: code } })
+            || await prisma.driver.findFirst({ where: { registrationCode: code } });
+        if (!exists) return code;
+    }
+    return String(Date.now()).slice(-5);
 }
 
 // ─── Masulni bazadan olish ────────────────────────────────────────────────────
@@ -26,17 +42,6 @@ async function getSupervisor(tgId: string) {
     });
 }
 
-// ─── Masul bosh menyu ─────────────────────────────────────────────────────────
-function adminKeyboard(lang: Lang) {
-    return {
-        keyboard: [
-            [{ text: getText('adm_btn_requests', lang) }, { text: getText('adm_btn_drivers', lang) }],
-            [{ text: getText('adm_btn_payments', lang) }, { text: getText('adm_btn_point', lang) }],
-            [{ text: getText('adm_btn_report', lang) }],
-        ],
-        resize_keyboard: true,
-    };
-}
 
 // ─── Volume label ─────────────────────────────────────────────────────────────
 function volLabel(size: string | null): string {
@@ -83,7 +88,7 @@ export async function initAdminBot(): Promise<Telegraf | null> {
     });
 
     // ══════════════════════════════════════════════════════════════════════
-    // /start — Kod bilan kirish yoki bosh menyu
+    // /start — Telefon orqali ro'yxatdan o'tish yoki bosh menyu
     // ══════════════════════════════════════════════════════════════════════
     bot.start(async (ctx) => {
         const tgId = ctx.from.id.toString();
@@ -96,14 +101,17 @@ export async function initAdminBot(): Promise<Telegraf | null> {
                     name: sup.name,
                     point: sup.point?.regionUz || '—',
                 }),
-                { parse_mode: 'HTML', reply_markup: adminKeyboard(lang) }
+                { parse_mode: 'HTML', reply_markup: supervisorMainKeyboard() }
             );
             return;
         }
 
-        // Yangi foydalanuvchi — kod so'rash
-        sessions.set(tgId, { step: 'code', lang: 'uz' });
-        await ctx.reply(getText('adm_welcome', 'uz'), { parse_mode: 'HTML' });
+        // Yangi foydalanuvchi — telefon so'rash
+        sessions.set(tgId, { step: 'phone', lang: 'uz' });
+        await ctx.reply(getText('adm_welcome', 'uz'), {
+            parse_mode: 'HTML',
+            reply_markup: supervisorSharePhoneKeyboard(),
+        });
     });
 
     // ══════════════════════════════════════════════════════════════════════
@@ -163,17 +171,12 @@ export async function initAdminBot(): Promise<Telegraf | null> {
                     return;
                 }
 
-                const keyboard = drivers.map(d => [
-                    btn(`🚚 ${d.name} ${d.vehicleInfo ? '(' + d.vehicleInfo + ')' : ''}`, `select_drv_${d.id}_${reqId}`),
-                ]);
-                keyboard.push([btn('❌ Bekor', 'adm_cancel')]);
-
                 await ctx.answerCbQuery('🚚');
                 await ctx.editMessageText(
                     formatText('adm_select_driver', 'uz', { id: String(reqId) }),
                     {
                         parse_mode: 'HTML',
-                        reply_markup: { inline_keyboard: keyboard },
+                        reply_markup: assignDriverKeyboard(drivers, reqId),
                     }
                 );
                 return;
@@ -393,6 +396,42 @@ export async function initAdminBot(): Promise<Telegraf | null> {
                 return;
             }
 
+            // ── HAYDOVCHI MA'LUMOTI ─────────────────────────────────────
+            if (data.startsWith('driver_info_')) {
+                const driverId = parseInt(data.replace('driver_info_', ''));
+                const driver = await prisma.driver.findUnique({ where: { id: driverId } });
+                if (!driver) {
+                    await ctx.answerCbQuery('❌ Haydovchi topilmadi');
+                    return;
+                }
+
+                const totalCollections = await prisma.recycleCollection.count({
+                    where: { driverId: driver.id },
+                });
+                const totalWeightAgg = await prisma.recycleCollection.aggregate({
+                    where: { driverId: driver.id },
+                    _sum: { actualWeight: true },
+                });
+
+                await ctx.answerCbQuery('👤');
+                await ctx.editMessageText(
+                    `👤 <b>${driver.name}</b>\n\n` +
+                    `📞 ${driver.phone}\n` +
+                    `🚗 Mashina: ${driver.vehicleInfo || '—'}\n` +
+                    `📊 Holat: ${driver.isOnline ? '🟢 Online' : '🔴 Offline'}\n` +
+                    `🔄 Status: ${driver.status}\n\n` +
+                    `📈 <b>Statistika:</b>\n` +
+                    `🔢 Jami yig'ishlar: ${totalCollections}\n` +
+                    `⚖️ Jami og'irlik: ${fmtN(Math.round((totalWeightAgg._sum.actualWeight || 0) * 10) / 10)} kg\n` +
+                    `📅 Ro'yxatdan: ${driver.registeredAt ? new Date(driver.registeredAt).toLocaleDateString('ru-RU') : '—'}`,
+                    {
+                        parse_mode: 'HTML',
+                        reply_markup: backKeyboard(),
+                    }
+                );
+                return;
+            }
+
             // ── BEKOR ───────────────────────────────────────────────────
             if (data === 'adm_cancel') {
                 await ctx.answerCbQuery('❌');
@@ -407,6 +446,121 @@ export async function initAdminBot(): Promise<Telegraf | null> {
     });
 
     // ══════════════════════════════════════════════════════════════════════
+    // CONTACT HANDLER — Telefon raqami ulashilganda
+    // ══════════════════════════════════════════════════════════════════════
+    bot.on('contact', async (ctx) => {
+        const tgId = ctx.from.id.toString();
+
+        if (ctx.message.contact.user_id && ctx.message.contact.user_id !== ctx.from.id) {
+            await ctx.reply('❌ Iltimos, faqat o\'z telefon raqamingizni ulashing.', {
+                reply_markup: supervisorSharePhoneKeyboard(),
+            });
+            return;
+        }
+
+        let phone = ctx.message.contact.phone_number.replace(/[^0-9+]/g, '');
+        if (!phone.startsWith('+')) phone = '+' + phone;
+
+        try {
+            const supervisor = await prisma.supervisor.findFirst({
+                where: {
+                    OR: [
+                        { phone },
+                        { phone: phone.replace('+', '') },
+                        { phone: phone.replace('+998', '0') },
+                        { phone: phone.slice(-9) },
+                    ],
+                },
+                include: { point: true },
+            });
+
+            if (!supervisor) {
+                await ctx.reply(
+                    `❌ <b>Raqamingiz tizimda topilmadi!</b>\n\n` +
+                    `📱 Telefon: <code>${phone}</code>\n\n` +
+                    `Bu bot faqat <b>ro'yxatdan o'tgan masul xodimlar</b> uchun.\n\n` +
+                    `📋 Masul xodim bo'lish uchun:\n` +
+                    `1️⃣ Pack24 bosh administratori sizni tizimga qo'shishi kerak\n` +
+                    `2️⃣ Keyin qaytib kelib /start bosing\n\n` +
+                    `👤 Oddiy foydalanuvchi sifatida ro'yxatdan o'tmoqchimisiz?\n` +
+                    `▶️ <a href="https://t.me/Pack24AI_bot">@Pack24AI_bot</a> botiga o'ting\n\n` +
+                    `📞 Bog'lanish: <a href="tel:+998880557888">+998 88 055-78-88</a>`,
+                    { parse_mode: 'HTML', reply_markup: { remove_keyboard: true } }
+                );
+                sessions.delete(tgId);
+                return;
+            }
+
+            if (supervisor.telegramId && supervisor.telegramId !== tgId) {
+                await ctx.reply(getText('adm_already_registered', 'uz'), {
+                    parse_mode: 'HTML',
+                    reply_markup: { remove_keyboard: true },
+                });
+                return;
+            }
+
+            // Yangi 5-raqamli kod generatsiya
+            const code = await generateUniqueSupCode();
+
+            await prisma.supervisor.update({
+                where: { id: supervisor.id },
+                data: {
+                    telegramId: tgId,
+                    telegramName: ctx.from.username || ctx.from.first_name || null,
+                    registeredAt: new Date(),
+                    registrationCode: code,
+                },
+            });
+
+            sessions.delete(tgId);
+
+            // Masulga kod va menyu yuborish
+            await ctx.reply(
+                formatText('adm_code_sent', 'uz', {
+                    name: supervisor.name,
+                    point: supervisor.point?.regionUz || '—',
+                    code,
+                }),
+                {
+                    parse_mode: 'HTML',
+                    reply_markup: supervisorMainKeyboard(),
+                }
+            );
+
+            // Admin salesChatId ga xabar (agar sozlangan bo'lsa)
+            try {
+                const config = await prisma.telegramConfig.findFirst();
+                if (config?.salesChatId) {
+                    const adminBot_ = await import('./botManager').then(m => m.getAdminBot());
+                    if (adminBot_) {
+                        const chatIds = config.salesChatId.split(',').map(s => s.trim()).filter(Boolean);
+                        for (const chatId of chatIds) {
+                            await adminBot_.telegram.sendMessage(
+                                chatId,
+                                `🆕 <b>Masul shaxs ro'yxatdan o'tdi!</b>\n\n` +
+                                `👤 ${supervisor.name}\n` +
+                                `📞 ${supervisor.phone}\n` +
+                                `🏭 Punkt: ${supervisor.point?.regionUz || '—'}\n` +
+                                `🔑 Verifikatsion kod: <code>${code}</code>\n` +
+                                `🕐 ${new Date().toLocaleString('ru-RU')}`,
+                                { parse_mode: 'HTML' }
+                            );
+                        }
+                    }
+                }
+            } catch { /* salesChatId yo'q — ok */ }
+
+            console.log(`[AdminBot] ✅ Masul ro'yxatdan o'tdi: ${supervisor.name} | Kod: ${code}`);
+
+        } catch (err) {
+            console.error('[AdminBot] Contact handler xatolik:', err);
+            await ctx.reply('❌ Xatolik yuz berdi. Qayta urinib ko\'ring.', {
+                reply_markup: { remove_keyboard: true },
+            });
+        }
+    });
+
+    // ══════════════════════════════════════════════════════════════════════
     // TEXT HANDLER
     // ══════════════════════════════════════════════════════════════════════
     bot.on('text', async (ctx) => {
@@ -417,51 +571,13 @@ export async function initAdminBot(): Promise<Telegraf | null> {
 
         const ses = sessions.get(tgId);
 
-        // ── KOD BILAN RO'YXATDAN O'TISH ────────────────────────────────
-        if (ses?.step === 'code' || !(await getSupervisor(tgId))) {
-            const code = text.trim();
-            if (!/^\d{5}$/.test(code)) {
-                await ctx.reply('❌ 5 ta raqam kiriting! <i>Masalan: 59312</i>', { parse_mode: 'HTML' });
-                return;
-            }
-
-            const supervisor = await prisma.supervisor.findFirst({
-                where: { registrationCode: code },
-                include: { point: true },
-            });
-            if (!supervisor) {
-                await ctx.reply(`❌ <b>Kod topilmadi!</b>\n<code>${code}</code> — bazada yo'q.\n\n/start`, { parse_mode: 'HTML' });
-                return;
-            }
-            if (supervisor.telegramId && supervisor.telegramId !== tgId) {
-                await ctx.reply('❌ Bu kod boshqa foydalanuvchiga ulangan.');
-                return;
-            }
-
-            await prisma.supervisor.update({
-                where: { id: supervisor.id },
-                data: {
-                    telegramId: tgId,
-                    telegramName: ctx.from.username || ctx.from.first_name || null,
-                    registeredAt: new Date(),
-                },
-            });
-
-            sessions.delete(tgId);
-            await ctx.reply(
-                formatText('adm_registered', 'uz', {
-                    name: supervisor.name,
-                    point: supervisor.point?.regionUz || '—',
-                }),
-                { parse_mode: 'HTML', reply_markup: adminKeyboard('uz') }
-            );
-            return;
-        }
-
-        // Masulni tekshirish
+        // Ro'yxatdan o'tmagan foydalanuvchi — /start ga yo'naltirish
         const sup = await getSupervisor(tgId);
         if (!sup) {
-            await ctx.reply(getText('adm_not_registered', 'uz'), { parse_mode: 'HTML' });
+            await ctx.reply(
+                '❌ Siz masul sifatida ro\'yxatdan o\'tmagansiz.\n\n/start bosing va telefon raqamingizni ulashing.',
+                { parse_mode: 'HTML' }
+            );
             return;
         }
 
@@ -577,11 +693,7 @@ export async function initAdminBot(): Promise<Telegraf | null> {
 
                 await ctx.reply(info, {
                     parse_mode: 'HTML',
-                    reply_markup: {
-                        inline_keyboard: [
-                            [btn('✅ Tasdiqlash', `approve_payment_${col.id}`)],
-                        ],
-                    },
+                    reply_markup: paymentApproveKeyboard(col.id),
                 });
             }
             return;
@@ -603,14 +715,7 @@ export async function initAdminBot(): Promise<Telegraf | null> {
                     status: statusText,
                     hours: point.workingHours,
                 }),
-                {
-                    parse_mode: 'HTML',
-                    reply_markup: {
-                        inline_keyboard: [
-                            [btn(point.isAccepting ? '🔴 Yopish' : '🟢 Ochish', `toggle_point_${point.id}`)],
-                        ],
-                    },
-                }
+                { parse_mode: 'HTML', reply_markup: pointToggleKeyboard(point.id, point.isAccepting) }
             );
             return;
         }
@@ -619,14 +724,7 @@ export async function initAdminBot(): Promise<Telegraf | null> {
         if (text === getText('adm_btn_report', lang) || text === getText('adm_btn_report', 'ru') || text === getText('adm_btn_report', 'en')) {
             await ctx.reply(
                 '📊 <b>Hisobot davrini tanlang:</b>',
-                {
-                    parse_mode: 'HTML',
-                    reply_markup: {
-                        inline_keyboard: [
-                            [btn('📅 Bugun', 'report_today'), btn('📆 Hafta', 'report_week'), btn('🗓 Oy', 'report_month')],
-                        ],
-                    },
-                }
+                { parse_mode: 'HTML', reply_markup: reportPeriodKeyboard() }
             );
             return;
         }

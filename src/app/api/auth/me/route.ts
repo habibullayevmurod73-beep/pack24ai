@@ -1,19 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+
+async function getCurrentUserId(): Promise<number | null> {
+    const session = await getServerSession(authOptions);
+    const userId = Number(session?.user?.id);
+    return Number.isFinite(userId) ? userId : null;
+}
 
 // PATCH /api/auth/me — Foydalanuvchi profilini yangilash
 export async function PATCH(request: NextRequest) {
     try {
-        const body = await request.json();
-        const { phone, name } = body;
-
-        if (!phone) {
-            return NextResponse.json(
-                { error: 'Telefon raqam majburiy (identifikator sifatida)' },
-                { status: 400 }
-            );
+        const userId = await getCurrentUserId();
+        if (!userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        const body = await request.json();
+        const { name } = body as { name?: string };
 
         if (!name || name.trim().length < 2) {
             return NextResponse.json(
@@ -22,11 +27,8 @@ export async function PATCH(request: NextRequest) {
             );
         }
 
-        const cleanPhone = phone.replace(/\s/g, '');
-
-        // Foydalanuvchini topish
         const user = await prisma.user.findUnique({
-            where: { phone: cleanPhone },
+            where: { id: userId },
         });
 
         if (!user) {
@@ -38,11 +40,11 @@ export async function PATCH(request: NextRequest) {
 
         // Yangilash
         const updated = await prisma.user.update({
-            where: { phone: cleanPhone },
+            where: { id: userId },
             data: { name: name.trim() },
         });
 
-        const { passwordHash: _, ...safeUser } = updated;
+        const { passwordHash: _ph, otpCode: _oc, ...safeUser } = updated;
         return NextResponse.json({ success: true, user: safeUser });
 
     } catch (error) {
@@ -57,22 +59,22 @@ export async function PATCH(request: NextRequest) {
 // GET /api/auth/me — Joriy foydalanuvchi ma'lumotlari
 export async function GET(request: NextRequest) {
     try {
-        const { searchParams } = new URL(request.url);
-        const phone = searchParams.get('phone');
+        void request;
 
-        if (!phone) {
-            return NextResponse.json({ error: 'phone majburiy' }, { status: 400 });
+        const userId = await getCurrentUserId();
+        if (!userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         const user = await prisma.user.findUnique({
-            where: { phone: phone.replace(/\s/g, '') },
+            where: { id: userId },
         });
 
         if (!user) {
             return NextResponse.json({ error: 'Foydalanuvchi topilmadi' }, { status: 404 });
         }
 
-        const { passwordHash: _, ...safeUser } = user;
+        const { passwordHash: _ph, otpCode: _oc, ...safeUser } = user;
         return NextResponse.json(safeUser);
 
     } catch (error) {

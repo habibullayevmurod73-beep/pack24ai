@@ -7,6 +7,7 @@ import { useLanguage } from '@/lib/contexts/LanguageContext';
 import { useCurrencySafe } from '@/lib/contexts/CurrencyContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import {
     Package, Loader2, ChevronRight, ArrowLeft,
     Truck, CheckCircle, XCircle, Box, ClipboardCheck,
@@ -88,6 +89,7 @@ const ORDERS_PER_PAGE = 8;
 
 export default function MyOrdersPage() {
     const { user, isAuthenticated } = useAuthStore();
+    const { status } = useSession();
     const addToCart = useCartStore(s => s.addToCart);
     const { language } = useLanguage();
     const { format } = useCurrencySafe();
@@ -102,10 +104,9 @@ export default function MyOrdersPage() {
     const [visibleCount, setVisibleCount] = useState(ORDERS_PER_PAGE);
 
     const fetchOrders = useCallback(async () => {
-        if (!user?.phone) return;
         setLoading(true);
         try {
-            const res = await fetch(`/api/orders?contactPhone=${encodeURIComponent(user.phone)}`);
+            const res = await fetch('/api/orders');
             if (res.ok) {
                 const data = await res.json();
                 setOrders(data);
@@ -115,15 +116,15 @@ export default function MyOrdersPage() {
         } finally {
             setLoading(false);
         }
-    }, [user?.phone]);
+    }, []);
 
     useEffect(() => {
-        if (isAuthenticated && user?.phone) {
+        if (status === 'authenticated') {
             fetchOrders();
-        } else {
+        } else if (status === 'unauthenticated') {
             setLoading(false);
         }
-    }, [isAuthenticated, user?.phone, fetchOrders]);
+    }, [fetchOrders, status]);
 
     // ── Buyurtmani bekor qilish ──
     const handleCancel = async (orderId: number) => {
@@ -171,7 +172,15 @@ export default function MyOrdersPage() {
     };
 
     // ── Login talab qilinadi ──
-    if (!isAuthenticated || !user) {
+    if (status === 'loading') {
+        return (
+            <div className="min-h-[70vh] bg-[#f5f6fa] flex flex-col items-center justify-center p-8 text-center">
+                <Loader2 size={28} className="animate-spin text-blue-500" />
+            </div>
+        );
+    }
+
+    if (status !== 'authenticated' || !isAuthenticated || !user) {
         return (
             <div className="min-h-[70vh] bg-[#f5f6fa] flex flex-col items-center justify-center p-8 text-center">
                 <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mb-5 shadow-sm border border-gray-100">

@@ -14,26 +14,42 @@ datasource db {
 model User {
   id           Int      @id @default(autoincrement())
   name         String
-  email        String?  @unique  // Opsional email (unique)
+  email        String?  @unique
   phone        String   @unique
-  passwordHash String   // bcrypt hash — hech qachon plain text saqlama!
-  role         String   @default("user") // "user" | "admin"
+  passwordHash String
+  role         String   @default("user")        // "user" | "admin"
   isActive     Boolean  @default(true)
 
+  // ─── Telegram orqali ro'yxatdan o'tish ───
+  telegramId         String?   @unique          // Telegram user ID
+  telegramCode       String?                    // Doimiy kirish kodi (kabinetga kirish uchun)
+  telegramVerifiedAt DateTime?                  // Telegram orqali tasdiqlangan vaqt
+
+  // ─── OTP (Bir martalik kod — saytga kirish uchun) ─
+  otpCode       String?                         // Telegram orqali yuborilgan OTP
+  otpExpiry     DateTime?                       // OTP amal qilish muddati (5 daqiqa)
+  otpAttempts   Int       @default(0)           // Noto'g'ri urinishlar soni
+
   // ─── Mijoz klassifikatsiyasi ──────────────
-  customerType  String  @default("individual") // individual, corporate, wholesale, dealer
-  customerGroup String  @default("standard")   // standard, vip, new, inactive, blocked
-  companyName   String?                         // Korporativ/ulgurji uchun kompaniya nomi
-  address       String?                         // Mijoz manzili
-  notes         String?                         // Admin eslatmalari
+  customerType  String  @default("individual")  // individual, corporate, wholesale, dealer
+  customerGroup String  @default("standard")    // standard, vip, new, inactive, blocked
+  companyName   String?
+  address       String?
+  notes         String?
 
   // Eco & Gamification
-  ecoPoints           Int      @default(0)      // Mijoz yig'gan eko-ballar
-  totalRecycledWeight Float    @default(0)      // Jami topshirgan makulatura hajmi (kg)
+  ecoPoints           Int      @default(0)
+  totalRecycledWeight Float    @default(0)
 
-  orders            Order[]                     // Mijoz buyurtmalari
-  pushSubscriptions PushSubscription[]          // Push notification subscriptionlar
-  recycleRequests   RecycleRequest[]            // Mijoz topshirgan makulatura arizalari
+  // Referral System
+  referralCode        String?  @unique
+  referredById        Int?
+  referredBy          User?    @relation("UserReferrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals           User[]   @relation("UserReferrals")
+
+  orders            Order[]
+  pushSubscriptions PushSubscription[]
+  recycleRequests   RecycleRequest[]
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

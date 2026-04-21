@@ -180,7 +180,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'To‘lov turi', href: '/admin/payments', icon: CreditCard },
         { name: 'Yetkazib berish', href: '/admin/delivery', icon: Truck },
         { name: 'Filiallar', href: '/admin/branches', icon: MapPin },
-        { name: 'Qayta ishlash', href: '/admin/recycling', icon: Recycle },
+        { 
+            name: 'Qayta ishlash', 
+            href: '/admin/recycling', 
+            icon: Recycle,
+            hasDropdown: true,
+            subItems: [
+                { name: 'Arizalar', href: '/admin/recycling' },
+                { name: 'Xarita (GPS)', href: '/admin/logistics', badge: 'NEW' }
+            ]
+        },
         {
             name: 'Xodimlar',
             href: '/admin/staff',

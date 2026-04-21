@@ -188,12 +188,15 @@ export default function Footer() {
 
                         {/* Stats */}
                         <div className="mt-5 grid grid-cols-2 gap-2">
-                            {STATS.map(({ icon: Icon, label }, i) => (
-                                <div key={i} className="flex items-center gap-1.5 text-blue-200/60 text-xs">
+                            {STATS.map((stat, idx) => {
+                            const Icon = stat.icon;
+                            return (
+                                <div key={idx} className="flex items-center gap-1.5 text-blue-200/60 text-xs">
                                     <Icon size={12} className="text-blue-400 shrink-0" />
-                                    <span>{lbl(label)}</span>
+                                    <span>{lbl(stat.label)}</span>
                                 </div>
-                            ))}
+                            );
+                            })}
                         </div>
                     </div>
 
