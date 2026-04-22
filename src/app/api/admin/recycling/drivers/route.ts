@@ -5,8 +5,9 @@ import { prisma } from '@/lib/prisma';
 async function generateDriverCode(): Promise<string> {
     for (let i = 0; i < 20; i++) {
         const code = String(Math.floor(10000 + Math.random() * 90000)); // 10000-99999
-        const exists = await prisma.driver.findUnique({ where: { registrationCode: code } });
-        if (!exists) return code;
+        const existsDrv = await prisma.driver.findUnique({ where: { registrationCode: code } });
+        const existsSup = await prisma.supervisor.findUnique({ where: { registrationCode: code } });
+        if (!existsDrv && !existsSup) return code;
     }
     throw new Error('Kod generatsiya qilib bo\'lmadi');
 }

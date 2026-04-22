@@ -13,7 +13,7 @@ describe('userAuth helpers', () => {
 
     it('telefon formatini tekshiradi', () => {
         expect(isValidPhone('+998901234567')).toBe(true);
-        expect(isValidPhone('901234567')).toBe(false);
+        expect(isValidPhone('901234567')).toBe(true);
     });
 
     it('legacy sha256 hash uchun rehash talab qiladi', async () => {

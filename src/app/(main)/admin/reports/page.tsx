@@ -56,6 +56,47 @@ interface ReportData {
         cancelled: number;
     } | null;
     regionSales: { region: string; orders: number; revenue: number }[];
+    botReports: {
+        customer: {
+            uniqueUsers: number;
+            totalRequests: number;
+            pickupRequests: number;
+            selfDeliveryRequests: number;
+            confirmedRequests: number;
+            disputedRequests: number;
+        };
+        driver: {
+            totalCollections: number;
+            totalWeight: number;
+            totalAmount: number;
+            pendingPayments: number;
+        };
+        admin: {
+            assignedRequests: number;
+            completedRequests: number;
+            approvedPaymentsCount: number;
+            approvedPaymentsAmount: number;
+        };
+        topDrivers: {
+            driverId: number;
+            name: string;
+            phone: string;
+            isOnline: boolean;
+            status: string;
+            collections: number;
+            totalWeight: number;
+            totalAmount: number;
+        }[];
+        topSupervisors: {
+            supervisorId: number;
+            name: string;
+            phone: string;
+            assignedRequests: number;
+            completedRequests: number;
+            approvedPaymentsCount: number;
+            approvedPaymentsAmount: number;
+        }[];
+    };
     period: number;
 }
 
@@ -150,6 +191,8 @@ export default function ReportsPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError]     = useState<string | null>(null);
     const [period, setPeriod]   = useState(30);
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
     const [online, setOnline]   = useState(true);
     const [showExport, setShowExport] = useState(false);
 
@@ -169,7 +212,12 @@ export default function ReportsPage() {
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch(`/api/admin/reports?period=${period}`);
+            const params = new URLSearchParams({ period: String(period) });
+            if (startDate && endDate) {
+                params.set('from', startDate);
+                params.set('to', endDate);
+            }
+            const res = await fetch(`/api/admin/reports?${params.toString()}`);
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
                 throw new Error(body?.error ?? `Server xatosi (${res.status})`);
@@ -182,7 +230,7 @@ export default function ReportsPage() {
         } finally {
             setLoading(false);
         }
-    }, [period]);
+    }, [period, startDate, endDate]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -194,6 +242,7 @@ export default function ReportsPage() {
             value: o._count.status,
             color: STATUS_MAP[o.status]?.color ?? '#9ca3af',
         }));
+    const botReports = data?.botReports;
 
 
 
@@ -219,7 +268,11 @@ export default function ReportsPage() {
                         {[7, 30, 90].map(d => (
                             <button
                                 key={d}
-                                onClick={() => setPeriod(d)}
+                                onClick={() => {
+                                    setPeriod(d);
+                                    setStartDate('');
+                                    setEndDate('');
+                                }}
                                 className={`px-4 py-2 text-sm font-semibold transition-colors ${
                                     period === d
                                         ? 'bg-[#064E3B] text-white'
@@ -229,6 +282,32 @@ export default function ReportsPage() {
                                 {d} kun
                             </button>
                         ))}
+                    </div>
+                    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-2 py-1">
+                        <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="text-xs text-gray-700 outline-none"
+                            aria-label="Boshlanish sanasi"
+                        />
+                        <span className="text-gray-300 text-xs">—</span>
+                        <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className="text-xs text-gray-700 outline-none"
+                            aria-label="Tugash sanasi"
+                        />
+                        <button
+                            onClick={() => {
+                                setStartDate('');
+                                setEndDate('');
+                            }}
+                            className="text-[10px] text-gray-500 hover:text-gray-700 px-2 py-1 border border-gray-200 rounded-md"
+                        >
+                            Tozalash
+                        </button>
                     </div>
                     <button
                         onClick={fetchData}
@@ -255,11 +334,21 @@ export default function ReportsPage() {
                                     { type: 'products',  label: '🏷️ Mahsulotlar (CSV)',    emoji: '🏷️' },
                                     { type: 'customers', label: '👥 Mijozlar (CSV)',        emoji: '👥' },
                                     { type: 'recycling', label: '♻️ Makulatura (CSV)',      emoji: '♻️' },
+                                    { type: 'bot_drivers', label: '🚚 Bot: Top haydovchilar (CSV)', emoji: '🚚' },
+                                    { type: 'bot_supervisors', label: '👷 Bot: Top masullar (CSV)', emoji: '👷' },
                                 ].map(item => (
                                     <button
                                         key={item.type}
                                         onClick={() => {
-                                            window.open(`/api/admin/export?type=${item.type}&period=${period}`, '_blank');
+                                            const params = new URLSearchParams({
+                                                type: item.type,
+                                                period: String(period),
+                                            });
+                                            if (startDate && endDate) {
+                                                params.set('from', startDate);
+                                                params.set('to', endDate);
+                                            }
+                                            window.open(`/api/admin/export?${params.toString()}`, '_blank');
                                             setShowExport(false);
                                         }}
                                         className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
@@ -268,7 +357,11 @@ export default function ReportsPage() {
                                     </button>
                                 ))}
                                 <div className="border-t border-gray-100 mt-1 pt-1 px-4 py-2">
-                                    <p className="text-[10px] text-gray-400">Davr: so&apos;nggi {period} kun</p>
+                                    <p className="text-[10px] text-gray-400">
+                                        {startDate && endDate
+                                            ? `Davr: ${startDate} - ${endDate}`
+                                            : `Davr: so&apos;nggi ${period} kun`}
+                                    </p>
                                 </div>
                             </div>
                         )}
@@ -335,6 +428,120 @@ export default function ReportsPage() {
                         </div>
                     ))}
                 </div>
+            )}
+
+            {/* Bot KPI + Tables */}
+            {!loading && botReports && (
+                <>
+                    <div className="grid md:grid-cols-3 gap-4 mb-5">
+                        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                            <p className="text-xs text-gray-400 mb-1">🤖 Customer Bot</p>
+                            <p className="text-lg font-extrabold text-gray-900">{fmt(botReports.customer.totalRequests)} ariza</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                                {fmt(botReports.customer.uniqueUsers)} foydalanuvchi • Tasdiq: {fmt(botReports.customer.confirmedRequests)}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                                Pickup: {fmt(botReports.customer.pickupRequests)} • Self: {fmt(botReports.customer.selfDeliveryRequests)}
+                            </p>
+                        </div>
+                        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                            <p className="text-xs text-gray-400 mb-1">🚚 Driver Bot</p>
+                            <p className="text-lg font-extrabold text-gray-900">{fmt(botReports.driver.totalCollections)} yig&apos;ish</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                                {fmt(botReports.driver.totalWeight)} kg • {fmtM(botReports.driver.totalAmount)} so&apos;m
+                            </p>
+                            <p className="text-xs text-gray-500">
+                                Kutilayotgan to&apos;lovlar: {fmt(botReports.driver.pendingPayments)}
+                            </p>
+                        </div>
+                        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                            <p className="text-xs text-gray-400 mb-1">👷 Admin Bot</p>
+                            <p className="text-lg font-extrabold text-gray-900">{fmt(botReports.admin.completedRequests)} yakunlangan</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                                Tayinlangan: {fmt(botReports.admin.assignedRequests)} • To&apos;lovlar: {fmt(botReports.admin.approvedPaymentsCount)}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                                Tasdiqlangan summa: {fmtM(botReports.admin.approvedPaymentsAmount)} so&apos;m
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid lg:grid-cols-2 gap-5 mb-5">
+                        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                            <div className="px-4 py-3 border-b border-gray-50">
+                                <p className="font-bold text-gray-800 text-sm">🚚 Top haydovchilar</p>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                                        <tr>
+                                            <th className="px-4 py-2 text-left">Haydovchi</th>
+                                            <th className="px-4 py-2 text-right">Yig&apos;ish</th>
+                                            <th className="px-4 py-2 text-right">Og&apos;irlik</th>
+                                            <th className="px-4 py-2 text-right">Summa</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {botReports.topDrivers.length === 0 ? (
+                                            <tr>
+                                                <td className="px-4 py-6 text-center text-gray-400" colSpan={4}>Ma&apos;lumot yo&apos;q</td>
+                                            </tr>
+                                        ) : (
+                                            botReports.topDrivers.slice(0, 8).map((row) => (
+                                                <tr key={row.driverId} className="border-t border-gray-50">
+                                                    <td className="px-4 py-2.5">
+                                                        <p className="font-semibold text-gray-800">{row.name}</p>
+                                                        <p className="text-xs text-gray-400">{row.phone}</p>
+                                                    </td>
+                                                    <td className="px-4 py-2.5 text-right font-semibold text-gray-700">{fmt(row.collections)}</td>
+                                                    <td className="px-4 py-2.5 text-right text-gray-600">{fmt(row.totalWeight)} kg</td>
+                                                    <td className="px-4 py-2.5 text-right font-bold text-emerald-700">{fmtM(row.totalAmount)} so&apos;m</td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                            <div className="px-4 py-3 border-b border-gray-50">
+                                <p className="font-bold text-gray-800 text-sm">👷 Top masullar</p>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                                        <tr>
+                                            <th className="px-4 py-2 text-left">Masul</th>
+                                            <th className="px-4 py-2 text-right">Tayinlangan</th>
+                                            <th className="px-4 py-2 text-right">Yakunlangan</th>
+                                            <th className="px-4 py-2 text-right">To&apos;lov</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {botReports.topSupervisors.length === 0 ? (
+                                            <tr>
+                                                <td className="px-4 py-6 text-center text-gray-400" colSpan={4}>Ma&apos;lumot yo&apos;q</td>
+                                            </tr>
+                                        ) : (
+                                            botReports.topSupervisors.slice(0, 8).map((row) => (
+                                                <tr key={row.supervisorId} className="border-t border-gray-50">
+                                                    <td className="px-4 py-2.5">
+                                                        <p className="font-semibold text-gray-800">{row.name}</p>
+                                                        <p className="text-xs text-gray-400">{row.phone}</p>
+                                                    </td>
+                                                    <td className="px-4 py-2.5 text-right text-gray-600">{fmt(row.assignedRequests)}</td>
+                                                    <td className="px-4 py-2.5 text-right font-semibold text-gray-700">{fmt(row.completedRequests)}</td>
+                                                    <td className="px-4 py-2.5 text-right font-bold text-emerald-700">{fmtM(row.approvedPaymentsAmount)} so&apos;m</td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </>
             )}
 
             {/* Charts row */}

@@ -308,6 +308,11 @@ model RecyclePoint {
   requests    RecycleRequest[]
   supervisors Supervisor[]
   drivers     Driver[]
+  intakeLogs  RecycleManualIntake[]
+  pressLogs   RecyclePressLog[]
+  expenseLogs RecycleExpenseLog[]
+  cashLogs    RecycleDailyCash[]
+  salesLogs   RecycleSalesLog[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -329,6 +334,11 @@ model Supervisor {
 
   drivers      Driver[]
   requests     RecycleRequest[]          // Yo'naltirilgan arizalar
+  intakeLogs   RecycleManualIntake[]
+  pressLogs    RecyclePressLog[]
+  expenseLogs  RecycleExpenseLog[]
+  cashLogs     RecycleDailyCash[]
+  salesLogs    RecycleSalesLog[]
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -450,6 +460,113 @@ model RecycleCollection {
   collectedAt      DateTime?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+// Masul tomonidan qo'lda kiritiladigan qabul jurnali
+model RecycleManualIntake {
+  id          Int      @id @default(autoincrement())
+  supervisorId Int
+  supervisor  Supervisor @relation(fields: [supervisorId], references: [id])
+  pointId     Int?
+  point       RecyclePoint? @relation(fields: [pointId], references: [id])
+
+  date        DateTime
+  weightKg    Float
+  pricePerKg  Float
+  totalAmount Float
+  note        String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([supervisorId, date])
+  @@index([pointId, date])
+}
+
+// Preslangan qog'oz toylari / ishlab chiqarish jurnali
+model RecyclePressLog {
+  id           Int      @id @default(autoincrement())
+  supervisorId Int
+  supervisor   Supervisor @relation(fields: [supervisorId], references: [id])
+  pointId      Int?
+  point        RecyclePoint? @relation(fields: [pointId], references: [id])
+
+  date         DateTime
+  pressedKg    Float
+  baleCount    Int
+  operators    String?
+  note         String?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([supervisorId, date])
+  @@index([pointId, date])
+}
+
+// Ish haqi, xarajat va avans jurnali
+model RecycleExpenseLog {
+  id            Int      @id @default(autoincrement())
+  supervisorId  Int
+  supervisor    Supervisor @relation(fields: [supervisorId], references: [id])
+  pointId       Int?
+  point         RecyclePoint? @relation(fields: [pointId], references: [id])
+
+  date          DateTime
+  expenseAmount Float    @default(0)
+  advanceAmount Float    @default(0)
+  comment       String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([supervisorId, date])
+  @@index([pointId, date])
+}
+
+// Har kunlik kassa ochilishi
+model RecycleDailyCash {
+  id             Int      @id @default(autoincrement())
+  supervisorId   Int
+  supervisor     Supervisor @relation(fields: [supervisorId], references: [id])
+  pointId        Int?
+  point          RecyclePoint? @relation(fields: [pointId], references: [id])
+
+  date           DateTime
+  openingBalance Float
+  note           String?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([supervisorId, date])
+  @@index([pointId, date])
+}
+
+// Preslangan makulatura sotuv jurnali
+model RecycleSalesLog {
+  id             Int      @id @default(autoincrement())
+  supervisorId   Int
+  supervisor     Supervisor @relation(fields: [supervisorId], references: [id])
+  pointId        Int?
+  point          RecyclePoint? @relation(fields: [pointId], references: [id])
+
+  date           DateTime
+  customerName   String
+  weightKg       Float
+  baleCount      Int      @default(0)
+  pricePerKg     Float
+  totalAmount    Float
+  vehicleType    String?
+  plateNumber    String?
+  note           String?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([supervisorId, date])
+  @@index([pointId, date])
+  @@index([customerName])
 }
 
 // Shikoyat tizimi (2 darajali: masul → admin/direktor)

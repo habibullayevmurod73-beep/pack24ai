@@ -425,7 +425,7 @@ export const t: Texts = {
         en: '💰 Payments',
     },
     adm_btn_point: {
-        uz: '🏭 Punkt boshqarish',
+        uz: '🏭 Punkt holati',
         ru: '🏭 Управление пунктом',
         en: '🏭 Point management',
     },

@@ -11,6 +11,7 @@ import SupervisorsTab from './_components/SupervisorsTab';
 import DriversTab from './_components/DriversTab';
 import CollectionsTab from './_components/CollectionsTab';
 import ComplaintsTab from './_components/ComplaintsTab';
+import MonthlyJournalTab from './_components/MonthlyJournalTab';
 
 // ─── Типлар ──────────────────────────────────────────────────────────────────
 
@@ -106,7 +107,7 @@ const EMPTY_POINT = { regionUz: '', regionRu: '', cityUz: '', cityRu: '', phone:
 
 export default function AdminRecyclingPage() {
     // ─── State ────────────────────────────────────────────────────────────
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'points' | 'requests' | 'supervisors' | 'drivers' | 'collections' | 'complaints'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'points' | 'requests' | 'supervisors' | 'drivers' | 'collections' | 'complaints' | 'journal'>('dashboard');
     const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
 
     // Points
@@ -308,6 +309,7 @@ export default function AdminRecyclingPage() {
                     ['supervisors', '👷 Masullar'],
                     ['drivers', '🚚 Haydovchilar'],
                     ['collections', '💰 Hisob-kitob'],
+                    ['journal', '🧾 Oylik jurnal'],
                     ['complaints', '⚠️ Shikoyatlar'],
                 ] as const).map(([key, label]) => (
                     <button
@@ -847,6 +849,14 @@ export default function AdminRecyclingPage() {
 
             {/* HISOB-KITOB TAB */}
             {activeTab === 'collections' && <CollectionsTab />}
+
+            {/* OYLIK JURNAL TAB */}
+            {activeTab === 'journal' && (
+                <MonthlyJournalTab
+                    points={points.map(p => ({ id: p.id, name: p.regionUz }))}
+                    supervisors={supervisors.map(s => ({ id: s.id, name: s.name }))}
+                />
+            )}
 
             {/* SHIKOYATLAR TAB */}
             {activeTab === 'complaints' && <ComplaintsTab />}

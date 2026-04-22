@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import {
+    calculateCollectionAmounts,
+    normalizeCreateCollectionInput,
+} from '@/lib/domain/recycling/collections';
+import {
+    canTransitionRecycleRequestStatus,
+    isRecycleCollectionPaymentStatus,
+} from '@/lib/domain/recycling/statuses';
 import { sendTelegramMessage } from '@/lib/telegram/bot';
 
 // Yordamchi
@@ -34,7 +42,12 @@ export async function GET(req: NextRequest) {
         };
         if (driverId) where.driverId = Number(driverId);
         if (requestId) where.requestId = Number(requestId);
-        if (paymentStatus) where.paymentStatus = paymentStatus;
+        if (paymentStatus) {
+            if (!isRecycleCollectionPaymentStatus(paymentStatus)) {
+                return NextResponse.json({ error: 'paymentStatus noto\'g\'ri' }, { status: 400 });
+            }
+            where.paymentStatus = paymentStatus;
+        }
 
         const collections = await prisma.recycleCollection.findMany({
             where,
@@ -55,24 +68,31 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { requestId, driverId, actualWeight, discountPercent, pricePerKg, materialType, notes, discountReason } = body;
-
-        if (!requestId || !driverId || !actualWeight || !pricePerKg) {
-            return NextResponse.json({ error: 'requestId, driverId, actualWeight, pricePerKg majburiy' }, { status: 400 });
+        const normalizedInput = normalizeCreateCollectionInput(body as Record<string, unknown>);
+        if (!normalizedInput.ok) {
+            return NextResponse.json({ error: normalizedInput.error }, { status: 400 });
         }
 
-        const weight = parseFloat(actualWeight);
-        const discount = parseFloat(discountPercent || '0');
-        const price = parseFloat(pricePerKg);
+        const {
+            requestId,
+            driverId,
+            actualWeight,
+            discountPercent,
+            pricePerKg,
+            materialType,
+            notes,
+            discountReason,
+        } = normalizedInput.data;
 
-        // Kalkulator: effectiveWeight = actualWeight - (actualWeight * discount / 100)
-        // totalAmount = effectiveWeight * pricePerKg
-        const effectiveWeight = weight - (weight * discount / 100);
-        const totalAmount = Math.round(effectiveWeight * price);
+        const {
+            effectiveWeight,
+            totalAmount,
+            ecoPoints,
+        } = calculateCollectionAmounts(actualWeight, discountPercent, pricePerKg);
 
         const collection = await prisma.$transaction(async (tx) => {
             const existingCollection = await tx.recycleCollection.findFirst({
-                where: { requestId: Number(requestId) },
+                where: { requestId },
                 select: { id: true },
             });
 
@@ -80,14 +100,27 @@ export async function POST(req: NextRequest) {
                 throw new Error('COLLECTION_ALREADY_EXISTS');
             }
 
+            const request = await tx.recycleRequest.findUnique({
+                where: { id: requestId },
+                select: { id: true, status: true, userId: true },
+            });
+
+            if (!request) {
+                throw new Error('REQUEST_NOT_FOUND');
+            }
+
+            if (!canTransitionRecycleRequestStatus(request.status, 'collected')) {
+                throw new Error('INVALID_REQUEST_STATUS');
+            }
+
             const createdCollection = await tx.recycleCollection.create({
                 data: {
-                    requestId: Number(requestId),
-                    driverId: Number(driverId),
-                    actualWeight: weight,
-                    discountPercent: discount,
+                    requestId,
+                    driverId,
+                    actualWeight,
+                    discountPercent,
                     effectiveWeight,
-                    pricePerKg: price,
+                    pricePerKg,
                     totalAmount,
                     discountReason: discountReason || null,
                     materialType: materialType || null,
@@ -101,7 +134,7 @@ export async function POST(req: NextRequest) {
             });
 
             const updatedRequest = await tx.recycleRequest.update({
-                where: { id: Number(requestId) },
+                where: { id: requestId },
                 data: {
                     status: 'collected',
                     collectedAt: new Date(),
@@ -117,7 +150,7 @@ export async function POST(req: NextRequest) {
                             increment: effectiveWeight,
                         },
                         ecoPoints: {
-                            increment: Math.max(1, Math.round(effectiveWeight)),
+                            increment: ecoPoints,
                         },
                     },
                 });
@@ -131,10 +164,10 @@ export async function POST(req: NextRequest) {
         if (request.customerTgId) {
             const msg =
                 `📦 <b>Makulatura yig'ildi! #${request.id}</b>\n\n` +
-                `⚖️ Og'irlik: <b>${weight} kg</b>\n` +
-                `${discount > 0 ? `🏷️ Chegirma: <b>${discount}%</b> (${discountReason || 'sifat'})\n` : ''}` +
-                `${discount > 0 ? `📊 Hisoblangan og'irlik: <b>${effectiveWeight.toFixed(1)} kg</b>\n` : ''}` +
-                `💰 Narx: <b>${fmtMoney(price)} so'm/kg</b>\n` +
+                `⚖️ Og'irlik: <b>${actualWeight} kg</b>\n` +
+                `${discountPercent > 0 ? `🏷️ Chegirma: <b>${discountPercent}%</b> (${discountReason || 'sifat'})\n` : ''}` +
+                `${discountPercent > 0 ? `📊 Hisoblangan og'irlik: <b>${effectiveWeight.toFixed(1)} kg</b>\n` : ''}` +
+                `💰 Narx: <b>${fmtMoney(pricePerKg)} so'm/kg</b>\n` +
                 `━━━━━━━━━━━━━━━━━━\n` +
                 `💵 <b>Jami: ${fmtMoney(totalAmount)} so'm</b>\n\n` +
                 `Ma'lumotlar to'g'rimi?\n` +
@@ -148,7 +181,7 @@ export async function POST(req: NextRequest) {
             if (sup?.telegramId) {
                 await sendToTelegram(sup.telegramId,
                     `📦 Ariza #${request.id} — yuk yig'ildi\n` +
-                    `⚖️ ${weight} kg | 💵 ${fmtMoney(totalAmount)} so'm\n` +
+                    `⚖️ ${actualWeight} kg | 💵 ${fmtMoney(totalAmount)} so'm\n` +
                     `🚚 Haydovchi: ${collection.driver.name}`
                 );
             }
@@ -158,7 +191,7 @@ export async function POST(req: NextRequest) {
         // Adminga xabar
         await sendTelegramMessage(
             `📦 Yig'ish #${collection.id} yaratildi\n` +
-            `Ariza #${request.id} | ${weight} kg | ${fmtMoney(totalAmount)} so'm`
+            `Ariza #${request.id} | ${actualWeight} kg | ${fmtMoney(totalAmount)} so'm`
         );
 
         return NextResponse.json(collection, { status: 201 });
@@ -166,6 +199,20 @@ export async function POST(req: NextRequest) {
         if (error instanceof Error && error.message === 'COLLECTION_ALREADY_EXISTS') {
             return NextResponse.json(
                 { error: 'Bu ariza uchun yig\'ish hisobi allaqachon yaratilgan' },
+                { status: 409 }
+            );
+        }
+
+        if (error instanceof Error && error.message === 'REQUEST_NOT_FOUND') {
+            return NextResponse.json(
+                { error: 'Ariza topilmadi' },
+                { status: 404 }
+            );
+        }
+
+        if (error instanceof Error && error.message === 'INVALID_REQUEST_STATUS') {
+            return NextResponse.json(
+                { error: 'Ariza holati yig\'ish yaratish uchun mos emas' },
                 { status: 409 }
             );
         }

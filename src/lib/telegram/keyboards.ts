@@ -233,7 +233,10 @@ export function supervisorMainKeyboard(): ReplyKeyboard {
         keyboard: [
             [{ text: '📋 Arizalar' }, { text: '👥 Haydovchilar' }],
             [{ text: '💰 To\'lovlar' }, { text: '🏭 Punkt holati' }],
-            [{ text: '📊 Hisobotlar' }, { text: '❓ Yordam' }],
+            [{ text: '📥 Qabul' }, { text: '🏭 Press' }],
+            [{ text: '💸 Xarajat' }, { text: '💼 Kassa' }],
+            [{ text: '🚛 Sotuv' }, { text: '📊 Hisobotlar' }],
+            [{ text: '❓ Yordam' }],
         ],
         resize_keyboard: true,
     };

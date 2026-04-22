@@ -1,28 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-
-// ─── Helper: foiz o'zgarish ──────────────────────────────────────────────────
-function pctChange(current: number, previous: number): number {
-    if (previous === 0) return current > 0 ? 100 : 0;
-    return Math.round(((current - previous) / previous) * 1000) / 10; // 1 decimal
-}
+import {
+    buildReportsDateRange,
+    calculateOrderSummaries,
+} from '@/lib/domain/admin/reports';
 
 // ─── GET /api/admin/reports — Analitika va hisobotlar ────────────────────────
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
-        const period = searchParams.get('period') ?? '30';
-        const days   = parseInt(period);
-
-        // Joriy davr
-        const from = new Date();
-        from.setDate(from.getDate() - days);
-
-        // Oldingi davr (taqqoslash uchun)
-        const prevFrom = new Date();
-        prevFrom.setDate(prevFrom.getDate() - days * 2);
-        const prevTo = new Date();
-        prevTo.setDate(prevTo.getDate() - days);
+        const fromParam = searchParams.get('from');
+        const toParam = searchParams.get('to');
+        const {
+            from,
+            toExclusive,
+            days,
+            prevFrom,
+            prevTo,
+        } = buildReportsDateRange(searchParams.get('period'), fromParam, toParam);
 
         const [
             totalOrders,
@@ -35,6 +30,14 @@ export async function GET(req: NextRequest) {
             dailyRevenue,
             // Yangi: takroriy mijozlar
             repeatCustomers,
+            requestByPickupType,
+            requestByRecycleStatus,
+            uniqueRecycleUsers,
+            driverCollections,
+            pendingDriverPayments,
+            supervisorRequests,
+            supervisorCompleted,
+            approvedPayments,
         ] = await Promise.all([
             // 1. Jami buyurtmalar
             prisma.order.count(),
@@ -52,7 +55,7 @@ export async function GET(req: NextRequest) {
 
             // 4. Joriy davr buyurtmalari
             prisma.order.findMany({
-                where: { createdAt: { gte: from } },
+                where: { createdAt: { gte: from, lt: toExclusive } },
                 orderBy: { createdAt: 'asc' },
                 select: { id: true, totalAmount: true, status: true, createdAt: true, contactPhone: true },
             }),
@@ -76,7 +79,7 @@ export async function GET(req: NextRequest) {
             prisma.order.groupBy({
                 by: ['status'],
                 _count: { status: true },
-                where: { createdAt: { gte: from } },
+                where: { createdAt: { gte: from, lt: toExclusive } },
             }),
 
             // 8. Kunlik daromad
@@ -104,6 +107,75 @@ export async function GET(req: NextRequest) {
                     HAVING COUNT(*) >= 2
                 ) as repeats
             `,
+
+            // 10. Customer bot: arizalar pickup turi bo'yicha
+            prisma.recycleRequest.groupBy({
+                by: ['pickupType'],
+                _count: { _all: true },
+                where: { createdAt: { gte: from, lt: toExclusive } },
+            }),
+
+            // 11. Customer bot: status bo'yicha arizalar
+            prisma.recycleRequest.groupBy({
+                by: ['status'],
+                _count: { _all: true },
+                where: { createdAt: { gte: from, lt: toExclusive } },
+            }),
+
+            // 12. Customer bot: unikal Telegram foydalanuvchilar
+            prisma.$queryRaw<{ count: number }[]>`
+                SELECT COUNT(DISTINCT "customerTgId")::int as count
+                FROM "RecycleRequest"
+                WHERE "createdAt" >= ${from}
+                  AND "createdAt" < ${toExclusive}
+                  AND "customerTgId" IS NOT NULL
+                  AND "customerTgId" != ''
+            `,
+
+            // 13. Driver bot: yig'ishlar top haydovchilar kesimida
+            prisma.recycleCollection.groupBy({
+                by: ['driverId'],
+                _count: { _all: true },
+                _sum: { actualWeight: true, totalAmount: true },
+                where: { createdAt: { gte: from, lt: toExclusive } },
+                orderBy: { _sum: { totalAmount: 'desc' } },
+                take: 10,
+            }),
+
+            // 14. Driver bot: to'lovi kutilayotgan yig'ishlar
+            prisma.recycleCollection.count({
+                where: { createdAt: { gte: from, lt: toExclusive }, paymentStatus: 'pending' },
+            }),
+
+            // 15. Admin bot: supervisor bo'yicha arizalar
+            prisma.recycleRequest.groupBy({
+                by: ['supervisorId'],
+                _count: { _all: true },
+                where: { createdAt: { gte: from, lt: toExclusive }, supervisorId: { not: null } },
+            }),
+
+            // 16. Admin bot: supervisor bo'yicha yakunlangan arizalar
+            prisma.recycleRequest.groupBy({
+                by: ['supervisorId'],
+                _count: { _all: true },
+                where: {
+                    status: 'completed',
+                    completedAt: { gte: from, lt: toExclusive },
+                    supervisorId: { not: null },
+                },
+            }),
+
+            // 17. Admin bot: masullar tomonidan tasdiqlangan to'lovlar
+            prisma.recycleCollection.groupBy({
+                by: ['paidBy'],
+                _count: { _all: true },
+                _sum: { totalAmount: true },
+                where: {
+                    paidAt: { gte: from, lt: toExclusive },
+                    paidBy: { not: null },
+                    paymentStatus: { in: ['paid_to_customer', 'paid_to_driver', 'paid_both', 'completed'] },
+                },
+            }),
         ]);
 
         // ─── Top mahsulotlar details ──────────────────────────────────────
@@ -132,37 +204,111 @@ export async function GET(req: NextRequest) {
             orders:  Number(d.count ?? 0),
         }));
 
-        // ─── Joriy davr summary ───────────────────────────────────────────
-        const curCount     = periodOrders.length;
-        const curRevenue   = periodOrders.reduce((s: number, o: { totalAmount: number | null }) => s + (o.totalAmount ?? 0), 0);
-        const curCompleted = periodOrders.filter((o: { status: string }) => o.status === 'delivered').length;
-        const curCancelled = periodOrders.filter((o: { status: string }) => o.status === 'cancelled').length;
-        const curConversion = curCount > 0 ? Math.round((curCompleted / curCount) * 100) : 0;
+        const repeatCount = Number(repeatCustomers?.[0]?.count ?? 0);
+        const orderSummaries = calculateOrderSummaries(periodOrders, prevPeriodOrders, repeatCount);
+        const curCount = orderSummaries.current.count;
+        const curRevenue = orderSummaries.current.revenue;
+        const curCompleted = orderSummaries.current.completed;
+        const curCancelled = orderSummaries.current.cancelled;
+        const curConversion = orderSummaries.current.conversion;
+        const aov = orderSummaries.current.aov;
+        const cancelRate = orderSummaries.current.cancelRate;
+        const repeatRate = orderSummaries.current.repeatRate;
+        const trends = orderSummaries.trends;
 
-        // ─── Oldingi davr summary ─────────────────────────────────────────
-        const prevCount     = prevPeriodOrders.length;
-        const prevRevenue   = prevPeriodOrders.reduce((s: number, o: { totalAmount: number | null }) => s + (o.totalAmount ?? 0), 0);
-        const prevCompleted = prevPeriodOrders.filter((o: { status: string }) => o.status === 'delivered').length;
-        const prevConversion = prevCount > 0 ? Math.round((prevCompleted / prevCount) * 100) : 0;
+        // ─── Botlar bo'yicha KPI va jadvallar ────────────────────────────────
+        const recycleStatusCountMap = new Map(
+            requestByRecycleStatus.map((item) => [item.status, item._count._all])
+        );
+        const recyclePickupTypeMap = new Map(
+            requestByPickupType.map((item) => [item.pickupType ?? 'unknown', item._count._all])
+        );
 
-        // ─── TREND hisoblash ──────────────────────────────────────────────
-        const trends = {
-            ordersGrowth:     pctChange(curCount, prevCount),
-            revenueGrowth:    pctChange(curRevenue, prevRevenue),
-            conversionChange: pctChange(curConversion, prevConversion),
+        const customerBotKpi = {
+            uniqueUsers: Number(uniqueRecycleUsers?.[0]?.count ?? 0),
+            totalRequests: requestByRecycleStatus.reduce((sum, row) => sum + row._count._all, 0),
+            pickupRequests: recyclePickupTypeMap.get('pickup') ?? 0,
+            selfDeliveryRequests: recyclePickupTypeMap.get('base') ?? 0,
+            confirmedRequests:
+                (recycleStatusCountMap.get('confirmed') ?? 0) +
+                (recycleStatusCountMap.get('completed') ?? 0),
+            disputedRequests: recycleStatusCountMap.get('disputed') ?? 0,
         };
 
-        // ─── Yangi metrikalar ─────────────────────────────────────────────
-        const aov = curCount > 0 ? Math.round(curRevenue / curCount) : 0; // O'rtacha buyurtma
-        const cancelRate = curCount > 0 ? Math.round((curCancelled / curCount) * 100) : 0;
-        const repeatCount = Number(repeatCustomers?.[0]?.count ?? 0);
+        const driverTotals = driverCollections.reduce(
+            (acc, row) => {
+                acc.collections += row._count._all;
+                acc.totalWeight += Number(row._sum.actualWeight ?? 0);
+                acc.totalAmount += Number(row._sum.totalAmount ?? 0);
+                return acc;
+            },
+            { collections: 0, totalWeight: 0, totalAmount: 0 }
+        );
 
-        const uniquePhones = new Set(
-            periodOrders
-                .map((o: { contactPhone: string | null }) => o.contactPhone)
-                .filter(Boolean)
-        ).size;
-        const repeatRate = uniquePhones > 0 ? Math.round((repeatCount / uniquePhones) * 100) : 0;
+        const driverIds = driverCollections.map((row) => row.driverId).filter(Boolean) as number[];
+        const drivers = driverIds.length > 0
+            ? await prisma.driver.findMany({
+                where: { id: { in: driverIds } },
+                select: { id: true, name: true, phone: true, isOnline: true, status: true },
+            })
+            : [];
+        const driverMap = new Map(drivers.map((d) => [d.id, d]));
+
+        const topDrivers = driverCollections.map((row) => {
+            const driver = driverMap.get(row.driverId);
+            return {
+                driverId: row.driverId,
+                name: driver?.name ?? `Haydovchi #${row.driverId}`,
+                phone: driver?.phone ?? '—',
+                isOnline: driver?.isOnline ?? false,
+                status: driver?.status ?? 'unknown',
+                collections: row._count._all,
+                totalWeight: Number(row._sum.actualWeight ?? 0),
+                totalAmount: Number(row._sum.totalAmount ?? 0),
+            };
+        });
+
+        const adminAssignedMap = new Map(
+            supervisorRequests.map((row) => [row.supervisorId as number, row._count._all])
+        );
+        const adminCompletedMap = new Map(
+            supervisorCompleted.map((row) => [row.supervisorId as number, row._count._all])
+        );
+        const paymentBySupervisorNameMap = new Map(
+            approvedPayments.map((row) => [row.paidBy ?? '', row])
+        );
+
+        const supervisorIds = Array.from(new Set([
+            ...supervisorRequests.map((row) => row.supervisorId),
+            ...supervisorCompleted.map((row) => row.supervisorId),
+        ].filter(Boolean))) as number[];
+
+        const supervisors = supervisorIds.length > 0
+            ? await prisma.supervisor.findMany({
+                where: { id: { in: supervisorIds } },
+                select: { id: true, name: true, phone: true },
+            })
+            : [];
+
+        const topSupervisors = supervisors.map((sup) => {
+            const paymentRow = paymentBySupervisorNameMap.get(sup.name);
+            return {
+                supervisorId: sup.id,
+                name: sup.name,
+                phone: sup.phone,
+                assignedRequests: adminAssignedMap.get(sup.id) ?? 0,
+                completedRequests: adminCompletedMap.get(sup.id) ?? 0,
+                approvedPaymentsCount: paymentRow?._count?._all ?? 0,
+                approvedPaymentsAmount: Number(paymentRow?._sum?.totalAmount ?? 0),
+            };
+        }).sort((a, b) => b.completedRequests - a.completedRequests);
+
+        const adminBotKpi = {
+            assignedRequests: supervisorRequests.reduce((sum, row) => sum + row._count._all, 0),
+            completedRequests: supervisorCompleted.reduce((sum, row) => sum + row._count._all, 0),
+            approvedPaymentsCount: approvedPayments.reduce((sum, row) => sum + row._count._all, 0),
+            approvedPaymentsAmount: approvedPayments.reduce((sum, row) => sum + Number(row._sum.totalAmount ?? 0), 0),
+        };
 
         // ─── Sotuv Funnel (status pipeline) ──────────────────────────────────
         const funnelData = {
@@ -203,6 +349,7 @@ export async function GET(req: NextRequest) {
                     COALESCE(SUM("totalAmount"), 0)::float as revenue
                 FROM "Order"
                 WHERE "createdAt" >= ${from}
+                  AND "createdAt" < ${toExclusive}
                   AND status NOT IN ('draft', 'cancelled')
                   AND "shippingAddress" IS NOT NULL
                   AND "shippingAddress" != ''
@@ -227,6 +374,7 @@ export async function GET(req: NextRequest) {
                     COUNT(*)::int as cnt
                 FROM "Order"
                 WHERE "createdAt" >= ${from}
+                  AND "createdAt" < ${toExclusive}
                   AND status NOT IN ('draft')
                 GROUP BY hour
                 ORDER BY cnt DESC
@@ -257,9 +405,33 @@ export async function GET(req: NextRequest) {
             dailyRevenue: daily,
             funnelData,
             regionSales,
+            botReports: {
+                customer: customerBotKpi,
+                driver: {
+                    totalCollections: driverTotals.collections,
+                    totalWeight: Math.round(driverTotals.totalWeight * 10) / 10,
+                    totalAmount: Math.round(driverTotals.totalAmount),
+                    pendingPayments: pendingDriverPayments,
+                },
+                admin: adminBotKpi,
+                topDrivers,
+                topSupervisors,
+            },
             period: days,
         });
     } catch (error) {
+        if (error instanceof Error && error.message === 'INVALID_FROM') {
+            return NextResponse.json({ error: 'Noto\'g\'ri from sana' }, { status: 400 });
+        }
+
+        if (error instanceof Error && error.message === 'INVALID_TO') {
+            return NextResponse.json({ error: 'Noto\'g\'ri to sana' }, { status: 400 });
+        }
+
+        if (error instanceof Error && error.message === 'INVALID_RANGE') {
+            return NextResponse.json({ error: '`to` sanasi `from` dan katta bo\'lishi kerak' }, { status: 400 });
+        }
+
         console.error('[API/admin/reports]', error);
         return NextResponse.json({ error: 'Server xatosi' }, { status: 500 });
     }
