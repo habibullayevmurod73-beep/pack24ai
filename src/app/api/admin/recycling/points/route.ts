@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { getPoints, createPoint } from '@/lib/domain/recycling/pointService';
 
 export async function GET() {
     try {
-        const points = await prisma.recyclePoint.findMany({
-            orderBy: { id: 'asc' }
-        });
+        const points = await getPoints();
         return NextResponse.json(points);
     } catch (error) {
+        console.error('[Points GET]', error);
         return NextResponse.json({ error: 'Server xatosi' }, { status: 500 });
     }
 }
@@ -15,27 +14,14 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        
-        if (!body.regionUz || !body.cityUz || !body.phone) {
-            return NextResponse.json({ error: 'Asosiy maydonlar to\'ldirilmagan' }, { status: 400 });
-        }
-
-        const point = await prisma.recyclePoint.create({
-            data: {
-                regionUz: body.regionUz,
-                regionRu: body.regionRu || body.regionUz,
-                cityUz: body.cityUz,
-                cityRu: body.cityRu || body.cityUz,
-                phone: body.phone,
-                address: body.address || null,
-                lat: body.lat ? Number(body.lat) : null,
-                lng: body.lng ? Number(body.lng) : null,
-                status: body.status || 'planned',
-                color: body.color || 'bg-blue-500',
-            }
-        });
+        const point = await createPoint(body);
         return NextResponse.json(point, { status: 201 });
     } catch (error) {
+        if (error instanceof Error && error.message.startsWith('VALIDATION_ERROR:')) {
+            return NextResponse.json({ error: error.message.replace('VALIDATION_ERROR: ', '') }, { status: 400 });
+        }
+        console.error('[Points POST]', error);
         return NextResponse.json({ error: 'Server xatosi' }, { status: 500 });
     }
 }
+

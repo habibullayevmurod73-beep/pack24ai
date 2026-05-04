@@ -1,18 +1,9 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { getRecycleRequests } from '@/lib/domain/recycling/requestService';
 
 export async function GET() {
     try {
-        const requests = await prisma.recycleRequest.findMany({
-            orderBy: { createdAt: 'desc' },
-            include: {
-                point: true,
-                supervisor: true,
-                assignedDriver: true,
-                collections: true,
-                complaints: true,
-            },
-        });
+        const requests = await getRecycleRequests();
         return NextResponse.json(requests);
     } catch (error) {
         console.error('[Requests GET]', error);
