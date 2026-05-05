@@ -12,9 +12,9 @@ export async function register() {
     setTimeout(() => {
         void (async () => {
             try {
-                const { isTelegramPollingStarted, startTelegramPolling } =
-                    await import('@/lib/telegram/runtime');
-                const { TELEGRAM_POLLING_BOT_ENTRIES } = await import('@/lib/telegram/pollingBotsConfig');
+                const { isTelegramPollingStarted, startTelegramPolling } = await import('./lib/telegram/runtime');
+                const { TELEGRAM_POLLING_BOT_ENTRIES } = await import('./lib/telegram/pollingBotsConfig');
+
                 if (isTelegramPollingStarted()) return;
                 const results = await startTelegramPolling(TELEGRAM_POLLING_BOT_ENTRIES);
                 console.log('[telegram] TELEGRAM_DEV_AUTO_POLL:', results);

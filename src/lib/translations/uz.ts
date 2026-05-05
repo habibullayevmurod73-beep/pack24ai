@@ -37,6 +37,8 @@ export const uz = {
     'nav.contacts': 'KONTAKTLAR',
     'nav.onlinePayment': "Onlayn To'lov",
     'nav.catalog': 'KATALOG',
+    'nav.eco_dashboard': 'ECO DASHBOARD',
+    'nav.referral': 'REFERAL',
     // Common
     'common.search': 'Qidirish...',
     'common.cart': 'Savat',

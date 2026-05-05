@@ -37,6 +37,8 @@ export const en = {
     'nav.contacts': 'CONTACTS',
     'nav.onlinePayment': 'Online Payment',
     'nav.catalog': 'CATALOG',
+    'nav.eco_dashboard': 'ECO DASHBOARD',
+    'nav.referral': 'REFERRAL',
     // Common
     'common.search': 'Search...',
     'common.cart': 'Cart',

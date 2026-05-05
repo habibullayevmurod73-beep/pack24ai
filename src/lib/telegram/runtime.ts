@@ -1,4 +1,4 @@
-import { Telegraf } from 'telegraf';
+import type { Telegraf } from 'telegraf';
 
 export type TelegramRuntimeBot = {
     name: string;
@@ -9,7 +9,7 @@ export type TelegramRuntimeBot = {
 const globalForTelegramRuntime = globalThis as unknown as {
     _telegramPollingStarted?: boolean;
     _telegramPollingShutdownRegistered?: boolean;
-    _telegramPollingBots?: Map<string, Telegraf>;
+    _telegramPollingBots?: Map<string, any>;
 };
 
 function getPollingBotsRegistry() {

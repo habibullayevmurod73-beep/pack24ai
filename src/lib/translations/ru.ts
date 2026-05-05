@@ -37,6 +37,8 @@ export const ru = {
     'nav.contacts': 'КОНТАКТЫ',
     'nav.onlinePayment': 'Онлайн-оплата',
     'nav.catalog': 'КАТАЛОГ',
+    'nav.eco_dashboard': 'ЭКО ПАНЕЛЬ',
+    'nav.referral': 'РЕФЕРАЛ',
     // Common
     'common.search': 'Поиск...',
     'common.cart': 'Корзина',

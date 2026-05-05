@@ -62,6 +62,20 @@ const nextConfig: NextConfig = {
 
   // Trailing slash consistency
   trailingSlash: false,
+
+  // External packages that should not be bundled (Node.js only)
+  serverExternalPackages: ["telegraf", "safe-compare"],
+
+  webpack: (config, { isServer, nextRuntime }) => {
+    if (nextRuntime === 'edge') {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        telegraf: false,
+        'safe-compare': false,
+      };
+    }
+    return config;
+  },
 };
 
 export default nextConfig;
