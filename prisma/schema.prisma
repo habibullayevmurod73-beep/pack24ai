@@ -73,15 +73,22 @@ model User {
 // ─── Push Notification Subscriptionlar ───────────────────────────────────────
 model PushSubscription {
   id        Int      @id @default(autoincrement())
-  endpoint  String   @unique           // Browser push endpoint URL
-  p256dh    String                     // Public ECDH key
-  auth      String                     // Auth secret
-  userId    Int?                       // Autentifikatsiya qilingan foydalanuvchi (ixtiyoriy)
+  endpoint  String?  @unique           // Browser push endpoint URL
+  p256dh    String?                    // Public ECDH key
+  auth      String?                    // Auth secret
+  token     String?  @unique           // Expo Push Token (mobil)
+  userId    Int?                       // Autentifikatsiya qilingan foydalanuvchi
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  userAgent String?                    // Browser turi (debug uchun)
-  isActive  Boolean  @default(true)    // Subscription hali ham faol
+  driverId  Int?                       // Haydovchi (mobil)
+  platform  String   @default("web")   // web, ios, android
+  appType   String   @default("web")   // web, customer, driver
+  userAgent String?                    // Browser turi
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([driverId])
+  @@index([appType, isActive])
 }
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -937,3 +944,5 @@ model CorporateInvoice {
   @@index([orderId])
   @@index([dueDate, status])
 }
+
+
