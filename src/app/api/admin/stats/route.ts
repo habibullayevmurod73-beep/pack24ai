@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { OrderStatus } from '@prisma/client';
 
 // ─── GET /api/admin/stats — Dashboard uchun real statistika ──────────────────
 export async function GET(req: NextRequest) {
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
             recentOrders,
         ] = await Promise.all([
             prisma.order.count(),
-            prisma.order.count({ where: { status: 'new' } }),
+            prisma.order.count({ where: { status: OrderStatus.new_ } }),
             prisma.order.findMany({
                 where: { createdAt: { gte: startOfMonth } },
                 select: { totalAmount: true, status: true },

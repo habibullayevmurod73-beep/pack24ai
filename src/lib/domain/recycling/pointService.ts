@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { RecyclePointStatus } from '@prisma/client';
 
 export async function getPoints() {
     return prisma.recyclePoint.findMany({
@@ -32,7 +33,7 @@ export async function createPoint(data: {
             address: data.address || null,
             lat: data.lat ? Number(data.lat) : null,
             lng: data.lng ? Number(data.lng) : null,
-            status: data.status || 'planned',
+            status: (data.status as RecyclePointStatus) || RecyclePointStatus.planned,
             color: data.color || 'bg-blue-500',
         }
     });

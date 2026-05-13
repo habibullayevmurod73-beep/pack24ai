@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { DriverStatus } from '@prisma/client';
 import { createBotEvent } from '@/lib/telegram/botEvents';
 import { normalizeStaffPhone } from '@/lib/telegram/botAccessRequests';
 
@@ -65,7 +66,7 @@ export async function createDriver(data: {
             supervisorId: data.supervisorId ? Number(data.supervisorId) : null,
             pointId: data.pointId ? Number(data.pointId) : null,
             vehicleInfo: data.vehicleInfo || null,
-            status: data.status || 'active',
+            status: (data.status as DriverStatus) || DriverStatus.active,
             registrationCode,
         },
         include: { supervisor: true, point: true },

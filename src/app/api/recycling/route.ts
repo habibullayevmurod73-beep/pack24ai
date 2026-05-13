@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { RecycleRequestStatus, DriverStatus } from '@prisma/client';
 import { notifyCustomer, notifySalesChats } from '@/lib/telegram/notifier';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -87,10 +88,10 @@ export async function POST(request: Request) {
                 // Avto-dispatch
                 ...(supervisor ? {
                     supervisorId: supervisor.id,
-                    status:       'dispatched',
+                    status:       RecycleRequestStatus.dispatched,
                     dispatchedAt: new Date(),
                 } : {
-                    status: 'new',
+                    status: RecycleRequestStatus.new_,
                 }),
             },
         });
@@ -151,7 +152,7 @@ export async function POST(request: Request) {
 
                 // Masulga inline tayinlash tugmalari bilan yuklaymiz
                 const drivers = await prisma.driver.findMany({
-                    where: { supervisorId: supervisor.id, status: 'active', isOnline: true },
+                    where: { supervisorId: supervisor.id, status: DriverStatus.active, isOnline: true },
                     take: 5,
                     orderBy: { id: 'asc' },
                 });

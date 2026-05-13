@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+import { BotEventStatus } from '@prisma/client';
 
 export type PlatformEventSource =
     | 'customer'
@@ -8,7 +9,7 @@ export type PlatformEventSource =
     | 'platform';
 
 export type PlatformEventSeverity = 'info' | 'success' | 'warning' | 'error';
-export type PlatformEventStatus = 'new' | 'read' | 'archived';
+export type PlatformEventStatus = BotEventStatus;
 
 /**
  * Tanilgan `eventType` roʻyxati: buyurtmalar, qayta ishlash (admin + botlar), ombor, jurnal, shikoyat.

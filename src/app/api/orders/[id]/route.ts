@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { OrderStatus } from '@prisma/client';
 import { notifyCustomer, notifySalesChats } from '@/lib/telegram/notifier';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -74,7 +75,7 @@ export async function PUT(
         });
 
         // If status changed to 'new', send telegram notification
-        if (body.status === 'new' && updatedOrder.status === 'new') {
+        if (body.status === 'new' && updatedOrder.status === OrderStatus.new_) {
             try {
                 if (updatedOrder.telegramUserId) {
                     await notifyCustomer(
@@ -115,7 +116,7 @@ export async function PATCH(
 
         if (action === 'cancel') {
             // Faqat 'new' yoki 'processing' statusdagi buyurtmalarni bekor qilish mumkin
-            if (!['new', 'processing'].includes(order.status)) {
+            if (order.status !== OrderStatus.new_ && order.status !== OrderStatus.processing) {
                 return NextResponse.json(
                     { error: 'Bu buyurtmani bekor qilib bo\'lmaydi. Faqat yangi yoki jarayondagi buyurtmalarni bekor qilish mumkin.' },
                     { status: 400 }
@@ -129,7 +130,7 @@ export async function PATCH(
                 // 2. Buyurtma statusini yangilash
                 return tx.order.update({
                     where: { id: parseInt(id) },
-                    data: { status: 'cancelled' },
+                    data: { status: OrderStatus.cancelled },
                     include: { items: { include: { product: true } } },
                 });
             }, { maxWait: 10000, timeout: 30000 });

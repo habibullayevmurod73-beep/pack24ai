@@ -1,14 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { ProductStatus } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { parseProduct } from '@/lib/product-utils';
 import { downloadAndUploadToSupabase, processGalleryUrls } from '@/lib/media-utils';
 
-// ─── Prisma Product filter type ───────────────────────────────────────────────
-interface ProductWhere {
-    category?: string;
-    status?: string;
-    name?: { contains: string; mode: 'insensitive' };
-}
+
 
 export async function GET(request: Request) {
     try {
@@ -17,7 +14,7 @@ export async function GET(request: Request) {
         const status   = searchParams.get('status');
         const search   = searchParams.get('search');
 
-        const where: ProductWhere = {};
+        const where: Prisma.ProductWhereInput = {};
 
         if (category && category !== 'all') where.category = category;
         if (status   && status   !== 'all') where.status   = status;
@@ -63,7 +60,7 @@ export async function POST(request: Request) {
                 specifications: body.specifications ?? {},
                 tags:           Array.isArray(body.tags) ? body.tags : [],
                 minQuantity:    body.minQuantity    ? parseInt(body.minQuantity) : 1,
-                status:         body.status         || 'draft',
+                status:         (body.status as ProductStatus) || ProductStatus.draft,
                 inStock:        body.inStock        !== false,
             },
         });

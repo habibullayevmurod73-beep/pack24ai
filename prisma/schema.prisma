@@ -10,6 +10,159 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ─── Enum turlar ─────────────────────────────────────────────────────────────
+
+enum OrderStatus {
+  draft
+  new_       @map("new")
+  processing
+  shipping
+  delivered
+  cancelled
+}
+
+enum PaymentStatus {
+  pending
+  processing
+  paid
+  failed
+  refunded
+}
+
+enum ProductStatus {
+  active
+  draft
+  archived
+}
+
+enum RecycleRequestStatus {
+  new_        @map("new")
+  dispatched
+  assigned
+  en_route
+  arrived
+  collecting
+  collected
+  confirmed
+  completed
+  cancelled
+  disputed
+}
+
+enum DriverStatus {
+  active
+  inactive
+  on_route
+  busy
+}
+
+enum RecyclePaymentStatus {
+  pending
+  paid_to_driver
+  paid_to_customer
+  paid_both
+  completed
+}
+
+enum WorkOrderStatus {
+  planned
+  in_progress
+  completed
+  paused
+  cancelled
+}
+
+enum WorkOrderStageStatus {
+  pending
+  in_progress
+  completed
+}
+
+enum RecyclePointStatus {
+  active
+  planned
+}
+
+enum CampaignStatus {
+  draft
+  scheduled
+  sent
+}
+
+enum BotAccessStatus {
+  pending
+  approved
+  rejected
+}
+
+enum TaskStatus {
+  pending
+  in_progress
+  review
+  completed
+  cancelled
+}
+
+enum TaskPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum TaskAssigneeRole {
+  assignee
+  reviewer
+  observer
+}
+
+enum TaskAssigneeStatus {
+  assigned
+  in_progress
+  completed
+  declined
+}
+
+enum ComplaintStatus {
+  open
+  in_progress
+  resolved
+  closed
+}
+
+enum ComplaintLevel {
+  supervisor
+  director
+}
+
+enum NotificationStatus {
+  sent
+  delivered
+  read
+  accepted
+  failed
+  escalated
+}
+
+enum ContractStatus {
+  active
+  suspended
+  closed
+}
+
+enum InvoiceStatus {
+  issued
+  paid
+  partial
+  overdue
+  cancelled
+}
+
+enum BotEventStatus {
+  new_       @map("new")
+  processed
+}
+
 // ─── Foydalanuvchi modeli ────────────────────────────────────────────────────
 model User {
   id           Int      @id @default(autoincrement())
@@ -98,7 +251,7 @@ model Campaign {
   type      String   // 'telegram', 'sms', 'email'
   content   String
   audience  String
-  status    String   // 'sent', 'scheduled', 'draft'
+  status    CampaignStatus
   sentAt    DateTime?
   receivers Int      @default(0)
   views     Int      @default(0)
@@ -137,7 +290,7 @@ model TelegramHqAdmin {
 model BotAccessRequest {
   id                     Int       @id @default(autoincrement())
   role                   String
-  status                 String    @default("pending")
+  status                 BotAccessStatus    @default(pending)
   name                   String
   phone                  String
   telegramId             String?
@@ -179,7 +332,7 @@ model BotEvent {
   severity     String    @default("info")
   title        String
   message      String
-  status       String    @default("new")
+  status       BotEventStatus    @default(new_)
   dedupeKey    String?   @unique
   payload      Json?
   requestId    Int?
@@ -221,7 +374,7 @@ model Product {
   inStock      Boolean  @default(true)
   rating       Float    @default(0)
   reviews      Int      @default(0)
-  status       String   @default("active")  // active, draft, archived
+  status       ProductStatus   @default(active)
   isFeatured   Boolean  @default(false)     // Kategoriya namuna mahsuloti
   sourceUrl    String?
   items        OrderItem[]
@@ -254,7 +407,7 @@ model Order {
   userId          Int?
   user            User?       @relation(fields: [userId], references: [id])
   
-  status          String      @default("draft") // draft, new, processing, shipping, delivered, cancelled
+  status          OrderStatus      @default(draft)
   totalAmount     Float       @default(0)
   
   shippingAddress String?
@@ -263,7 +416,7 @@ model Order {
   deliveryMethod  String?     // 'courier', 'pickup'
 
   paymentMethod   String?     // 'cash', 'click', 'payme'
-  paymentStatus   String      @default("pending")
+  paymentStatus   PaymentStatus      @default(pending)
   
   // Yangi: Status timestamp'lar — analytics uchun
   confirmedAt     DateTime?   // Tasdiqlangan
@@ -351,8 +504,8 @@ model WorkOrder {
   quantity    Int
   deadline    DateTime
   
-  status      String   @default("planned") // planned, in_progress, completed, paused, cancelled
-  priority    String   @default("normal") // low, normal, high, urgent
+  status      WorkOrderStatus   @default(planned)
+  priority    TaskPriority   @default(normal)
   
   progress    Int      @default(0) // 0-100%
   currentStage String  @default("gofra") // gofra, pechat, yiguv, qc
@@ -370,7 +523,7 @@ model WorkOrderStage {
   workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   
   stage       String    // gofra, pechat, yiguv, qc
-  status      String    @default("pending") // pending, in_progress, completed
+  status      WorkOrderStageStatus    @default(pending)
   
   startedAt   DateTime?
   completedAt DateTime?
@@ -410,7 +563,7 @@ model RecyclePoint {
   lat         Float?                     // Kenglik (koordinata)
   lng         Float?                     // Uzunlik (koordinata)
   pricePerKg    Float    @default(800)     // Default narx (so'm/kg) — masul+admin belgilaydi
-  status        String   @default("active") // active, planned
+  status        RecyclePointStatus   @default(active)
   color         String   @default("bg-emerald-500")
   workingHours  String   @default("08:00-18:00") // Ish tartibi
   isAccepting   Boolean  @default(true)    // Hozir qabul qilayaptimi (masul boshqaradi)
@@ -464,7 +617,7 @@ model Supervisor {
 // Mas'ul jurnal yozuvlarini tahrirlash — HQ admin tasdig'i bilan
 model JournalCorrectionRequest {
   id                  Int       @id @default(autoincrement())
-  status              String    @default("pending") // pending | approved | rejected
+  status              BotAccessStatus    @default(pending)
   entityType          String    // manual_intake | press_log | expense_log | daily_cash | sales_log
   entityId            Int
   supervisorId        Int
@@ -499,7 +652,7 @@ model Driver {
   supervisor     Supervisor? @relation(fields: [supervisorId], references: [id])
   pointId        Int?                    // Qaysi baza hududida
   point          RecyclePoint? @relation(fields: [pointId], references: [id])
-  status         String   @default("active")  // active, inactive, on_route, busy
+  status         DriverStatus   @default(active)
   isOnline       Boolean  @default(false)
   vehicleInfo    String?                 // Mashina ma'lumoti
   lastSeenAt     DateTime?
@@ -541,7 +694,7 @@ model RecycleRequest {
   user          User?                    @relation(fields: [userId], references: [id])
 
   // Status pipeline: new → dispatched → assigned → en_route → arrived → collecting → collected → confirmed → completed / cancelled / disputed
-  status        String       @default("new")
+  status        RecycleRequestStatus       @default(new_)
 
   // Dispatch zanjiri
   supervisorId    Int?
@@ -597,7 +750,7 @@ model RecycleCollection {
   deliveredAt       DateTime?
 
   // To'lov — masul belgilaydi: haydovchiga yoki mijozga
-  paymentStatus    String   @default("pending")  // pending, paid_to_driver, paid_to_customer, paid_both, completed
+  paymentStatus    RecyclePaymentStatus   @default(pending)
   paymentToDriver  Float?                // Haydovchiga to'langan summa
   paymentToCustomer Float?               // Mijozga to'langan summa
   paymentNote      String?
@@ -724,10 +877,10 @@ model RecycleComplaint {
 
   fromPhone   String                     // Shikoyatchi telefoni
   fromName    String
-  level       String   @default("supervisor")  // supervisor, director (=admin)
+  level       ComplaintLevel   @default(supervisor)
   message     String                     // Shikoyat matni
 
-  status      String   @default("open")  // open, in_progress, resolved, closed
+  status      ComplaintStatus   @default(open)
   response    String?                    // Javob matni
   respondedBy String?
   resolvedAt  DateTime?
@@ -749,8 +902,8 @@ model Task {
   department     String  @default("general")
 
   assignmentType String  @default("individual")
-  status         String  @default("pending")
-  priority       String  @default("normal")
+  status         TaskStatus  @default(pending)
+  priority       TaskPriority  @default(normal)
 
   dueAt            DateTime?
   estimatedMinutes Int?
@@ -789,8 +942,8 @@ model TaskAssignee {
   userId Int
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  role   String  @default("assignee")
-  status String  @default("assigned")
+  role   TaskAssigneeRole  @default(assignee)
+  status TaskAssigneeStatus  @default(assigned)
 
   createdAt   DateTime  @default(now())
   completedAt DateTime?
@@ -869,7 +1022,7 @@ model TaskNotification {
   user       User     @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
 
   channel    String                 // "telegram" | "sms" | "call"
-  status     String   @default("sent")  // "sent" | "delivered" | "read" | "accepted" | "failed" | "escalated"
+  status     NotificationStatus   @default(sent)
 
   sentAt       DateTime  @default(now())
   deliveredAt  DateTime?
@@ -904,7 +1057,7 @@ model Contract {
   creditLimit    Float     @default(0)      // Nasiya limiti (so'm)
   paymentTermDays Int      @default(15)     // To'lov muddati (kun)
 
-  status         String    @default("active") // active, suspended, closed
+  status         ContractStatus    @default(active)
   startDate      DateTime  @default(now())
   endDate        DateTime?
   notes          String?
@@ -932,7 +1085,7 @@ model CorporateInvoice {
   vatAmount      Float                      // QQS summasi
   totalAmount    Float                      // Jami (QQS bilan)
 
-  status         String    @default("issued") // issued, paid, partial, overdue, cancelled
+  status         InvoiceStatus    @default(issued)
   dueDate        DateTime                   // To'lov muddati
   paidAmount     Float     @default(0)
   paidAt         DateTime?

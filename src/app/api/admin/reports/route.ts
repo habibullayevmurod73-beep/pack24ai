@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { OrderStatus, RecycleRequestStatus, RecyclePaymentStatus } from '@prisma/client';
 import {
     buildReportsDateRange,
     calculateOrderSummaries,
@@ -159,7 +160,7 @@ export async function GET(req: NextRequest) {
                 by: ['supervisorId'],
                 _count: { _all: true },
                 where: {
-                    status: 'completed',
+                    status: RecycleRequestStatus.completed,
                     completedAt: { gte: from, lt: toExclusive },
                     supervisorId: { not: null },
                 },
@@ -312,12 +313,12 @@ export async function GET(req: NextRequest) {
 
         // ─── Sotuv Funnel (status pipeline) ──────────────────────────────────
         const funnelData = {
-            draft:      ordersByStatus.find(s => s.status === 'draft')?._count?.status ?? 0,
-            new:        ordersByStatus.find(s => s.status === 'new')?._count?.status ?? 0,
-            processing: ordersByStatus.find(s => s.status === 'processing')?._count?.status ?? 0,
-            shipping:   ordersByStatus.find(s => s.status === 'shipping')?._count?.status ?? 0,
-            delivered:  ordersByStatus.find(s => s.status === 'delivered')?._count?.status ?? 0,
-            cancelled:  ordersByStatus.find(s => s.status === 'cancelled')?._count?.status ?? 0,
+            draft:      ordersByStatus.find(s => s.status === OrderStatus.draft)?._count?.status ?? 0,
+            new:        ordersByStatus.find(s => s.status === OrderStatus.new_)?._count?.status ?? 0,
+            processing: ordersByStatus.find(s => s.status === OrderStatus.processing)?._count?.status ?? 0,
+            shipping:   ordersByStatus.find(s => s.status === OrderStatus.shipping)?._count?.status ?? 0,
+            delivered:  ordersByStatus.find(s => s.status === OrderStatus.delivered)?._count?.status ?? 0,
+            cancelled:  ordersByStatus.find(s => s.status === OrderStatus.cancelled)?._count?.status ?? 0,
         };
 
         // ─── Viloyat bo'yicha savdo ──────────────────────────────────────────

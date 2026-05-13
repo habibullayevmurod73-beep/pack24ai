@@ -6,6 +6,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { RecycleRequestStatus } from '@prisma/client';
 import crypto from 'crypto';
 
 const TOKEN_SECRET = process.env.ADMIN_SECRET || 'pack24-driver-secret';
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
         const tasks = await prisma.recycleRequest.findMany({
             where: {
                 driverId: auth.driverId,
-                status: { in: ['assigned', 'en_route', 'arrived', 'collecting'] },
+                status: { in: [RecycleRequestStatus.assigned, RecycleRequestStatus.en_route, RecycleRequestStatus.arrived, RecycleRequestStatus.collecting] },
             },
             include: {
                 point: { select: { id: true, regionUz: true, pricePerKg: true } },
@@ -52,10 +53,10 @@ export async function GET(req: NextRequest) {
         const todayStats = await prisma.recycleCollection.aggregate({
             where: {
                 driverId: auth.driverId,
-                confirmedAt: { gte: todayStart },
+                collectedAt: { gte: todayStart },
             },
             _count: true,
-            _sum: { weight: true, totalPrice: true },
+            _sum: { actualWeight: true, totalAmount: true },
         });
 
         return NextResponse.json({
@@ -63,8 +64,8 @@ export async function GET(req: NextRequest) {
             tasks,
             todayStats: {
                 count: todayStats._count,
-                weight: todayStats._sum.weight || 0,
-                revenue: todayStats._sum.totalPrice || 0,
+                weight: todayStats._sum.actualWeight || 0,
+                revenue: todayStats._sum.totalAmount || 0,
             },
         });
     } catch (error) {

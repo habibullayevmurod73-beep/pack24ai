@@ -1,5 +1,6 @@
 import { Telegraf } from 'telegraf';
 import { prisma } from '@/lib/prisma';
+import { BotEventStatus } from '@prisma/client';
 import { getAccessIdentity, touchDbAdmin, formatEventRows, replyWithMenu } from './helpers';
 import { renderSupervisorsList, renderDriversList, renderSupervisorAccessRequests } from './renders';
 import { pack24AdminMainKeyboard } from '../../keyboards';
@@ -224,7 +225,7 @@ export function registerTextHandlers(bot: Telegraf) {
             const events = await prisma.botEvent.findMany({
                 where: {
                     OR: [
-                        { status: 'new' },
+                        { status: BotEventStatus.new_ },
                         { severity: { in: ['warning', 'error'] } },
                     ],
                 },
@@ -252,7 +253,7 @@ export function registerTextHandlers(bot: Telegraf) {
             const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
             const [all, unread, critical, grouped] = await Promise.all([
                 prisma.botEvent.count({ where: { createdAt: { gte: since } } }),
-                prisma.botEvent.count({ where: { status: 'new' } }),
+                prisma.botEvent.count({ where: { status: BotEventStatus.new_ } }),
                 prisma.botEvent.count({
                     where: {
                         createdAt: { gte: since },
@@ -283,9 +284,9 @@ export function registerTextHandlers(bot: Telegraf) {
 
         if (text === '✅ Barchasini o\'qildi') {
             const result = await prisma.botEvent.updateMany({
-                where: { status: 'new' },
+                where: { status: BotEventStatus.new_ },
                 data: {
-                    status: 'read',
+                    status: BotEventStatus.processed,
                     processedAt: new Date(),
                 },
             });
@@ -298,7 +299,7 @@ export function registerTextHandlers(bot: Telegraf) {
         }
 
         if (text === '👤 Profil') {
-            const unreadCount = await prisma.botEvent.count({ where: { status: 'new' } });
+            const unreadCount = await prisma.botEvent.count({ where: { status: BotEventStatus.new_ } });
             await ctx.reply(
                 `👤 <b>HQ admin profili</b>\n\n` +
                 `Ism: <b>${hqAdmin.name}</b>\n` +

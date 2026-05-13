@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { ComplaintLevel, ComplaintStatus } from '@prisma/client';
 import { notifyCustomer, notifySalesChats } from '@/lib/telegram/notifier';
 import { createBotEvent } from '@/lib/telegram/botEvents';
 
@@ -39,7 +40,7 @@ export async function createComplaint(data: {
             requestId: Number(data.requestId),
             fromPhone: data.fromPhone,
             fromName: data.fromName || 'Mijoz',
-            level: data.level || 'supervisor',
+            level: (data.level as ComplaintLevel) || ComplaintLevel.supervisor,
             message: data.message,
         },
         include: { request: { include: { point: true } } },
@@ -50,8 +51,8 @@ export async function createComplaint(data: {
         eventType: 'complaint.created',
         entityType: 'recycle_complaint',
         entityId: complaint.id,
-        severity: complaint.level === 'director' ? 'error' : 'warning',
-        title: complaint.level === 'director' ? 'Direktor darajasiga eskalatsiya' : 'Yangi shikoyat yaratildi',
+        severity: complaint.level === ComplaintLevel.director ? 'error' : 'warning',
+        title: complaint.level === ComplaintLevel.director ? 'Direktor darajasiga eskalatsiya' : 'Yangi shikoyat yaratildi',
         message: `${complaint.fromName} ariza #${complaint.requestId} bo'yicha shikoyat qoldirdi.`,
         requestId: complaint.requestId,
         supervisorId: complaint.request.supervisorId ?? undefined,
@@ -64,7 +65,7 @@ export async function createComplaint(data: {
     });
 
     // Xabar yuborish
-    if (complaint.level === 'supervisor' && complaint.request.supervisorId) {
+    if (complaint.level === ComplaintLevel.supervisor && complaint.request.supervisorId) {
         const sup = await prisma.supervisor.findUnique({
             where: { id: complaint.request.supervisorId },
         });
@@ -79,7 +80,7 @@ export async function createComplaint(data: {
     }
 
     // Director (=Admin) darajasidagi shikoyat
-    if (complaint.level === 'director') {
+    if (complaint.level === ComplaintLevel.director) {
         await notifySalesChats(
             `🚨 <b>ESKALATSIYA! Ariza #${complaint.requestId}</b>\n\n` +
             `👤 ${complaint.fromName} | 📞 ${complaint.fromPhone}\n` +
@@ -106,7 +107,7 @@ export async function updateComplaint(data: {
     if (data.status) updateData.status = data.status;
     if (data.response) updateData.response = data.response;
     if (data.respondedBy) updateData.respondedBy = data.respondedBy;
-    if (data.status === 'resolved' || data.status === 'closed') {
+    if (data.status === ComplaintStatus.resolved || data.status === ComplaintStatus.closed) {
         updateData.resolvedAt = new Date();
     }
 
@@ -121,7 +122,7 @@ export async function updateComplaint(data: {
         eventType: 'complaint.updated',
         entityType: 'recycle_complaint',
         entityId: complaint.id,
-        severity: data.status === 'resolved' || data.status === 'closed' ? 'success' : 'info',
+        severity: data.status === ComplaintStatus.resolved || data.status === ComplaintStatus.closed ? 'success' : 'info',
         title: 'Shikoyat holati yangilandi',
         message: `Shikoyat #${complaint.id} holati ${data.status || complaint.status} ga o'zgartirildi.`,
         requestId: complaint.requestId,
@@ -140,7 +141,7 @@ export async function updateComplaint(data: {
             `📋 <b>Shikoyatingizga javob berildi</b>\n\n` +
             `Ariza #${complaint.requestId}\n\n` +
             `💬 "${data.response}"\n\n` +
-            `${data.status === 'resolved' ? '✅ Masala hal qilindi' : '🔄 Ko\'rib chiqilmoqda'}`
+            `${data.status === ComplaintStatus.resolved ? '✅ Masala hal qilindi' : '🔄 Ko\'rib chiqilmoqda'}`
         );
     }
 

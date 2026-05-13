@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { TaskAssigneeRole, TaskStatus as PrismaTaskStatus } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
 
 // Re-export constants and types from the browser-safe constants module
@@ -276,8 +277,8 @@ export async function addTaskComment(taskId: number, authorId: number, body: str
 export async function assignUser(taskId: number, userId: number, role = 'assignee') {
     const assignee = await prisma.taskAssignee.upsert({
         where: { taskId_userId: { taskId, userId } },
-        create: { taskId, userId, role },
-        update: { role },
+        create: { taskId, userId, role: (role as TaskAssigneeRole) },
+        update: { role: (role as TaskAssigneeRole) },
         include: { user: { select: { id: true, name: true, email: true, phone: true } } },
     });
 

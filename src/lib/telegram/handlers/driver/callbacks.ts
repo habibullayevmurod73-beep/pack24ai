@@ -1,5 +1,6 @@
 import { Telegraf } from 'telegraf';
 import { prisma } from '@/lib/prisma';
+import { RecycleRequestStatus, DriverStatus } from '@prisma/client';
 import { getDriver, sessions } from './helpers';
 import { Lang, getText, formatText } from '../../i18n';
 import { btn, customerConfirmKeyboard } from '../../keyboards';
@@ -33,12 +34,12 @@ export function registerCallbackHandlers(bot: Telegraf) {
 
                 await prisma.recycleRequest.update({
                     where: { id: reqId },
-                    data: { status: 'assigned', assignedAt: new Date() },
+                    data: { status: RecycleRequestStatus.assigned, assignedAt: new Date() },
                 });
 
                 await prisma.driver.update({
                     where: { id: driver.id },
-                    data: { status: 'busy' },
+                    data: { status: DriverStatus.busy },
                 });
 
                 await createBotEvent({
@@ -86,11 +87,11 @@ export function registerCallbackHandlers(bot: Telegraf) {
 
                 await prisma.recycleRequest.update({
                     where: { id: reqId },
-                    data: { status: 'new', assignedDriverId: null, assignedAt: null },
+                    data: { status: RecycleRequestStatus.new_, assignedDriverId: null, assignedAt: null },
                 });
                 await prisma.driver.update({
                     where: { id: driver.id },
-                    data: { status: 'active' },
+                    data: { status: DriverStatus.active },
                 });
 
                 await createBotEvent({
@@ -132,7 +133,7 @@ export function registerCallbackHandlers(bot: Telegraf) {
 
                 await prisma.recycleRequest.update({
                     where: { id: reqId },
-                    data: { status: 'en_route', driverEnRouteAt: new Date() },
+                    data: { status: RecycleRequestStatus.en_route, driverEnRouteAt: new Date() },
                 });
 
                 await createBotEvent({
@@ -177,7 +178,7 @@ export function registerCallbackHandlers(bot: Telegraf) {
 
                 await prisma.recycleRequest.update({
                     where: { id: reqId },
-                    data: { status: 'arrived', driverArrivedAt: new Date() },
+                    data: { status: RecycleRequestStatus.arrived, driverArrivedAt: new Date() },
                 });
 
                 await createBotEvent({
@@ -256,7 +257,7 @@ export function registerCallbackHandlers(bot: Telegraf) {
 
                 await prisma.recycleRequest.update({
                     where: { id: reqId },
-                    data: { status: 'collecting', collectedAt: new Date() },
+                    data: { status: RecycleRequestStatus.collecting, collectedAt: new Date() },
                 });
 
                 await createBotEvent({

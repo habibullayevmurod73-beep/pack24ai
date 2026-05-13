@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { BotEventStatus } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 
 function readPositiveIntegerParam(value: string | null, fieldName: string) {
     if (!value) return undefined;
@@ -48,19 +50,7 @@ export async function GET(req: NextRequest) {
         const q = searchParams.get('q')?.trim();
         const take = Math.min(Number(searchParams.get('take') || 50), 100);
 
-        const where: {
-            sourceBot?: string;
-            eventType?: string;
-            entityType?: string;
-            entityId?: number;
-            createdAt?: {
-                gte?: Date;
-                lte?: Date;
-            };
-            severity?: string;
-            status?: string;
-            OR?: Array<{ title?: { contains: string; mode: 'insensitive' }; message?: { contains: string; mode: 'insensitive' } }>;
-        } = {};
+        const where: Prisma.BotEventWhereInput = {};
 
         if (from || to) {
             where.createdAt = {};
@@ -90,7 +80,7 @@ export async function GET(req: NextRequest) {
             prisma.botEvent.count({
                 where: {
                     ...where,
-                    status: 'new',
+                    status: BotEventStatus.new_,
                 },
             }),
             prisma.botEvent.count({

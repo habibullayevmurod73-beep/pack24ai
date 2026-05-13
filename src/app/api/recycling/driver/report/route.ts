@@ -36,27 +36,27 @@ export async function GET(req: NextRequest) {
 
         const [today, week, total] = await Promise.all([
             prisma.recycleCollection.aggregate({
-                where: { driverId: auth.driverId, confirmedAt: { gte: todayStart } },
+                where: { driverId: auth.driverId, collectedAt: { gte: todayStart } },
                 _count: true,
-                _sum: { weight: true, totalPrice: true },
+                _sum: { actualWeight: true, totalAmount: true },
             }),
             prisma.recycleCollection.aggregate({
-                where: { driverId: auth.driverId, confirmedAt: { gte: weekStart } },
+                where: { driverId: auth.driverId, collectedAt: { gte: weekStart } },
                 _count: true,
-                _sum: { weight: true, totalPrice: true },
+                _sum: { actualWeight: true, totalAmount: true },
             }),
             prisma.recycleCollection.aggregate({
                 where: { driverId: auth.driverId },
                 _count: true,
-                _sum: { weight: true, totalPrice: true },
+                _sum: { actualWeight: true, totalAmount: true },
             }),
         ]);
 
         // Haftalik kunlik statistika
         const dailyStats = await prisma.recycleCollection.groupBy({
-            by: ['confirmedAt'],
-            where: { driverId: auth.driverId, confirmedAt: { gte: weekStart } },
-            _sum: { weight: true },
+            by: ['collectedAt'],
+            where: { driverId: auth.driverId, collectedAt: { gte: weekStart } },
+            _sum: { actualWeight: true },
             _count: true,
         });
 
@@ -64,18 +64,18 @@ export async function GET(req: NextRequest) {
             success: true,
             today: {
                 count: today._count,
-                weight: today._sum.weight || 0,
-                revenue: today._sum.totalPrice || 0,
+                weight: today._sum.actualWeight || 0,
+                revenue: today._sum.totalAmount || 0,
             },
             week: {
                 count: week._count,
-                weight: week._sum.weight || 0,
-                revenue: week._sum.totalPrice || 0,
+                weight: week._sum.actualWeight || 0,
+                revenue: week._sum.totalAmount || 0,
             },
             total: {
                 count: total._count,
-                weight: total._sum.weight || 0,
-                revenue: total._sum.totalPrice || 0,
+                weight: total._sum.actualWeight || 0,
+                revenue: total._sum.totalAmount || 0,
             },
             dailyStats,
         });

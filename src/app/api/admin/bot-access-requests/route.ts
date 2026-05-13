@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import type { Prisma } from '@prisma/client';
 import { createOrReuseBotAccessRequest } from '@/lib/telegram/botAccessRequests';
 
 export async function GET(req: NextRequest) {
@@ -8,7 +9,7 @@ export async function GET(req: NextRequest) {
         const status = searchParams.get('status') || 'pending';
         const role = searchParams.get('role') || 'all';
 
-        const where: { status?: string; role?: string } = {};
+        const where: Prisma.BotAccessRequestWhereInput = {};
         if (status !== 'all') where.status = status;
         if (role !== 'all') where.role = role;
 

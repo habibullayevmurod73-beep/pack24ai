@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { OrderStatus, PaymentStatus } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import {
@@ -86,12 +87,12 @@ export async function POST(req: NextRequest) {
                     fItems.push({ productId: item.productId, quantity: item.quantity, price: product.price });
                 }
             }
-            let order = await prisma.order.findFirst({ where: { telegramUserId: telegramUserId?.toString(), status: 'draft' } });
+            let order = await prisma.order.findFirst({ where: { telegramUserId: telegramUserId?.toString(), status: OrderStatus.draft } });
             if (order) {
                 await prisma.orderItem.deleteMany({ where: { orderId: order.id } });
                 order = await prisma.order.update({ where: { id: order.id }, data: { totalAmount: total, items: { create: fItems } }, include: { items: { include: { product: true } } } });
             } else {
-                order = await prisma.order.create({ data: { telegramUserId: telegramUserId?.toString(), status: 'draft', totalAmount: total, items: { create: fItems } }, include: { items: { include: { product: true } } } });
+                order = await prisma.order.create({ data: { telegramUserId: telegramUserId?.toString(), status: OrderStatus.draft, totalAmount: total, items: { create: fItems } }, include: { items: { include: { product: true } } } });
             }
             return NextResponse.json(order);
         }
@@ -132,8 +133,8 @@ export async function POST(req: NextRequest) {
                     comment:         comment ?? null,
                     deliveryMethod:  deliveryMethod ?? 'courier',
                     paymentMethod:   paymentMethod ?? 'cash',
-                    paymentStatus:   (paymentMethod === 'cash' || !paymentMethod) ? 'pending' : 'awaiting',
-                    status,
+                    paymentStatus:   (paymentMethod === 'cash' || !paymentMethod) ? PaymentStatus.pending : PaymentStatus.pending,
+                    status:          (status as OrderStatus),
                     totalAmount: computedTotal,
                     items: { create: orderItems },
                 },
@@ -239,7 +240,7 @@ export async function GET(request: Request) {
 
         // Draft buyurtmalarni ko'rsatmaslik
         if (!telegramUserId) {
-            where.status = { not: 'draft' };
+            where.status = { not: OrderStatus.draft };
         }
 
         const orders = await prisma.order.findMany({

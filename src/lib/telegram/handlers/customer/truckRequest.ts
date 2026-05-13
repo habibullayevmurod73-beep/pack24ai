@@ -1,5 +1,6 @@
 import type { Context, Telegraf } from 'telegraf';
 import { prisma } from '@/lib/prisma';
+import { RecyclePointStatus, RecycleRequestStatus } from '@prisma/client';
 import type { Lang } from '../../i18n';
 import { getText } from '../../i18n';
 import { haversineDistance } from '../../geo';
@@ -21,7 +22,7 @@ export async function submitTruckRequest(
 
     // Eng yaqin bazani topish
     const points = await prisma.recyclePoint.findMany({
-        where: { status: 'active' },
+        where: { status: RecyclePointStatus.active },
         include: { supervisors: { where: { isActive: true }, take: 1 } },
     });
 
@@ -56,7 +57,7 @@ export async function submitTruckRequest(
             customerLang: lang,
             volumeSize: ses.volumeSize || null,
             photoUrl: photoUrl || null,
-            status: supervisorForPoint ? 'dispatched' : 'new',
+            status: supervisorForPoint ? RecycleRequestStatus.dispatched : RecycleRequestStatus.new_,
             supervisorId: supervisorForPoint?.id ?? null,
             dispatchedAt: supervisorForPoint ? new Date() : null,
         },

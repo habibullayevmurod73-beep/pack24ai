@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { ProductStatus } from '@prisma/client';
 
 // ─── POST /api/products/bulk-import — CSV/JSON orqali mahsulotlarni import qilish ───
 export async function POST(req: NextRequest) {
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
                                 originalPrice: originalPrice ? Number(originalPrice) : undefined,
                                 description:   description   ? String(description)   : undefined,
                                 image:         image         ? String(image)         : undefined,
-                                status:        status        ? String(status)        : undefined,
+                                status:        status        ? (String(status) as ProductStatus) : undefined,
                                 category:      categoryName,
                             },
                         });
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
                         originalPrice: originalPrice ? Number(originalPrice) : undefined,
                         description:   description   ? String(description)   : '',
                         image:         image         ? String(image)         : '/placeholder.png',
-                        status:        status        ? String(status)        : 'active',
+                        status:        status        ? (String(status) as ProductStatus) : ProductStatus.active,
                         category:      categoryName,
                     },
                 });

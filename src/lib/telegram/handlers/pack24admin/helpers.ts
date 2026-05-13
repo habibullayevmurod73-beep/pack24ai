@@ -1,5 +1,6 @@
 import { Context } from 'telegraf';
 import { prisma } from '@/lib/prisma';
+import { BotEventStatus } from '@prisma/client';
 import { createTelegramSessionStore } from '../../sessionStore';
 import { pack24AdminMainKeyboard } from '../../keyboards';
 import type { Pack24AdminSession, AccessIdentity } from './types';
@@ -100,7 +101,7 @@ export function formatEventRows(events: Array<{
 
 export async function replyWithMenu(ctx: Context, hqAdminName: string) {
     const unreadCount = await prisma.botEvent.count({
-        where: { status: 'new' },
+        where: { status: BotEventStatus.new_ },
     });
 
     await ctx.reply(

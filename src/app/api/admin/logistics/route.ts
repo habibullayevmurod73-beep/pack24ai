@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { RecycleRequestStatus } from '@prisma/client';
 import { verifyAdminAuth } from '@/lib/adminAuth';
 
 export async function GET(request: NextRequest) {
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
         const requests = await prisma.recycleRequest.findMany({
             where: {
                 status: {
-                    in: ["new", "dispatched", "assigned", "en_route", "arrived", "collecting"]
+                    in: [RecycleRequestStatus.new_, RecycleRequestStatus.dispatched, RecycleRequestStatus.assigned, RecycleRequestStatus.en_route, RecycleRequestStatus.arrived, RecycleRequestStatus.collecting]
                 },
                 pickupLat: { not: null },
                 pickupLng: { not: null }

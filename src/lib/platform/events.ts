@@ -1,4 +1,4 @@
-import { BotEvent } from '@prisma/client';
+import { BotEvent, BotEventStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { notifyPack24Admin } from '@/lib/telegram/notifier';
 import {
@@ -86,7 +86,7 @@ export async function publishPlatformEvent(input: PublishPlatformEventInput): Pr
             severity: input.severity ?? 'info',
             title: input.title,
             message: input.message,
-            status: input.status ?? 'new',
+            status: input.status ?? BotEventStatus.new_,
             dedupeKey: input.dedupeKey,
             payload: input.payload,
             requestId: input.requestId,

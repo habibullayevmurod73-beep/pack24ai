@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { OrderStatus } from '@prisma/client';
 
 // ─── GET /api/admin/notifications — Yangi bildirishnomalar ───────────────────
 // Admin panel har 30 sekundda bu endpointni polling qiladi
@@ -12,7 +13,7 @@ export async function GET(req: NextRequest) {
         const [newOrders, newOrdersCount] = await Promise.all([
             prisma.order.findMany({
                 where: {
-                    status: 'new',
+                    status: OrderStatus.new_,
                     createdAt: { gte: sinceDate },
                 },
                 select: {
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
                 orderBy: { createdAt: 'desc' },
                 take: 10,
             }),
-            prisma.order.count({ where: { status: 'new' } }),
+            prisma.order.count({ where: { status: OrderStatus.new_ } }),
         ]);
 
         return NextResponse.json({
