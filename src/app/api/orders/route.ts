@@ -23,7 +23,20 @@ const ORDER_PAYMENT_METHODS = ['cash', 'click', 'payme', 'bank_transfer'] as con
 export async function POST(req: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
-        const sessionUserId = Number(session?.user?.id);
+        let sessionUserId = Number(session?.user?.id);
+
+        // Mobile token fallback
+        if (!Number.isFinite(sessionUserId)) {
+            try {
+                const { verifyMobileToken } = await import('@/lib/auth/verifyMobileToken');
+                const authHeader = req.headers.get('authorization');
+                const result = await verifyMobileToken(authHeader);
+                if (result.ok) {
+                    sessionUserId = result.userId;
+                }
+            } catch { /* noop */ }
+        }
+
         const body = await readJsonObject(req);
         const telegramUserId = readOptionalString(body.telegramUserId, 'telegramUserId');
         const customerName = readOptionalString(body.customerName, 'customerName');
@@ -213,11 +226,27 @@ export async function POST(req: NextRequest) {
 export async function GET(request: Request) {
     try {
         const session = await getServerSession(authOptions);
-        const sessionUserId = Number(session?.user?.id);
-        const isAdmin = session?.user?.role === 'admin';
+        let sessionUserId = Number(session?.user?.id);
+        let isAdmin = session?.user?.role === 'admin';
+
+        // Mobile token fallback
+        if (!Number.isFinite(sessionUserId)) {
+            try {
+                const { verifyMobileToken } = await import('@/lib/auth/verifyMobileToken');
+                const authHeader = request.headers.get('authorization');
+                const result = await verifyMobileToken(authHeader);
+                if (result.ok) {
+                    sessionUserId = result.userId;
+                    isAdmin = result.user.role === 'admin';
+                }
+            } catch { /* noop */ }
+        }
+
         const { searchParams } = new URL(request.url);
         const telegramUserId = searchParams.get('telegramUserId');
         const contactPhone   = searchParams.get('contactPhone');
+        const paramUserId    = searchParams.get('userId');
+
         const where: Record<string, unknown> = {};
         if (telegramUserId) where.telegramUserId = telegramUserId;
         if (contactPhone) {
@@ -227,7 +256,17 @@ export async function GET(request: Request) {
             where.contactPhone = contactPhone;
         }
 
-        if (!telegramUserId && !contactPhone) {
+        // userId parametri (mobile app uchun)
+        if (paramUserId && Number.isFinite(Number(paramUserId))) {
+            const uid = Number(paramUserId);
+            // Faqat o'z buyurtmalarini ko'rish (yoki admin)
+            if (!isAdmin && uid !== sessionUserId) {
+                return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+            }
+            where.userId = uid;
+        }
+
+        if (!telegramUserId && !contactPhone && !paramUserId) {
             if (!Number.isFinite(sessionUserId)) {
                 return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
             }

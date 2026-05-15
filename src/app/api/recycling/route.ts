@@ -1,10 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { RecycleRequestStatus, DriverStatus } from '@prisma/client';
 import { notifyCustomer, notifySalesChats } from '@/lib/telegram/notifier';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { createBotEvent } from '@/lib/telegram/botEvents';
+import { verifyMobileToken } from '@/lib/auth/verifyMobileToken';
 
 // Telegraf inline keyboard tipi
 type IKBtn = { text: string; callback_data: string };
@@ -25,6 +26,52 @@ async function sendToChat(chatId: string, message: string, inlineKeyboard?: IKBt
         return false;
     }
 }
+
+// ─── GET /api/recycling — Foydalanuvchi arizalarini olish ────────────────────
+export async function GET(req: NextRequest) {
+    try {
+        // Auth — NextAuth session yoki Mobile token
+        let userId: number | null = null;
+
+        const session = await getServerSession(authOptions);
+        if (session?.user?.id) {
+            userId = Number(session.user.id);
+        } else {
+            const authResult = await verifyMobileToken(req.headers.get('authorization'));
+            if (authResult.ok) {
+                userId = authResult.userId;
+            }
+        }
+
+        // URL params dan userId olish (fallback)
+        const { searchParams } = new URL(req.url);
+        const paramUserId = searchParams.get('userId');
+        if (!userId && paramUserId) {
+            userId = Number(paramUserId);
+        }
+
+        if (!userId || !Number.isFinite(userId)) {
+            return NextResponse.json([]);
+        }
+
+        const requests = await prisma.recycleRequest.findMany({
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
+            take: 20,
+            include: {
+                point: {
+                    select: { regionUz: true, cityUz: true },
+                },
+            },
+        });
+
+        return NextResponse.json(requests);
+    } catch (error) {
+        console.error('[GET /api/recycling]', error);
+        return NextResponse.json({ error: 'Server xatosi' }, { status: 500 });
+    }
+}
+
 
 
 export async function POST(request: Request) {

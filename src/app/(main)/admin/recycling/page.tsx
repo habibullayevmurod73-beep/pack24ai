@@ -15,7 +15,10 @@ import ComplaintsTab from './_components/ComplaintsTab';
 import MonthlyJournalTab from './_components/MonthlyJournalTab';
 import BotEventsTab from './_components/BotEventsTab';
 import FinanceTab from './_components/FinanceTab';
+import dynamic from 'next/dynamic';
 import { removeBotEventFeedParamsFromSearchString, urlHasBotEventFeedParams } from '@/lib/platform/botEventFeedUrl';
+
+const LogisticsMap = dynamic(() => import('@/components/admin/LogisticsMap'), { ssr: false });
 
 // ─── Типлар ──────────────────────────────────────────────────────────────────
 
@@ -109,6 +112,7 @@ const EMPTY_POINT = { regionUz: '', regionRu: '', cityUz: '', cityRu: '', phone:
 
 type AdminRecyclingTab =
     | 'dashboard'
+    | 'map'
     | 'points'
     | 'requests'
     | 'supervisors'
@@ -173,6 +177,7 @@ function readInitialRecyclingFilters(): {
     const requestId = params.get('requestId')?.trim() ?? '';
     const allowedTabs = new Set<AdminRecyclingTab>([
         'dashboard',
+        'map',
         'points',
         'requests',
         'supervisors',
@@ -535,6 +540,7 @@ export default function AdminRecyclingPage() {
             <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit flex-wrap">
                 {([
                     ['dashboard', '📊 Dashboard'],
+                    ['map', '🗺️ Xarita'],
                     ['points', '📍 Bazalar'],
                     ['requests', '📋 Arizalar'],
                     ['supervisors', '👷 Masullar'],
@@ -681,6 +687,21 @@ export default function AdminRecyclingPage() {
                         {requests.length === 0 && (
                             <p className="text-center text-sm text-gray-400 py-8">Hali arizalar yo{`'`}q</p>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* ════════════════════════════════════════════════════════════════ */}
+            {/* MAP TAB */}
+            {/* ════════════════════════════════════════════════════════════════ */}
+            {activeTab === 'map' && (
+                <div className="space-y-4">
+                    <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                        <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                            🗺️ Logistika Xaritasi
+                            <span className="text-xs font-normal text-gray-400">Bazalar, mashinalar va arizalar real-vaqtda</span>
+                        </h2>
+                        <LogisticsMap />
                     </div>
                 </div>
             )}
