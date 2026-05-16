@@ -1,14 +1,14 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Phone, Truck, MapPin, User, Copy, ShieldCheck } from 'lucide-react';
+import { Plus, Pencil, Trash2, Phone, Truck, MapPin, User, Copy, ShieldCheck, Smartphone, Mail, Hash } from 'lucide-react';
 
-interface Driver { id: number; name: string; phone: string; telegramId: string | null; telegramName: string | null; registrationCode: string | null; supervisorId: number | null; supervisor: { id: number; name: string } | null; pointId: number | null; point: { id: number; regionUz: string } | null; status: string; isOnline: boolean; vehicleInfo: string | null; lastSeenAt: string | null; lastLat: number | null; lastLng: number | null; isSupervisor?: boolean; _count?: { collections: number; assignedRequests: number }; }
+interface Driver { id: number; name: string; phone: string; email: string | null; passwordHash: string | null; telegramId: string | null; telegramName: string | null; registrationCode: string | null; supervisorId: number | null; supervisor: { id: number; name: string } | null; pointId: number | null; point: { id: number; regionUz: string } | null; status: string; isOnline: boolean; vehicleInfo: string | null; lastSeenAt: string | null; lastLat: number | null; lastLng: number | null; registeredAt: string | null; isSupervisor?: boolean; _count?: { collections: number; assignedRequests: number }; }
 interface Supervisor { id: number; name: string; }
 interface Point { id: number; regionUz: string; }
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = { active: { label: 'Faol', color: 'bg-emerald-100 text-emerald-700' }, inactive: { label: 'Faol emas', color: 'bg-gray-100 text-gray-600' }, on_route: { label: 'Yo\'lda', color: 'bg-blue-100 text-blue-700' }, busy: { label: 'Band', color: 'bg-amber-100 text-amber-700' } };
-const EMPTY = { name: '', phone: '', telegramId: '', supervisorId: '', pointId: '', vehicleInfo: '', status: 'active' };
+const EMPTY = { name: '', phone: '', email: '', telegramId: '', supervisorId: '', pointId: '', vehicleInfo: '', status: 'active' };
 
 export default function DriversTab({
     points,
@@ -53,7 +53,7 @@ export default function DriversTab({
         if (r.ok) { toast.success('O\'chirildi'); fetch_(); } else toast.error('Xatolik');
     };
 
-    const edit = (d: Driver) => { setEditId(d.id); setForm({ name: d.name, phone: d.phone, telegramId: d.telegramId || '', supervisorId: d.supervisorId?.toString() || '', pointId: d.pointId?.toString() || '', vehicleInfo: d.vehicleInfo || '', status: d.status }); setShowForm(true); };
+    const edit = (d: Driver) => { setEditId(d.id); setForm({ name: d.name, phone: d.phone, email: d.email || '', telegramId: d.telegramId || '', supervisorId: d.supervisorId?.toString() || '', pointId: d.pointId?.toString() || '', vehicleInfo: d.vehicleInfo || '', status: d.status }); setShowForm(true); };
 
     const promoteDriver = async (d: Driver) => {
         if (!confirm(`"${d.name}" ni masul hodim sifatida ro'yxatga olasizmi?\n\nHaydovchi ma'lumotlari (ism, telefon, baza) Supervisor jadvaliga ko'chiriladi va admin botga kirish kodi beriladi.`)) return;
@@ -107,6 +107,7 @@ export default function DriversTab({
                         <select value={form.supervisorId} onChange={e => setForm({ ...form, supervisorId: e.target.value })} title="Masul tanlash" className="border border-gray-200 rounded-xl px-3 py-2 text-sm"><option value="">Masul tanlang</option>{supervisors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
                         <select value={form.pointId} onChange={e => setForm({ ...form, pointId: e.target.value })} title="Baza tanlash" className="border border-gray-200 rounded-xl px-3 py-2 text-sm"><option value="">Baza tanlang</option>{points.map(p => <option key={p.id} value={p.id}>{p.regionUz}</option>)}</select>
                         <input value={form.vehicleInfo} onChange={e => setForm({ ...form, vehicleInfo: e.target.value })} placeholder="Mashina (masalan: Damas)" className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400" />
+                        <input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="Email (ixtiyoriy)" className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400" />
                     </div>
                     <p className="text-[10px] text-gray-400">💡 Telegram ID ni topish: Haydovchi @userinfobot ga /start yozsin → ID raqami chiqadi. Yoki Pack24 botga /start yozsa avtomatik ulanadi.</p>
                     <div className="flex gap-2">
@@ -123,8 +124,10 @@ export default function DriversTab({
                     <table className="w-full">
                         <thead className="bg-gray-50 border-b border-gray-100">
                             <tr>
+                                <th className="px-4 py-3 text-center text-[10px] font-bold text-gray-500 uppercase w-12">ID</th>
                                 <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Haydovchi</th>
                                 <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Status</th>
+                                <th className="px-4 py-3 text-center text-[10px] font-bold text-gray-500 uppercase">Ilova</th>
                                 <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase hidden md:table-cell">Masul</th>
                                 <th className="px-4 py-3 text-center text-[10px] font-bold text-gray-500 uppercase">Telegram</th>
                                 <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase hidden lg:table-cell">Baza</th>
@@ -137,8 +140,10 @@ export default function DriversTab({
                         <tbody className="divide-y divide-gray-50">
                             {visibleItems.map(d => { const st = STATUS_MAP[d.status] || STATUS_MAP.active; return (
                                 <tr key={d.id} className="hover:bg-blue-50/30 transition-colors">
-                                    <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="relative"><div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center text-white text-xs font-bold">{d.name.charAt(0)}</div>{d.isOnline && <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />}</div><div><p className="text-sm font-bold text-gray-800">{d.name}</p><p className="text-[10px] text-gray-400 flex items-center gap-0.5"><Phone size={9} />{d.phone}</p></div></div></td>
+                                    <td className="px-4 py-3 text-center"><span className="text-[10px] font-mono font-bold text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded">#{d.id}</span></td>
+                                    <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="relative"><div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center text-white text-xs font-bold">{d.name.charAt(0)}</div>{d.isOnline && <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />}</div><div><p className="text-sm font-bold text-gray-800">{d.name}</p><p className="text-[10px] text-gray-400 flex items-center gap-0.5"><Phone size={9} />{d.phone}</p>{d.email && <p className="text-[10px] text-blue-400 flex items-center gap-0.5"><Mail size={9} />{d.email}</p>}</div></div></td>
                                     <td className="px-4 py-3"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${st.color}`}>{st.label}</span></td>
+                                    <td className="px-4 py-3 text-center">{d.passwordHash ? <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600"><Smartphone size={9} />Ulangan</span> : <span className="text-[10px] text-gray-300">—</span>}</td>
                                     <td className="px-4 py-3 hidden md:table-cell">{d.supervisor ? <span className="text-xs text-gray-600 flex items-center gap-1"><User size={11} />{d.supervisor.name}</span> : <span className="text-xs text-gray-300">—</span>}</td>
                                     <td className="px-4 py-3 text-center">{d.telegramId ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">🟢 Ulangan</span> : d.registrationCode ? <button onClick={() => { navigator.clipboard.writeText(d.registrationCode!); toast.success('Kod nusxalandi: ' + d.registrationCode); }} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 hover:bg-amber-200 cursor-pointer inline-flex items-center gap-1" title="Nusxalash"><Copy size={9} />{d.registrationCode}</button> : <span className="text-[10px] text-gray-300">—</span>}</td>
                                     <td className="px-4 py-3 hidden lg:table-cell">{d.point ? <span className="text-xs text-emerald-600 flex items-center gap-1"><MapPin size={11} />{d.point.regionUz}</span> : <span className="text-xs text-gray-300">—</span>}</td>

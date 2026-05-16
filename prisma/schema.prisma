@@ -652,6 +652,8 @@ model Driver {
   id             Int      @id @default(autoincrement())
   name           String
   phone          String   @unique
+  email          String?  @unique        // Email pochta (ixtiyoriy)
+  passwordHash   String?                 // Parol (hashed)
   telegramId     String?  @unique
   telegramName   String?
   supervisorId   Int?                    // Qaysi masul ostida
@@ -671,9 +673,49 @@ model Driver {
   collections    RecycleCollection[]
   assignedRequests RecycleRequest[]
   createdAccessRequests BotAccessRequest[] @relation("CreatedDriverAccessRequests")
+  cards          DriverCard[]
+  transactions   DriverTransaction[]
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+// Haydovchi plastik kartasi
+model DriverCard {
+  id            Int      @id @default(autoincrement())
+  driverId      Int
+  driver        Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  cardNumber    String                    // Masklangan: **** **** **** 1234
+  cardHolder    String                    // Karta egasi ismi
+  expiryMonth   Int                       // Amal qilish muddati — oy
+  expiryYear    Int                       // Amal qilish muddati — yil
+  cardType      String   @default("uzcard") // uzcard, humo, visa, mastercard
+  isDefault     Boolean  @default(false)  // Asosiy karta
+  isActive      Boolean  @default(true)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([driverId])
+}
+
+// Haydovchi to'lov tranzaksiyalari
+model DriverTransaction {
+  id            Int      @id @default(autoincrement())
+  driverId      Int
+  driver        Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  type          String                    // earning, withdrawal, bonus
+  amount        Float                     // Summa (so'm)
+  description   String?                   // Tavsif
+  status        String   @default("completed") // pending, completed, failed
+  cardId        Int?                      // Qaysi kartaga
+  collectionId  Int?                      // Qaysi yig'ish uchun
+  metadata      Json?                     // Qo'shimcha ma'lumot
+
+  createdAt     DateTime @default(now())
+
+  @@index([driverId])
+  @@index([createdAt])
 }
 
 // Mijoz arizasi (kengaytirilgan)
