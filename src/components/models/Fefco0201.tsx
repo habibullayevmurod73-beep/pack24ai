@@ -16,27 +16,37 @@ const CONSTANTS = {
 const Model3D: React.FC<BoxModelProps> = ({ dimensions, material, foldProgress }) => {
     const { l: L, w: W, h: H } = dimensions;
 
-    // Convert to units used in ThreeJS (assuming 1 unit = 1 meter or consistent scaling)
-    // In the original file: L, W, H were mm, then divided by 1000 for threejs unit.
     const l = L / 1000;
     const w = W / 1000;
     const h = H / 1000;
     const flapW = w / 2;
+    const lineT = 0.001; // fold line thickness
 
-    // Folding logic from original file
-    const fold = foldProgress; // 0 to 1
+    const fold = foldProgress;
     const wallRad = (Math.PI / 2) * Math.min(fold / 0.5, 1);
     const flapRad = fold > 0.5 ? (Math.PI / 2) * Math.min((fold - 0.5) / 0.5, 1) : 0;
 
-    // Material appearance
-    // We can use the color from the material prop
     const mat = <meshStandardMaterial color={material.color} side={2} roughness={0.8} />;
+    const foldMat = <meshBasicMaterial color="#1d4ed8" side={2} />;
+
+    // Horizontal fold line (across panel width at y position)
+    const HCrease = ({ pw, y }: { pw: number; y: number }) => (
+        <mesh position={[0, y, 0.005]}>
+            <boxGeometry args={[pw, lineT, lineT]} />
+            {foldMat}
+        </mesh>
+    );
 
     return (
         <group position={[-l / 2, -h / 2, w / 2]} scale={1.2}>
             {/* L1 FRONT */}
             <mesh>
                 <boxGeometry args={[l, h, 0.003]} />{mat}
+                <HCrease pw={l} y={h/2} />
+                <HCrease pw={l} y={-h/2} />
+                {/* vertical crease at right edge */}
+                <mesh position={[l/2, 0, 0.005]}><boxGeometry args={[lineT, h + flapW*2, lineT]} />{foldMat}</mesh>
+                
                 <group position={[0, h / 2, 0]} rotation={[flapRad, 0, 0]}>
                     <mesh position={[0, flapW / 2, 0]}><boxGeometry args={[l, flapW, 0.002]} />{mat}</mesh>
                 </group>
@@ -48,6 +58,10 @@ const Model3D: React.FC<BoxModelProps> = ({ dimensions, material, foldProgress }
                 <group position={[l / 2, 0, 0]} rotation={[0, -wallRad, 0]}>
                     <mesh position={[w / 2, 0, 0]}>
                         <boxGeometry args={[w, h, 0.003]} />{mat}
+                        <HCrease pw={w} y={h/2} />
+                        <HCrease pw={w} y={-h/2} />
+                        <mesh position={[w/2, 0, 0.005]}><boxGeometry args={[lineT, h + flapW*2, lineT]} />{foldMat}</mesh>
+                        <mesh position={[-w/2, 0, 0.005]}><boxGeometry args={[lineT, h + flapW*2, lineT]} />{foldMat}</mesh>
                         <group position={[0, h / 2, 0.001]} rotation={[flapRad, 0, 0]}>
                             <mesh position={[0, flapW / 2, 0]}><boxGeometry args={[w, flapW, 0.002]} />{mat}</mesh>
                         </group>
@@ -59,6 +73,10 @@ const Model3D: React.FC<BoxModelProps> = ({ dimensions, material, foldProgress }
                         <group position={[w / 2, 0, 0]} rotation={[0, -wallRad, 0]}>
                             <mesh position={[l / 2, 0, 0]}>
                                 <boxGeometry args={[l, h, 0.003]} />{mat}
+                                <HCrease pw={l} y={h/2} />
+                                <HCrease pw={l} y={-h/2} />
+                                <mesh position={[l/2, 0, 0.005]}><boxGeometry args={[lineT, h + flapW*2, lineT]} />{foldMat}</mesh>
+                                <mesh position={[-l/2, 0, 0.005]}><boxGeometry args={[lineT, h + flapW*2, lineT]} />{foldMat}</mesh>
                                 <group position={[0, h / 2, 0]} rotation={[flapRad, 0, 0]}>
                                     <mesh position={[0, flapW / 2, 0]}><boxGeometry args={[l, flapW, 0.002]} />{mat}</mesh>
                                 </group>
@@ -70,6 +88,10 @@ const Model3D: React.FC<BoxModelProps> = ({ dimensions, material, foldProgress }
                                 <group position={[l / 2, 0, 0]} rotation={[0, -wallRad, 0]}>
                                     <mesh position={[w / 2, 0, 0]}>
                                         <boxGeometry args={[w, h, 0.003]} />{mat}
+                                        <HCrease pw={w} y={h/2} />
+                                        <HCrease pw={w} y={-h/2} />
+                                        <mesh position={[w/2, 0, 0.005]}><boxGeometry args={[lineT, h + flapW*2, lineT]} />{foldMat}</mesh>
+                                        <mesh position={[-w/2, 0, 0.005]}><boxGeometry args={[lineT, h + flapW*2, lineT]} />{foldMat}</mesh>
                                         <group position={[0, h / 2, 0.001]} rotation={[flapRad, 0, 0]}>
                                             <mesh position={[0, flapW / 2, 0]}><boxGeometry args={[w, flapW, 0.002]} />{mat}</mesh>
                                         </group>
