@@ -1,4 +1,24 @@
-'use client';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+    title: 'Katalog — Qadoqlash Mahsulotlari',
+    description:
+        "Pack24 katalogi: karton qutlar, gofrokarton, stretch-plyonka, havo-pufakchali plyonka va boshqa qadoqlash materiallari. Eng arzon narxlar O'zbekistonda.",
+    keywords: [
+        'qadoqlash katalog',
+        'karton quti sotib olish',
+        'gofrokarton',
+        'packaging Uzbekistan',
+        'pack24 catalog',
+    ],
+    openGraph: {
+        title: 'Katalog — Pack24 Qadoqlash Yechimlari',
+        description:
+            "Barcha qadoqlash mahsulotlari bir joyda. Karton qutlar, gofrokarton, stretch-plyonka — eng arzon narxlar O'zbekistonda.",
+        url: 'https://pack24.uz/catalog',
+    },
+    alternates: { canonical: 'https://pack24.uz/catalog' },
+};
 
 // Catalog layout — sodda wrapper, sidebar page.tsx ichida boshqariladi
 export default function CatalogLayout({ children }: { children: React.ReactNode }) {

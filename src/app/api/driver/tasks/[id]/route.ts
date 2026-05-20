@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const taskId = parseInt(params.id, 10);
+        const { id: rawId } = await params;
+        const taskId = parseInt(rawId, 10);
         if (isNaN(taskId)) return NextResponse.json({ error: 'Noto\'g\'ri ID' }, { status: 400 });
 
         const task = await prisma.recycleRequest.findUnique({

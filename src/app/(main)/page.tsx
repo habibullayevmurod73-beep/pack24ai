@@ -4,6 +4,7 @@ import ConfiguratorSection from '@/components/home/ConfiguratorSection';
 import AISection from '@/components/home/AISection';
 import ReviewsSection from '@/components/home/ReviewsSection';
 import CTABanner from '@/components/home/CTABanner';
+import { OrganizationLd, WebSiteLd } from '@/components/seo/JsonLd';
 import { prisma } from '@/lib/prisma';
 import type { Product } from '@/lib/store/useProductStore';
 
@@ -46,6 +47,10 @@ export default async function Home() {
 
     return (
         <div className="min-h-screen bg-[#f5f6fa]">
+            {/* SEO: JSON-LD Structured Data */}
+            <OrganizationLd />
+            <WebSiteLd />
+
             {/* Slider + Category Showcase
                 initialProducts → Zustand store ni birinchi render da seed qiladi
                 shuning uchun kategoriya kartalari darhol ko'rinadi */}
