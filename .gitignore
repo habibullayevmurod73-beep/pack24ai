@@ -33,6 +33,7 @@ yarn-error.log*
 # env files
 .env*
 !.env.example
+BOT_TOKENS.env
 
 # Prisma SQLite local DB (production da ishlatilmaydi)
 dev.db

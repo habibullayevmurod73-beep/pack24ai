@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { verifyAdminAuth } from '@/lib/adminAuth';
 
 // POST /api/products/bulk-update
 // Body: { category: string, percentage: number }
 // category = 'all' yoki kategoriya nomi
 // percentage = foiz o'zgarish (+10, -5 va h.k.)
 export async function POST(req: NextRequest) {
+    const authError = await verifyAdminAuth(req);
+    if (authError) return authError;
+
     try {
         const body = await req.json();
         const { category, percentage } = body;

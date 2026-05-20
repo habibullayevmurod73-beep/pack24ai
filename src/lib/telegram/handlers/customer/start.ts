@@ -1,8 +1,7 @@
 import { Telegraf } from 'telegraf';
 import { sessions, getUserByTgId } from './helpers';
-import { Lang, getText, formatText } from '../../i18n';
-import { cabinetMenuKeyboard, customerMainKeyboard, langSelectKeyboard } from '../../keyboards';
-import type { CustomerSession } from './types';
+import { Lang, getText } from '../../i18n';
+import { customerMainKeyboard, langSelectKeyboard } from '../../keyboards';
 
 export function registerStartHandler(bot: Telegraf) {
     bot.start(async (ctx) => {

@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { TaskAssigneeRole, TaskStatus as PrismaTaskStatus } from '@prisma/client';
+import { TaskAssigneeRole } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
 
 // Re-export constants and types from the browser-safe constants module

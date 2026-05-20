@@ -6,7 +6,7 @@ import { Lang, getText, formatText } from '../../i18n';
 import { btn, customerMainKeyboard, sharePhoneKeyboard, shareLocationKeyboard, recycleMethodKeyboard } from '../../keyboards';
 import { submitTruckRequest } from './truckRequest';
 import { askAI } from '../../aiChat';
-import type { CustomerSession } from './types';
+
 
 export function registerMessageHandlers(bot: Telegraf) {
     // CONTACT HANDLER
@@ -243,8 +243,8 @@ export function registerMessageHandlers(bot: Telegraf) {
                     formatText('reg_code_sent', lang, { name, code, phone: ses.phone }),
                     { parse_mode: 'HTML', reply_markup: customerMainKeyboard(lang) }
                 );
-            } catch (err: any) {
-                if (err?.code === 'P2002') {
+            } catch (err: unknown) {
+                if (err instanceof Error && 'code' in err && (err as Record<string, unknown>).code === 'P2002') {
                     await ctx.reply(getText('reg_phone_taken', lang), { parse_mode: 'HTML' });
                 } else {
                     await ctx.reply(lang === 'uz' ? '❌ Xatolik yuz berdi. Qayta urinib ko\'ring.' : '❌ Ошибка. Попробуйте ещё раз.');

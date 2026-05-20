@@ -257,7 +257,7 @@ export function registerMessageHandlers(bot: Telegraf) {
                     time: new Date(task.createdAt).toLocaleString('ru-RU'),
                 });
 
-                const buttons: any[][] = [];
+                const buttons: Array<Array<{ text: string; callback_data: string } | { text: string; url: string }>> = [];
                 
                 if (task.pickupLat && task.pickupLng) {
                     buttons.push([{ text: '🗺 Xaritada ochish', url: `https://yandex.com/maps/?pt=${task.pickupLng},${task.pickupLat}&z=16&l=map` }]);

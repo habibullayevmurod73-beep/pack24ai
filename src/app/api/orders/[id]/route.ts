@@ -85,6 +85,20 @@ export async function PUT(
         const { id } = await params;
         const body = await request.json();
 
+        // ── Auth: faqat egasi yoki admin yangilashi mumkin ───────────────
+        const existing = await prisma.order.findUnique({
+            where: { id: parseInt(id) },
+            select: { userId: true, contactPhone: true },
+        });
+
+        if (!existing) {
+            return NextResponse.json({ error: 'Buyurtma topilmadi' }, { status: 404 });
+        }
+
+        if (!(await canAccessOrder(existing))) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+
         // Update order
         const updatedOrder = await prisma.order.update({
             where: { id: parseInt(id) },

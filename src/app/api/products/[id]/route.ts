@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { parseProduct } from '@/lib/product-utils';
+import { verifyAdminAuth } from '@/lib/adminAuth';
 
 import { downloadAndUploadToSupabase, processGalleryUrls } from '@/lib/media-utils';
 
@@ -21,9 +22,12 @@ export async function GET(
 }
 
 export async function PUT(
-    request: Request,
+    request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const authError = await verifyAdminAuth(request);
+    if (authError) return authError;
+
     try {
         const { id } = await params;
         const body = await request.json();
@@ -70,9 +74,12 @@ export async function PUT(
 }
 
 export async function DELETE(
-    _request: Request,
+    request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const authError = await verifyAdminAuth(request);
+    if (authError) return authError;
+
     try {
         const { id } = await params;
         await prisma.product.delete({ where: { id: parseInt(id) } });

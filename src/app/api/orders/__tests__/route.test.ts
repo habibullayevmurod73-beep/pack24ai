@@ -8,6 +8,7 @@ const orderUpdateMock = jest.fn();
 const orderItemDeleteManyMock = jest.fn();
 const sendWebsiteOrderCreatedToAdminChatsMock = jest.fn();
 const publishPlatformEventMock = jest.fn();
+const validateAndReserveStockMock = jest.fn();
 
 jest.mock('next-auth', () => ({
     __esModule: true,
@@ -17,6 +18,12 @@ jest.mock('next-auth', () => ({
 
 jest.mock('@/lib/auth', () => ({
     authOptions: {},
+}));
+
+jest.mock('@/lib/domain/stockValidation', () => ({
+    validateAndReserveStock: (...args: unknown[]) => validateAndReserveStockMock(...args),
+    formatStockErrors: (errors: { productName: string; available: number; requested: number }[]) =>
+        errors.map((e) => `"${e.productName}" — omborda ${e.available} ta bor, ${e.requested} ta so'ralgan`).join('; '),
 }));
 
 jest.mock('@/lib/prisma', () => ({
@@ -31,6 +38,12 @@ jest.mock('@/lib/prisma', () => ({
         },
         orderItem: {
             deleteMany: (...args: unknown[]) => orderItemDeleteManyMock(...args),
+        },
+        $transaction: async (fn: (tx: {
+            order: { create: typeof orderCreateMock };
+        }) => Promise<unknown>) => {
+            const tx = { order: { create: orderCreateMock } };
+            return fn(tx);
         },
     },
 }));
@@ -49,6 +62,7 @@ describe('POST /api/orders route', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         getServerSessionMock.mockResolvedValue(null);
+        validateAndReserveStockMock.mockResolvedValue({ ok: true });
         sendWebsiteOrderCreatedToAdminChatsMock.mockResolvedValue(true);
         publishPlatformEventMock.mockResolvedValue({ id: 99 });
         orderFindFirstMock.mockResolvedValue(null);

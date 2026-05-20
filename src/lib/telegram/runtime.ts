@@ -9,7 +9,7 @@ export type TelegramRuntimeBot = {
 const globalForTelegramRuntime = globalThis as unknown as {
     _telegramPollingStarted?: boolean;
     _telegramPollingShutdownRegistered?: boolean;
-    _telegramPollingBots?: Map<string, any>;
+    _telegramPollingBots?: Map<string, Telegraf>;
 };
 
 function getPollingBotsRegistry() {

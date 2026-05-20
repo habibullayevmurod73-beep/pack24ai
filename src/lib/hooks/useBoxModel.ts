@@ -25,6 +25,7 @@ export function useBoxModel({ initialModel }: UseBoxModelProps) {
     useEffect(() => {
         const res = model.validate(dims);
         setValidation(res);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dims is a new object each render; using primitive values instead
     }, [dims.l, dims.w, dims.h, model]);
 
     const handleInputChange = (key: keyof typeof inputs, value: string) => {

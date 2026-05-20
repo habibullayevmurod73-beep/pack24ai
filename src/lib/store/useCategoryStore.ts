@@ -50,11 +50,12 @@ export const useCategoryStore = create<CategoryState>()(
             name: 'pack24-category-storage',
             storage: createJSONStorage(() => localStorage),
             skipHydration: true,
-            merge: (persistedState: any, currentState) => {
-                if (!persistedState || !persistedState.categories || persistedState.categories.length === 0) {
+            merge: (persistedState: unknown, currentState) => {
+                const state = persistedState as Partial<CategoryState> | undefined;
+                if (!state || !state.categories || state.categories.length === 0) {
                     return currentState;
                 }
-                return persistedState;
+                return state as CategoryState;
             },
         }
     )

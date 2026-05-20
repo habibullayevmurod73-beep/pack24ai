@@ -36,15 +36,6 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // CORS headers for API routes (Mobil ilova uchun)
-        source: '/api/(.*)',
-        headers: [
-          { key: 'Access-Control-Allow-Origin',  value: '*' },
-          { key: 'Access-Control-Allow-Methods', value: 'GET, POST, PUT, DELETE, OPTIONS' },
-          { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' },
-        ],
-      },
-      {
         source: '/(.*)',
         headers: [
           { key: 'X-Frame-Options',         value: 'DENY' },
@@ -52,6 +43,32 @@ const nextConfig: NextConfig = {
           { key: 'Referrer-Policy',          value: 'strict-origin-when-cross-origin' },
           { key: 'X-XSS-Protection',         value: '1; mode=block' },
           { key: 'Permissions-Policy',        value: 'camera=(), microphone=(), geolocation=()' },
+          // ── Yangi xavfsizlik headerlari ─────────────────────────────
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "img-src 'self' data: blob: https: http://localhost:*",
+              "font-src 'self' https://fonts.gstatic.com",
+              "connect-src 'self' https://api.telegram.org https://*.supabase.co https://*.supabase.in https://www.google-analytics.com https://generativelanguage.googleapis.com https://image.pollinations.ai wss:",
+              "media-src 'self' https://*.supabase.co https://*.supabase.in",
+              "frame-src 'self' https://www.google.com",
+              "object-src 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+              "frame-ancestors 'none'",
+              "upgrade-insecure-requests",
+            ].join('; '),
+          },
+          { key: 'X-DNS-Prefetch-Control',       value: 'on' },
+          { key: 'Cross-Origin-Opener-Policy',    value: 'same-origin' },
+          { key: 'Cross-Origin-Resource-Policy',  value: 'same-origin' },
         ],
       },
       {
@@ -66,7 +83,10 @@ const nextConfig: NextConfig = {
 
   // Compiler optimizations
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production',
+    removeConsole:
+      process.env.NODE_ENV === 'production'
+        ? { exclude: ['error', 'warn'] }
+        : false,
   },
 
   // Bundle size + `src/instrumentation.ts` Next 15 da fayl mavjud boʻlsa avtomatik ishlaydi

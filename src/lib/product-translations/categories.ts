@@ -1,4 +1,4 @@
-﻿// ─── Kategoriya nomlari tarjimasi ────────────────────────────────────────────
+// ─── Kategoriya nomlari tarjimasi ────────────────────────────────────────────
 import type { Language } from '../translations';
 
 export const CATEGORY_NAMES: Record<string, Record<Language, string>> = {
@@ -61,7 +61,7 @@ export const CATEGORY_NAMES: Record<string, Record<Language, string>> = {
 
 // ── Umumiy qadoqlash atamalari tarjimasi ─────────────────────────────────────
 // Mahsulot nomini "parse" qilib, kalit so'zlarni tiling tarzida almashtiramiz
-const TERM_MAP: Record<string, Record<Language, string>> = {
+const _TERM_MAP: Record<string, Record<Language, string>> = {
     'karton quti':       { uz: 'Karton quti',    ru: 'Картонная коробка', en: 'Cardboard box', qr: 'Karton qutı', zh: '纸板箱',  tr: 'Karton kutu',   tg: 'Қуттии картонӣ',   kk: 'Картон қорап',   tk: 'Karton guty',     fa: 'جعبه کارتونی' },
     'gofroqorti':        { uz: 'Gofroqorti',     ru: 'Гофрокартон',       en: 'Corrugated',    qr: 'Gofroqorti', zh: '瓦楞纸',   tr: 'Oluklu karton', tg: 'Гофрокартон',      kk: 'Гофрокартон',    tk: 'Gofrokarton',     fa: 'مقوای موجدار' },
     'kuryer paketi':     { uz: 'Kuryer paketi',  ru: 'Курьерский пакет',  en: 'Courier bag',   qr: 'Kuryer paketi', zh: '快递袋', tr: 'Kurye poşeti',  tg: 'Ҳалтаи курерӣ',    kk: 'Курьер пакет',   tk: 'Kurýer paketi',   fa: 'کیف پیک' },

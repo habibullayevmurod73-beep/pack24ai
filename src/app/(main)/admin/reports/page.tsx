@@ -1,209 +1,30 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import {
-    TrendingUp, ShoppingCart, DollarSign, Package,
-    RefreshCw, ArrowUp, ArrowDown, Download,
-    ChevronRight, Box, AlertCircle, Wifi, WifiOff,
-    type LucideIcon
-} from 'lucide-react';
-import {
-    AreaChart, Area, BarChart, Bar, XAxis, YAxis,
-    CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
-} from 'recharts';
-import Image from 'next/image';
-import Link from 'next/link';
-import SalesFunnel from '../dashboard/components/SalesFunnel';
-import RegionSalesMap from '../dashboard/components/RegionSalesMap';
+import { DollarSign, Package, ShoppingCart, TrendingUp } from 'lucide-react';
+import type { ReportData } from './_lib/types';
+import { fmt, fmtM } from './_lib/format';
+import { ErrorBanner, StatCard } from './_components/ReportUi';
+import ReportsHeader from './_components/ReportsHeader';
+import BotReportsPanel from './_components/BotReportsPanel';
+import ReportsCharts from './_components/ReportsCharts';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-interface ReportData {
-    summary: {
-        totalOrders: number;
-        newOrders: number;
-        totalRevenue: number;
-        periodOrders: number;
-        periodRevenue: number;
-        completedOrders: number;
-        conversionRate: number;
-        aov: number;
-        cancelRate: number;
-        repeatRate: number;
-        cancelledOrders: number;
-        peakHour: number;
-    };
-    trends: {
-        ordersGrowth: number;
-        revenueGrowth: number;
-        conversionChange: number;
-    };
-    topProducts: {
-        productId: number;
-        name: string;
-        image: string | null;
-        price: number;
-        totalSold: number;
-        orderCount: number;
-    }[];
-    ordersByStatus: { status: string; _count: { status: number } }[];
-    dailyRevenue: { date: string; revenue: number; orders: number }[];
-    funnelData: {
-        draft: number;
-        new: number;
-        processing: number;
-        shipping: number;
-        delivered: number;
-        cancelled: number;
-    } | null;
-    regionSales: { region: string; orders: number; revenue: number }[];
-    botReports: {
-        customer: {
-            uniqueUsers: number;
-            totalRequests: number;
-            pickupRequests: number;
-            selfDeliveryRequests: number;
-            confirmedRequests: number;
-            disputedRequests: number;
-        };
-        driver: {
-            totalCollections: number;
-            totalWeight: number;
-            totalAmount: number;
-            pendingPayments: number;
-        };
-        admin: {
-            assignedRequests: number;
-            completedRequests: number;
-            approvedPaymentsCount: number;
-            approvedPaymentsAmount: number;
-        };
-        topDrivers: {
-            driverId: number;
-            name: string;
-            phone: string;
-            isOnline: boolean;
-            status: string;
-            collections: number;
-            totalWeight: number;
-            totalAmount: number;
-        }[];
-        topSupervisors: {
-            supervisorId: number;
-            name: string;
-            phone: string;
-            assignedRequests: number;
-            completedRequests: number;
-            approvedPaymentsCount: number;
-            approvedPaymentsAmount: number;
-        }[];
-    };
-    period: number;
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function fmt(n: number)  { return n.toLocaleString('ru-RU'); }
-function fmtM(n: number) {
-    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-    if (n >= 1_000)     return `${(n / 1_000).toFixed(0)}K`;
-    return fmt(n);
-}
-
-// ─── Stat Card ────────────────────────────────────────────────────────────────
-function StatCard({ label, value, sub, icon: Icon, color, loading, trend }: {
-    label: string; value: string; sub?: string; icon: LucideIcon;
-    color: string; loading: boolean; trend?: number | null;
-}) {
-    if (loading) return (
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 animate-pulse">
-            <div className="h-4 bg-gray-100 rounded w-24 mb-3" />
-            <div className="h-8 bg-gray-100 rounded w-32 mb-2" />
-            <div className="h-3 bg-gray-50 rounded w-20" />
-        </div>
-    );
-    const isUp = (trend ?? 0) >= 0;
-    return (
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between mb-3">
-                <p className="text-sm text-gray-500 font-medium">{label}</p>
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${color}`}>
-                    <Icon size={16} className="text-white" />
-                </div>
-            </div>
-            <div className="flex items-end gap-2">
-                <p className="text-2xl font-extrabold text-gray-900">{value}</p>
-                {trend !== undefined && trend !== null && (
-                    <span className={`flex items-center gap-0.5 text-xs font-bold px-2 py-0.5 rounded-full mb-0.5 ${isUp ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
-                        {isUp ? <ArrowUp size={11} /> : <ArrowDown size={11} />}
-                        {Math.abs(trend)}%
-                    </span>
-                )}
-            </div>
-            {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
-        </div>
-    );
-}
-
-// ─── Status colors ────────────────────────────────────────────────────────────
-const STATUS_MAP: Record<string, { label: string; color: string }> = {
-    new:        { label: 'Yangi',       color: '#3b82f6' },
-    processing: { label: 'Jarayonda',   color: '#8b5cf6' },
-    shipping:   { label: "Yo'lda",      color: '#f59e0b' },
-    delivered:  { label: 'Yetkazildi',  color: '#10b981' },
-    cancelled:  { label: 'Bekor',       color: '#ef4444' },
-    draft:      { label: 'Draft',       color: '#9ca3af' },
-};
-
-// ─── Error Banner ─────────────────────────────────────────────────────────────
-function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
-    return (
-        <div className="flex items-center gap-3 bg-red-50 border border-red-100 rounded-2xl px-5 py-4 mb-6">
-            <AlertCircle size={18} className="text-red-500 shrink-0" />
-            <div className="flex-1">
-                <p className="text-sm font-semibold text-red-700">Ma&apos;lumot yuklanmadi</p>
-                <p className="text-xs text-red-400 mt-0.5">{message}</p>
-            </div>
-            <button
-                onClick={onRetry}
-                className="flex items-center gap-1.5 text-xs font-bold text-red-600 hover:text-red-700 border border-red-200 px-3 py-1.5 rounded-xl hover:bg-red-50 transition-colors"
-            >
-                <RefreshCw size={12} /> Qayta urinish
-            </button>
-        </div>
-    );
-}
-
-// ─── Empty Chart Placeholder ──────────────────────────────────────────────────
-function EmptyChart({ height = 200 }: { height?: number }) {
-    return (
-        <div
-            className="flex flex-col items-center justify-center gap-2 bg-gray-50 rounded-xl text-gray-400 text-sm"
-            style={{ height }}
-        >
-            <WifiOff size={24} className="text-gray-300" />
-            <span>Ma&apos;lumot yo&apos;q</span>
-        </div>
-    );
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function ReportsPage() {
-    const [data, setData]       = useState<ReportData | null>(null);
+    const [data, setData] = useState<ReportData | null>(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError]     = useState<string | null>(null);
-    const [period, setPeriod]   = useState(30);
+    const [error, setError] = useState<string | null>(null);
+    const [period, setPeriod] = useState(30);
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
-    const [online, setOnline]   = useState(true);
-    const [showExport, setShowExport] = useState(false);
+    const [online, setOnline] = useState(true);
 
-    // Network status listener
     useEffect(() => {
-        const onOnline  = () => setOnline(true);
+        const onOnline = () => setOnline(true);
         const onOffline = () => setOnline(false);
-        window.addEventListener('online',  onOnline);
+        window.addEventListener('online', onOnline);
         window.addEventListener('offline', onOffline);
         return () => {
-            window.removeEventListener('online',  onOnline);
+            window.removeEventListener('online', onOnline);
             window.removeEventListener('offline', onOffline);
         };
     }, []);
@@ -222,11 +43,9 @@ export default function ReportsPage() {
                 const body = await res.json().catch(() => ({}));
                 throw new Error(body?.error ?? `Server xatosi (${res.status})`);
             }
-            const json = await res.json();
-            setData(json);
+            setData(await res.json());
         } catch (e: unknown) {
-            const msg = e instanceof Error ? e.message : "Noma'lum xato";
-            setError(msg);
+            setError(e instanceof Error ? e.message : "Noma'lum xato");
         } finally {
             setLoading(false);
         }
@@ -235,144 +54,23 @@ export default function ReportsPage() {
     useEffect(() => { fetchData(); }, [fetchData]);
 
     const s = data?.summary;
-    const pieData = (data?.ordersByStatus ?? [])
-        .filter(o => o.status !== 'draft')
-        .map(o => ({
-            name:  STATUS_MAP[o.status]?.label ?? o.status,
-            value: o._count.status,
-            color: STATUS_MAP[o.status]?.color ?? '#9ca3af',
-        }));
-    const botReports = data?.botReports;
-
-
-
 
     return (
         <div className="p-6 bg-[#F9FAFB] min-h-screen">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-                <div>
-                    <div className="flex items-center gap-2">
-                        <h1 className="text-2xl font-extrabold text-gray-900">Hisobotlar & Analitika</h1>
-                        {/* Network indicator */}
-                        {online
-                            ? <span title="Tarmoq ulanishi bor"><Wifi size={14} className="text-emerald-500" /></span>
-                            : <span title="Tarmoq yo'q"><WifiOff size={14} className="text-red-400" /></span>
-                        }
-                    </div>
-                    <p className="text-sm text-gray-400 mt-0.5">Biznes ko&apos;rsatkichlari va tendentsiyalar</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    {/* Period selector */}
-                    <div className="flex rounded-xl overflow-hidden border border-gray-200 bg-white">
-                        {[7, 30, 90].map(d => (
-                            <button
-                                key={d}
-                                onClick={() => {
-                                    setPeriod(d);
-                                    setStartDate('');
-                                    setEndDate('');
-                                }}
-                                className={`px-4 py-2 text-sm font-semibold transition-colors ${
-                                    period === d
-                                        ? 'bg-[#064E3B] text-white'
-                                        : 'text-gray-600 hover:bg-gray-50'
-                                }`}
-                            >
-                                {d} kun
-                            </button>
-                        ))}
-                    </div>
-                    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-2 py-1">
-                        <input
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className="text-xs text-gray-700 outline-none"
-                            aria-label="Boshlanish sanasi"
-                        />
-                        <span className="text-gray-300 text-xs">—</span>
-                        <input
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="text-xs text-gray-700 outline-none"
-                            aria-label="Tugash sanasi"
-                        />
-                        <button
-                            onClick={() => {
-                                setStartDate('');
-                                setEndDate('');
-                            }}
-                            className="text-[10px] text-gray-500 hover:text-gray-700 px-2 py-1 border border-gray-200 rounded-md"
-                        >
-                            Tozalash
-                        </button>
-                    </div>
-                    <button
-                        onClick={fetchData}
-                        disabled={loading}
-                        title="Yangilash"
-                        aria-label="Ma'lumotlarni yangilash"
-                        className="w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors disabled:opacity-50"
-                    >
-                        <RefreshCw size={15} className={`text-gray-500 ${loading ? 'animate-spin' : ''}`} />
-                    </button>
+            <ReportsHeader
+                online={online}
+                loading={loading}
+                period={period}
+                startDate={startDate}
+                endDate={endDate}
+                onPeriodChange={setPeriod}
+                onStartDateChange={setStartDate}
+                onEndDateChange={setEndDate}
+                onRefresh={fetchData}
+            />
 
-                    {/* Export Button */}
-                    <div className="relative">
-                        <button
-                            onClick={() => setShowExport(!showExport)}
-                            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition-colors"
-                        >
-                            <Download size={14} /> Export
-                        </button>
-                        {showExport && (
-                            <div className="absolute right-0 top-12 bg-white rounded-xl border border-gray-200 shadow-xl py-2 z-50 min-w-[200px]">
-                                {[
-                                    { type: 'orders',    label: '📦 Buyurtmalar (CSV)',    emoji: '📦' },
-                                    { type: 'products',  label: '🏷️ Mahsulotlar (CSV)',    emoji: '🏷️' },
-                                    { type: 'customers', label: '👥 Mijozlar (CSV)',        emoji: '👥' },
-                                    { type: 'recycling', label: '♻️ Makulatura (CSV)',      emoji: '♻️' },
-                                    { type: 'bot_drivers', label: '🚚 Bot: Top haydovchilar (CSV)', emoji: '🚚' },
-                                    { type: 'bot_supervisors', label: '👷 Bot: Top masullar (CSV)', emoji: '👷' },
-                                ].map(item => (
-                                    <button
-                                        key={item.type}
-                                        onClick={() => {
-                                            const params = new URLSearchParams({
-                                                type: item.type,
-                                                period: String(period),
-                                            });
-                                            if (startDate && endDate) {
-                                                params.set('from', startDate);
-                                                params.set('to', endDate);
-                                            }
-                                            window.open(`/api/admin/export?${params.toString()}`, '_blank');
-                                            setShowExport(false);
-                                        }}
-                                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                    >
-                                        {item.label}
-                                    </button>
-                                ))}
-                                <div className="border-t border-gray-100 mt-1 pt-1 px-4 py-2">
-                                    <p className="text-[10px] text-gray-400">
-                                        {startDate && endDate
-                                            ? `Davr: ${startDate} - ${endDate}`
-                                            : `Davr: so&apos;nggi ${period} kun`}
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* Error banner */}
             {error && !loading && <ErrorBanner message={error} onRetry={fetchData} />}
 
-            {/* Stat Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <StatCard
                     label="Davr buyurtmalari"
@@ -412,15 +110,14 @@ export default function ReportsPage() {
                 />
             </div>
 
-            {/* Extended KPI row */}
             {!loading && s && (
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
                     {[
-                        { label: "Yangi buyurtmalar (24h)", value: fmt(s.newOrders),        clr: 'text-blue-600'   },
-                        { label: "Yetkazilgan",             value: fmt(s.completedOrders),  clr: 'text-emerald-600'},
-                        { label: "O'rtacha buyurtma (AOV)", value: `${fmtM(s.aov)} so'm`,  clr: 'text-purple-600' },
-                        { label: "Konversiya",              value: `${s.conversionRate}%`,  clr: s.conversionRate >= 50 ? 'text-emerald-600' : 'text-red-500' },
-                        { label: "⏰ Eng faol soat",        value: `${s.peakHour}:00`,      clr: 'text-blue-600'   },
+                        { label: 'Yangi buyurtmalar (24h)', value: fmt(s.newOrders), clr: 'text-blue-600' },
+                        { label: 'Yetkazilgan', value: fmt(s.completedOrders), clr: 'text-emerald-600' },
+                        { label: "O'rtacha buyurtma (AOV)", value: `${fmtM(s.aov)} so'm`, clr: 'text-purple-600' },
+                        { label: 'Konversiya', value: `${s.conversionRate}%`, clr: s.conversionRate >= 50 ? 'text-emerald-600' : 'text-red-500' },
+                        { label: '⏰ Eng faol soat', value: `${s.peakHour}:00`, clr: 'text-blue-600' },
                     ].map(({ label, value, clr }) => (
                         <div key={label} className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex flex-col">
                             <span className="text-[11px] text-gray-400 mb-1">{label}</span>
@@ -430,259 +127,9 @@ export default function ReportsPage() {
                 </div>
             )}
 
-            {/* Bot KPI + Tables */}
-            {!loading && botReports && (
-                <>
-                    <div className="grid md:grid-cols-3 gap-4 mb-5">
-                        <div className="bg-white rounded-2xl border border-gray-100 p-5">
-                            <p className="text-xs text-gray-400 mb-1">🤖 Customer Bot</p>
-                            <p className="text-lg font-extrabold text-gray-900">{fmt(botReports.customer.totalRequests)} ariza</p>
-                            <p className="text-xs text-gray-500 mt-1">
-                                {fmt(botReports.customer.uniqueUsers)} foydalanuvchi • Tasdiq: {fmt(botReports.customer.confirmedRequests)}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                                Pickup: {fmt(botReports.customer.pickupRequests)} • Self: {fmt(botReports.customer.selfDeliveryRequests)}
-                            </p>
-                        </div>
-                        <div className="bg-white rounded-2xl border border-gray-100 p-5">
-                            <p className="text-xs text-gray-400 mb-1">🚚 Driver Bot</p>
-                            <p className="text-lg font-extrabold text-gray-900">{fmt(botReports.driver.totalCollections)} yig&apos;ish</p>
-                            <p className="text-xs text-gray-500 mt-1">
-                                {fmt(botReports.driver.totalWeight)} kg • {fmtM(botReports.driver.totalAmount)} so&apos;m
-                            </p>
-                            <p className="text-xs text-gray-500">
-                                Kutilayotgan to&apos;lovlar: {fmt(botReports.driver.pendingPayments)}
-                            </p>
-                        </div>
-                        <div className="bg-white rounded-2xl border border-gray-100 p-5">
-                            <p className="text-xs text-gray-400 mb-1">👷 Admin Bot</p>
-                            <p className="text-lg font-extrabold text-gray-900">{fmt(botReports.admin.completedRequests)} yakunlangan</p>
-                            <p className="text-xs text-gray-500 mt-1">
-                                Tayinlangan: {fmt(botReports.admin.assignedRequests)} • To&apos;lovlar: {fmt(botReports.admin.approvedPaymentsCount)}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                                Tasdiqlangan summa: {fmtM(botReports.admin.approvedPaymentsAmount)} so&apos;m
-                            </p>
-                        </div>
-                    </div>
+            {!loading && data?.botReports && <BotReportsPanel botReports={data.botReports} />}
 
-                    <div className="grid lg:grid-cols-2 gap-5 mb-5">
-                        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                            <div className="px-4 py-3 border-b border-gray-50">
-                                <p className="font-bold text-gray-800 text-sm">🚚 Top haydovchilar</p>
-                            </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-                                        <tr>
-                                            <th className="px-4 py-2 text-left">Haydovchi</th>
-                                            <th className="px-4 py-2 text-right">Yig&apos;ish</th>
-                                            <th className="px-4 py-2 text-right">Og&apos;irlik</th>
-                                            <th className="px-4 py-2 text-right">Summa</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {botReports.topDrivers.length === 0 ? (
-                                            <tr>
-                                                <td className="px-4 py-6 text-center text-gray-400" colSpan={4}>Ma&apos;lumot yo&apos;q</td>
-                                            </tr>
-                                        ) : (
-                                            botReports.topDrivers.slice(0, 8).map((row) => (
-                                                <tr key={row.driverId} className="border-t border-gray-50">
-                                                    <td className="px-4 py-2.5">
-                                                        <p className="font-semibold text-gray-800">{row.name}</p>
-                                                        <p className="text-xs text-gray-400">{row.phone}</p>
-                                                    </td>
-                                                    <td className="px-4 py-2.5 text-right font-semibold text-gray-700">{fmt(row.collections)}</td>
-                                                    <td className="px-4 py-2.5 text-right text-gray-600">{fmt(row.totalWeight)} kg</td>
-                                                    <td className="px-4 py-2.5 text-right font-bold text-emerald-700">{fmtM(row.totalAmount)} so&apos;m</td>
-                                                </tr>
-                                            ))
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                            <div className="px-4 py-3 border-b border-gray-50">
-                                <p className="font-bold text-gray-800 text-sm">👷 Top masullar</p>
-                            </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-                                        <tr>
-                                            <th className="px-4 py-2 text-left">Masul</th>
-                                            <th className="px-4 py-2 text-right">Tayinlangan</th>
-                                            <th className="px-4 py-2 text-right">Yakunlangan</th>
-                                            <th className="px-4 py-2 text-right">To&apos;lov</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {botReports.topSupervisors.length === 0 ? (
-                                            <tr>
-                                                <td className="px-4 py-6 text-center text-gray-400" colSpan={4}>Ma&apos;lumot yo&apos;q</td>
-                                            </tr>
-                                        ) : (
-                                            botReports.topSupervisors.slice(0, 8).map((row) => (
-                                                <tr key={row.supervisorId} className="border-t border-gray-50">
-                                                    <td className="px-4 py-2.5">
-                                                        <p className="font-semibold text-gray-800">{row.name}</p>
-                                                        <p className="text-xs text-gray-400">{row.phone}</p>
-                                                    </td>
-                                                    <td className="px-4 py-2.5 text-right text-gray-600">{fmt(row.assignedRequests)}</td>
-                                                    <td className="px-4 py-2.5 text-right font-semibold text-gray-700">{fmt(row.completedRequests)}</td>
-                                                    <td className="px-4 py-2.5 text-right font-bold text-emerald-700">{fmtM(row.approvedPaymentsAmount)} so&apos;m</td>
-                                                </tr>
-                                            ))
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </>
-            )}
-
-            {/* Charts row */}
-            <div className="grid lg:grid-cols-3 gap-5 mb-5">
-                {/* Revenue area chart */}
-                <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-5">
-                    <p className="font-bold text-gray-800 mb-4">Kunlik daromad (so&apos;m)</p>
-                    {loading ? (
-                        <div className="h-48 bg-gray-50 rounded-xl animate-pulse" />
-                    ) : (data?.dailyRevenue ?? []).length === 0 ? (
-                        <EmptyChart height={200} />
-                    ) : (
-                        <ResponsiveContainer width="100%" height={200}>
-                            <AreaChart data={data?.dailyRevenue ?? []}>
-                                <defs>
-                                    <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%"  stopColor="#064E3B" stopOpacity={0.15} />
-                                        <stop offset="95%" stopColor="#064E3B" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                                <YAxis tickFormatter={v => fmtM(Number(v))} tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={48} />
-                                <Tooltip
-                                    formatter={(value) => [`${fmt(Number(value ?? 0))} so'm`, 'Daromad']}
-                                    contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 24px rgba(0,0,0,0.08)', fontSize: 12 }}
-                                />
-                                <Area type="monotone" dataKey="revenue" stroke="#064E3B" strokeWidth={2} fill="url(#revGrad)" dot={{ r: 3, fill: '#064E3B', strokeWidth: 0 }} activeDot={{ r: 5 }} />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    )}
-                </div>
-
-                {/* Status pie */}
-                <div className="bg-white rounded-2xl border border-gray-100 p-5">
-                    <p className="font-bold text-gray-800 mb-4">Status taqsimoti</p>
-                    {loading ? (
-                        <div className="h-48 bg-gray-50 rounded-xl animate-pulse" />
-                    ) : pieData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={200}>
-                            <PieChart>
-                                <Pie
-                                    data={pieData}
-                                    cx="50%" cy="50%"
-                                    innerRadius={50} outerRadius={80}
-                                    paddingAngle={3}
-                                    dataKey="value"
-                                >
-                                    {pieData.map((entry) => (
-                                        <Cell key={entry.name} fill={entry.color} />
-                                    ))}
-                                </Pie>
-                                <Tooltip contentStyle={{ borderRadius: 10, fontSize: 12 }} />
-                                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    ) : (
-                        <EmptyChart height={200} />
-                    )}
-                </div>
-            </div>
-
-            {/* Funnel + Region */}
-            <div className="grid lg:grid-cols-2 gap-5 mb-5">
-                <SalesFunnel data={data?.funnelData ?? null} loading={loading} />
-                <RegionSalesMap data={data?.regionSales ?? []} loading={loading} />
-            </div>
-
-            {/* Orders bar + Top products */}
-            <div className="grid lg:grid-cols-3 gap-5">
-                {/* Bar chart */}
-                <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-5">
-                    <p className="font-bold text-gray-800 mb-4">Kunlik buyurtmalar soni</p>
-                    {loading ? (
-                        <div className="h-44 bg-gray-50 rounded-xl animate-pulse" />
-                    ) : (data?.dailyRevenue ?? []).length === 0 ? (
-                        <EmptyChart height={180} />
-                    ) : (
-                        <ResponsiveContainer width="100%" height={180}>
-                            <BarChart data={data?.dailyRevenue ?? []}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                                <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                                <Tooltip
-                                    formatter={(v) => [Number(v ?? 0), 'Buyurtmalar']}
-                                    contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 24px rgba(0,0,0,0.08)', fontSize: 12 }}
-                                />
-                                <Bar dataKey="orders" fill="#3b82f6" radius={[6, 6, 0, 0]} maxBarSize={32} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    )}
-                </div>
-
-                {/* Top products */}
-                <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                    <div className="p-4 border-b border-gray-50 flex items-center justify-between">
-                        <p className="font-bold text-gray-800 text-sm">🏆 Top mahsulotlar</p>
-                        <Link href="/admin/products" className="text-xs text-blue-600 hover:underline flex items-center gap-0.5">
-                            Barchasi <ChevronRight size={12} />
-                        </Link>
-                    </div>
-                    <div className="divide-y divide-gray-50">
-                        {loading ? (
-                            Array.from({ length: 5 }).map((_, i) => (
-                                <div key={i} className="p-3 flex items-center gap-3 animate-pulse">
-                                    <div className="w-9 h-9 bg-gray-100 rounded-xl" />
-                                    <div className="flex-1">
-                                        <div className="h-3 bg-gray-100 rounded w-24 mb-1.5" />
-                                        <div className="h-2.5 bg-gray-50 rounded w-16" />
-                                    </div>
-                                    <div className="h-3 bg-gray-100 rounded w-10" />
-                                </div>
-                            ))
-                        ) : !data || data.topProducts.length === 0 ? (
-                            <div className="p-8 text-center text-gray-400 text-sm">Ma&apos;lumot yo&apos;q</div>
-                        ) : (
-                            data.topProducts.slice(0, 6).map((p, i) => (
-                                <div key={p.productId} className="px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors">
-                                    <span className={`w-5 text-[11px] font-extrabold ${i < 3 ? 'text-amber-500' : 'text-gray-400'}`}>
-                                        {i + 1}
-                                    </span>
-                                    <div className="w-9 h-9 rounded-xl bg-gray-50 border border-gray-100 overflow-hidden shrink-0 flex items-center justify-center">
-                                        {p.image
-                                            ? <Image src={p.image} alt={p.name} width={36} height={36} className="w-full h-full object-contain" unoptimized={p.image.startsWith('http')} />
-                                            : <Box size={14} className="text-gray-300" />
-                                        }
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-xs font-semibold text-gray-800 truncate">{p.name}</p>
-                                        <p className="text-[10px] text-gray-400">{p.orderCount} buyurtma</p>
-                                    </div>
-                                    <div className="text-right shrink-0">
-                                        <p className="text-xs font-extrabold text-gray-900">{fmt(p.totalSold)}</p>
-                                        <p className="text-[10px] text-gray-400">dona</p>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </div>
-            </div>
+            <ReportsCharts data={data} loading={loading} />
         </div>
     );
 }

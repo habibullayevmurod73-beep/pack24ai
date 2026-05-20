@@ -11,7 +11,7 @@ const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 interface PushMessage {
     title: string;
     body: string;
-    data?: Record<string, any>;
+    data?: Record<string, unknown>;
     sound?: 'default' | null;
     badge?: number;
 }

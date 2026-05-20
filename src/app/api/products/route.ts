@@ -1,9 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { ProductStatus } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
 import { parseProduct } from '@/lib/product-utils';
 import { downloadAndUploadToSupabase, processGalleryUrls } from '@/lib/media-utils';
+import { verifyAdminAuth } from '@/lib/adminAuth';
 
 
 
@@ -33,7 +34,10 @@ export async function GET(request: Request) {
     }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+    const authError = await verifyAdminAuth(request);
+    if (authError) return authError;
+
     try {
         const body = await request.json();
 

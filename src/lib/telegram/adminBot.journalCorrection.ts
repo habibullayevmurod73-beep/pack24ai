@@ -340,7 +340,7 @@ async function showCorrectionRowPicker(
     tgId: string,
     entity: CorrectionEntityType,
     day: Date,
-    lang: Lang,
+    _lang: Lang,
 ) {
     const rows = await fetchRows(entity, sup.id, day, 14);
     if (rows.length === 0) {

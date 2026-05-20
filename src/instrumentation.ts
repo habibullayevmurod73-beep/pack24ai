@@ -1,6 +1,16 @@
-/** Next.js Node server ishga tushganda chaqiladi (faqat NODE_ENV=development uchun ixtiyoriy polling). */
+/** Next.js Node server ishga tushganda chaqiladi */
 export async function register() {
     if (process.env.NEXT_RUNTIME !== 'nodejs') return;
+
+    // ── DB dan bot sessiyalarni tiklash (production + dev) ───────
+    try {
+        const { restoreSessionsFromDB } = await import('./lib/telegram/sessionStore');
+        await restoreSessionsFromDB();
+        console.log('[instrumentation] Telegram bot sessiyalari DB dan tiklandi');
+    } catch (err) {
+        console.warn('[instrumentation] Sessiya tiklash xatosi:', err);
+    }
+
     if (process.env.NODE_ENV !== 'development') return;
 
     const flag = process.env.TELEGRAM_DEV_AUTO_POLL?.trim().toLowerCase();

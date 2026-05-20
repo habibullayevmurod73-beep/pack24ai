@@ -1,3 +1,7 @@
+import { prisma } from '@/lib/prisma';
+
+/* ─── Types ──────────────────────────────────────────────────── */
+
 type SessionEntry<T> = {
     value: T;
     expiresAt: number;
@@ -16,19 +20,21 @@ type SessionStoreOptions = {
     refreshOnRead?: boolean;
 };
 
-const DEFAULT_TTL_MS = 1000 * 60 * 60 * 12;
+const DEFAULT_TTL_MS = 1000 * 60 * 60 * 12; // 12 soat
 const CLEANUP_INTERVAL = 50;
+
+/* ─── In-Memory Layer (tezkor operatsiyalar uchun) ───────────── */
 
 const globalForTelegramSessionStore = globalThis as typeof globalThis & {
     __telegramSessionStores?: Map<string, Map<string, SessionEntry<unknown>>>;
     __telegramSessionStoreOps?: Map<string, number>;
+    __telegramSessionPersistTimer?: ReturnType<typeof setInterval>;
 };
 
 function getGlobalStores() {
     if (!globalForTelegramSessionStore.__telegramSessionStores) {
         globalForTelegramSessionStore.__telegramSessionStores = new Map();
     }
-
     return globalForTelegramSessionStore.__telegramSessionStores;
 }
 
@@ -36,7 +42,6 @@ function getGlobalOpCounters() {
     if (!globalForTelegramSessionStore.__telegramSessionStoreOps) {
         globalForTelegramSessionStore.__telegramSessionStoreOps = new Map();
     }
-
     return globalForTelegramSessionStore.__telegramSessionStoreOps;
 }
 
@@ -45,7 +50,6 @@ function getOrCreateStore(namespace: string) {
     if (!stores.has(namespace)) {
         stores.set(namespace, new Map<string, SessionEntry<unknown>>());
     }
-
     return stores.get(namespace)!;
 }
 
@@ -60,7 +64,6 @@ function cleanupExpiredEntries(namespace: string, store: Map<string, SessionEntr
             store.delete(key);
         }
     }
-
     const counters = getGlobalOpCounters();
     counters.set(namespace, 0);
 }
@@ -74,6 +77,108 @@ function touchStore(namespace: string, store: Map<string, SessionEntry<unknown>>
         cleanupExpiredEntries(namespace, store);
     }
 }
+
+/* ─── DB Persistence Layer ───────────────────────────────────── */
+
+/**
+ * Sessiyalarni DB ga saqlash (BotEvent jadvalidan foydalanish)
+ * Server restart'da in-memory sessiyalar yo'qolmasligi uchun
+ * Telegram bot sessionlarini DB da JSON formatda saqlaymiz.
+ * dedupeKey orqali har bir namespace uchun bitta yozuv.
+ */
+async function persistSessionsToDB(): Promise<void> {
+    try {
+        const stores = getGlobalStores();
+        const now = Date.now();
+
+        for (const [namespace, store] of stores.entries()) {
+            // Faqat amal qilayotgan sessiyalarni saqlash
+            const validEntries: Record<string, SessionEntry<unknown>> = {};
+            for (const [key, entry] of store.entries()) {
+                if (entry.expiresAt > now) {
+                    validEntries[key] = entry;
+                }
+            }
+
+            const dedupeKey = `session_store_${namespace}`;
+            const payload = JSON.stringify(validEntries);
+
+            // BotEvent jadvaliga upsert (dedupeKey unique)
+            await prisma.botEvent.upsert({
+                where: { dedupeKey },
+                update: {
+                    message: payload,
+                    updatedAt: new Date(),
+                },
+                create: {
+                    sourceBot: 'system',
+                    eventType: 'session.persist',
+                    title: `Session Store: ${namespace}`,
+                    message: payload,
+                    dedupeKey,
+                    severity: 'info',
+                },
+            });
+        }
+    } catch (err) {
+        console.error('[SessionStore] DB persist xatosi:', err);
+    }
+}
+
+/**
+ * Server boshlanganda DB dan sessiyalarni tiklash
+ */
+export async function restoreSessionsFromDB(): Promise<void> {
+    try {
+        const events = await prisma.botEvent.findMany({
+            where: {
+                sourceBot: 'system',
+                eventType: 'session.persist',
+            },
+        });
+
+        const stores = getGlobalStores();
+        const now = Date.now();
+
+        for (const event of events) {
+            const namespace = (event.dedupeKey ?? '').replace('session_store_', '');
+            if (!namespace) continue;
+
+            const store = getOrCreateStore(namespace);
+
+            try {
+                const entries = JSON.parse(event.message ?? '{}') as Record<string, SessionEntry<unknown>>;
+                for (const [key, entry] of Object.entries(entries)) {
+                    if (entry.expiresAt > now) {
+                        store.set(key, entry);
+                    }
+                }
+                console.log(`[SessionStore] ${namespace}: ${store.size} ta sessiya tiklandi`);
+            } catch {
+                // JSON parse xatosi — o'tkazib yuborish
+            }
+        }
+    } catch (err) {
+        console.error('[SessionStore] DB restore xatosi:', err);
+    }
+}
+
+/* ─── Auto-Persist (har 5 daqiqada) ──────────────────────────── */
+
+function startAutoPersist(): void {
+    if (globalForTelegramSessionStore.__telegramSessionPersistTimer) return;
+
+    globalForTelegramSessionStore.__telegramSessionPersistTimer = setInterval(() => {
+        persistSessionsToDB().catch(() => {});
+    }, 5 * 60 * 1000); // 5 daqiqada bir
+}
+
+// Dev/production da auto-persist boshlash
+if (typeof globalThis !== 'undefined') {
+    startAutoPersist();
+}
+
+/* ─── Factory Function ───────────────────────────────────────── */
 
 export function createTelegramSessionStore<T>(
     namespace: string,

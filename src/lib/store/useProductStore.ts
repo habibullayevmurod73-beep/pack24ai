@@ -110,7 +110,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
                 set(state => ({ products: [product, ...state.products] }));
                 toast.success('Mahsulot qo\'shildi');
             }
-        } catch (error) {
+        } catch (_error) {
             toast.error('Xatolik yuz berdi');
         }
     },
@@ -129,7 +129,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
                 body: JSON.stringify(updates)
             });
             if (!res.ok) throw new Error();
-        } catch (error) {
+        } catch (_error) {
             set({ products: originalProducts }); // Revert
             toast.error('Yangilashda xatolik');
         }
@@ -143,7 +143,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
             const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
             if (!res.ok) throw new Error();
             toast.success("Mahsulot o'chirildi");
-        } catch (error) {
+        } catch (_error) {
             set({ products: originalProducts });
             toast.error("O'chirishda xatolik");
         }

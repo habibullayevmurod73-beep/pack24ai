@@ -497,7 +497,14 @@ async function main() {
     }
 }
 
-main().catch(err => {
-    console.error('Fatal:', err);
-    process.exit(1);
-});
+// Jest import qilganda ishlamasligi kerak — faqat `npm run test:integration` orqali
+const isDirectRun =
+    require.main === module ||
+    process.argv[1]?.includes('corporate-integration');
+
+if (isDirectRun) {
+    main().catch(err => {
+        console.error('Fatal:', err);
+        process.exit(1);
+    });
+}

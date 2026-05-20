@@ -1,7 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
+import { verifyAdminAuth } from '@/lib/adminAuth';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+    const authError = await verifyAdminAuth(request);
+    if (authError) return authError;
+
     try {
         const { url } = await request.json();
 

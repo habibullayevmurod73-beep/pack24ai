@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
     Leaf, Recycle, Trophy, CloudSun, Truck, Gift,
     CheckCircle, Loader2, TrendingUp, Award, TreePine, Droplets
@@ -131,9 +132,9 @@ export default function PRTSPage() {
             <div className="flex flex-col h-[60vh] items-center justify-center gap-4">
                 <Recycle className="h-12 w-12 text-emerald-300" />
                 <p className="text-gray-500">{error}</p>
-                <a href="/login" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors">
+                <Link href="/login" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors">
                     {t('auth.login')}
-                </a>
+                </Link>
             </div>
         );
     }

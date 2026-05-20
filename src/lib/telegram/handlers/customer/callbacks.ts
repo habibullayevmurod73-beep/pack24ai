@@ -2,7 +2,7 @@ import { Telegraf } from 'telegraf';
 import { prisma } from '@/lib/prisma';
 import { sessions, registrationSessions, getUserByTgId, getUserLang } from './helpers';
 import { Lang, getText, formatText } from '../../i18n';
-import { customerMainKeyboard, sharePhoneKeyboard, cabinetMenuKeyboard, volumeKeyboard, photoOrSkipKeyboard } from '../../keyboards';
+import { customerMainKeyboard, sharePhoneKeyboard, volumeKeyboard, photoOrSkipKeyboard } from '../../keyboards';
 import { submitTruckRequest } from './truckRequest';
 import { MAT, fmtN } from './types';
 import { haversineDistance } from '../../geo';

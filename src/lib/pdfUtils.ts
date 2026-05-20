@@ -1,10 +1,10 @@
 import jsPDF from 'jspdf';
 import { BoxDimensions } from './types';
-import { Language } from './translations';
+
 
 // Constants for fonts
 const FONT_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf";
-const FONT_NAME = "Roboto-Regular";
+
 
 export interface PDFGenOptions {
     fileName: string;

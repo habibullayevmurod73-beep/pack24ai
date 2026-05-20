@@ -25,6 +25,11 @@ const config: Config = {
         '**/?(*.)+(spec|test).[jt]s?(x)',
     ],
 
+    // Jonli server talab qiladigan integration script — Jest emas
+    testPathIgnorePatterns: [
+        '<rootDir>/src/app/api/orders/__tests__/corporate-integration.test.ts',
+    ],
+
     // coverage
     collectCoverageFrom: [
         'src/**/*.{ts,tsx}',

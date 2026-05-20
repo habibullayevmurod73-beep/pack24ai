@@ -11,7 +11,6 @@ import {
 import {
     fmtN,
     getSupervisor,
-    statusLabels,
     volLabel,
 } from './adminBot.shared';
 import { approveBotAccessRequest, rejectBotAccessRequest } from './botAccessRequests';

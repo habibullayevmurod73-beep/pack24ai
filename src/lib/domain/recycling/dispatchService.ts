@@ -67,7 +67,7 @@ async function publishDispatchEvent(params: {
 async function sendToTelegram(chatId: string, message: string, extra?: Record<string, unknown>) {
     try {
         if (!chatId) return false;
-        await notifyCustomer(chatId, message, extra as any);
+        await notifyCustomer(chatId, message, extra as Record<string, unknown>);
         return true;
     } catch (e) {
         console.error('[Dispatch TG]', e);

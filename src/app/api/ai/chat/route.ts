@@ -29,26 +29,61 @@ interface ChatRequest {
     };
 }
 
-// ─── Rate Limiting (in-memory, per IP) ───────────────────────
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT = 30;       // max requests
-const RATE_WINDOW = 60_000;  // per minute
+// ─── Rate Limiting (in-memory, per IP + per user) ────────────
+interface RateLimitEntry {
+    count: number;
+    resetAt: number;
+}
 
-function checkRateLimit(ip: string): boolean {
+const rateLimitMap = new Map<string, RateLimitEntry>();
+const RATE_LIMIT_IP = 30;         // IP uchun max so'rovlar
+const RATE_LIMIT_USER = 50;       // Autentifikatsiya qilingan foydalanuvchi uchun
+const RATE_WINDOW = 60_000;       // per minute
+
+/**
+ * IP manzilni aniqlash — proxy, load balancer, CDN ortida ham to'g'ri ishlaydi
+ */
+function extractClientIP(req: Request): string {
+    // Cloudflare
+    const cfIP = req.headers.get('cf-connecting-ip');
+    if (cfIP) return cfIP.trim();
+
+    // Standard proxy headers
+    const forwarded = req.headers.get('x-forwarded-for');
+    if (forwarded) {
+        // Birinchi IP — haqiqiy client IP
+        const firstIP = forwarded.split(',')[0]?.trim();
+        if (firstIP) return firstIP;
+    }
+
+    const realIP = req.headers.get('x-real-ip');
+    if (realIP) return realIP.trim();
+
+    // Vercel
+    const vercelIP = req.headers.get('x-vercel-forwarded-for');
+    if (vercelIP) return vercelIP.split(',')[0]?.trim() || 'unknown';
+
+    return 'unknown';
+}
+
+function checkRateLimit(identifier: string, limit: number = RATE_LIMIT_IP): boolean {
     const now = Date.now();
-    const entry = rateLimitMap.get(ip);
+    const entry = rateLimitMap.get(identifier);
 
     if (!entry || now > entry.resetAt) {
-        rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW });
+        rateLimitMap.set(identifier, { count: 1, resetAt: now + RATE_WINDOW });
         return true;
     }
 
-    if (entry.count >= RATE_LIMIT) return false;
+    if (entry.count >= limit) return false;
     entry.count++;
     return true;
 }
 
-// Periodically clean up old entries (every 5 min)
+/**
+ * Eskirgan yozuvlarni tozalash — memory leak oldini olish
+ * Har 5 daqiqada bir marta
+ */
 if (typeof globalThis !== 'undefined') {
     const cleanup = () => {
         const now = Date.now();
@@ -260,12 +295,10 @@ async function geminiResponse(
 // ─── POST Handler ────────────────────────────────────────────
 export async function POST(req: Request) {
     try {
-        // Rate limiting
-        const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-            || req.headers.get('x-real-ip')
-            || 'unknown';
+        // Rate limiting — IP + user token
+        const ip = extractClientIP(req);
 
-        if (!checkRateLimit(ip)) {
+        if (!checkRateLimit(`ip:${ip}`, RATE_LIMIT_IP)) {
             return NextResponse.json(
                 { error: 'Too many requests. Please try again later.' },
                 { status: 429 }

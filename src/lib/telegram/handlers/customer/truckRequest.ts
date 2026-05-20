@@ -1,13 +1,13 @@
 import type { Context, Telegraf } from 'telegraf';
 import { prisma } from '@/lib/prisma';
 import { RecyclePointStatus, RecycleRequestStatus } from '@prisma/client';
-import type { Lang } from '../../i18n';
+
 import { getText } from '../../i18n';
 import { haversineDistance } from '../../geo';
 import { notifyAdmin } from '../../notifier';
 import { createBotEvent } from '../../botEvents';
 import type { CustomerSession } from './types';
-import { fmtN } from './types';
+
 import { sessions, registrationSessions } from './helpers';
 
 // ─── Mashina chaqirish arizasini yuborish ─────────────────────────────────────

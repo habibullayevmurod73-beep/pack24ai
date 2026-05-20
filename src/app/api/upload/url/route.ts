@@ -3,6 +3,30 @@ import { NextRequest, NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 import { v4 as uuidv4 } from 'uuid';
 import { uploadBufferToSupabase } from '@/lib/supabase-storage';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { ADMIN_AUTH_COOKIE, ADMIN_AUTH_HEADER, validateAdminToken } from '@/lib/adminAuthShared';
+
+async function isAuthorized(request: NextRequest): Promise<boolean> {
+    const session = await getServerSession(authOptions);
+    if (session?.user?.id) return true;
+
+    const adminSecret = process.env.ADMIN_SECRET;
+    if (adminSecret) {
+        const cookie = request.cookies.get(ADMIN_AUTH_COOKIE)?.value;
+        if (cookie) {
+            const v = await validateAdminToken(cookie, adminSecret);
+            if (v.valid) return true;
+        }
+        const header = request.headers.get(ADMIN_AUTH_HEADER);
+        if (header) {
+            const v = await validateAdminToken(header, adminSecret);
+            if (v.valid) return true;
+        }
+    }
+
+    return false;
+}
 
 const MIME_TO_EXT: Record<string, string> = {
     'image/jpeg': '.jpg',
@@ -20,6 +44,10 @@ const MIME_TO_EXT: Record<string, string> = {
  * Qaytaradi: { success: true, url: "https://supabase.../..." }
  */
 export async function POST(req: NextRequest) {
+    if (!(await isAuthorized(req))) {
+        return NextResponse.json({ error: 'Avtorizatsiya talab etiladi' }, { status: 401 });
+    }
+
     let url = '';
     try {
         const body = await req.json();

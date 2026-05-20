@@ -91,10 +91,18 @@ export async function POST(req: NextRequest) {
 
         // Draft mode (old cart flow)
         if (telegramUserId && !customerName) {
+            // Barcha mahsulotlarni birdaniga olish (N+1 query oldini olish)
+            const productIds = items.map(i => i.productId);
+            const products = await prisma.product.findMany({
+                where: { id: { in: productIds } },
+                select: { id: true, price: true },
+            });
+            const productMap = new Map(products.map(p => [p.id, p]));
+
             let total = 0;
             const fItems: { productId: number; quantity: number; price: number }[] = [];
             for (const item of items) {
-                const product = await prisma.product.findUnique({ where: { id: item.productId } });
+                const product = productMap.get(item.productId);
                 if (product) {
                     total += product.price * item.quantity;
                     fItems.push({ productId: item.productId, quantity: item.quantity, price: product.price });

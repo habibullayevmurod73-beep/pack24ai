@@ -10,6 +10,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:integration": "tsx src/app/api/orders/__tests__/corporate-integration.test.ts",
     "seed": "tsx prisma/seed.ts",
     "db:push": "prisma db push",
     "db:studio": "prisma studio"

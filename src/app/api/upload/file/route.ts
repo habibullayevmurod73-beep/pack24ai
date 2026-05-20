@@ -1,16 +1,46 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import { uploadBufferToSupabase } from '@/lib/supabase-storage';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { ADMIN_AUTH_COOKIE, ADMIN_AUTH_HEADER, validateAdminToken } from '@/lib/adminAuthShared';
+
+async function isAuthorized(request: NextRequest): Promise<boolean> {
+    // 1) NextAuth session (foydalanuvchi yoki admin)
+    const session = await getServerSession(authOptions);
+    if (session?.user?.id) return true;
+
+    // 2) Admin HMAC token (cookie yoki header)
+    const adminSecret = process.env.ADMIN_SECRET;
+    if (adminSecret) {
+        const cookie = request.cookies.get(ADMIN_AUTH_COOKIE)?.value;
+        if (cookie) {
+            const v = await validateAdminToken(cookie, adminSecret);
+            if (v.valid) return true;
+        }
+        const header = request.headers.get(ADMIN_AUTH_HEADER);
+        if (header) {
+            const v = await validateAdminToken(header, adminSecret);
+            if (v.valid) return true;
+        }
+    }
+
+    return false;
+}
 
 /**
  * POST /api/upload/file
  * multipart/form-data: field "file"
  * Qaytaradi: { success: true, url: "https://..." }
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+    if (!(await isAuthorized(request))) {
+        return NextResponse.json({ error: 'Avtorizatsiya talab etiladi' }, { status: 401 });
+    }
+
     try {
         const data = await request.formData();
         const file = data.get('file') as File | null;
