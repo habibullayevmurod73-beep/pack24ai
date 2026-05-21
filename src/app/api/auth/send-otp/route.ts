@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { notifyCustomer } from '@/lib/telegram/notifier';
+import { otpLimiter, getClientIp, getRateLimitResponse } from '@/lib/rateLimit';
 
 const OTP_EXPIRY_MINUTES = 5;
 const MAX_ATTEMPTS_PER_WINDOW = 3;
@@ -24,6 +25,10 @@ function normalizePhone(phone: string): string {
 
 export async function POST(request: Request) {
     try {
+        // IP-based rate limiting: 3 urinish/daqiqa
+        const ip = getClientIp(request);
+        const rl = otpLimiter.check(`otp:${ip}`);
+        if (!rl.allowed) return getRateLimitResponse(rl.retryAfterMs);
         const body = await request.json();
         const { phone } = body as { phone?: string };
 

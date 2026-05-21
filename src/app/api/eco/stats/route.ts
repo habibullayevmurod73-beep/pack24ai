@@ -1,10 +1,18 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { rateLimit, getClientIp, getRateLimitResponse } from '@/lib/rateLimit';
 
-export async function GET() {
+const ecoStatsLimiter = rateLimit({ windowMs: 60_000, max: 30 });
+
+export async function GET(req: NextRequest) {
   try {
+    // Rate limiting
+    const ip = getClientIp(req);
+    const rl = ecoStatsLimiter.check(`eco-stats:${ip}`);
+    if (!rl.allowed) return getRateLimitResponse(rl.retryAfterMs);
+
     const session = await getServerSession(authOptions);
     const userId = Number(session?.user?.id);
 

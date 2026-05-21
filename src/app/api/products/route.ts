@@ -5,6 +5,7 @@ import type { Prisma } from '@prisma/client';
 import { parseProduct } from '@/lib/product-utils';
 import { downloadAndUploadToSupabase, processGalleryUrls } from '@/lib/media-utils';
 import { verifyAdminAuth } from '@/lib/adminAuth';
+import { readOptionalEnum, RequestValidationError } from '@/lib/requestValidation';
 
 
 
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
         const where: Prisma.ProductWhereInput = {};
 
         if (category && category !== 'all') where.category = category;
-        if (status   && status   !== 'all') where.status   = status as any;
+        if (status   && status   !== 'all') where.status   = readOptionalEnum(status, 'status', Object.values(ProductStatus));
         if (search)                          where.name     = { contains: search, mode: 'insensitive' };
 
         const products = await prisma.product.findMany({
@@ -29,6 +30,9 @@ export async function GET(request: Request) {
         // Type-safe JSON parse (gallery, specifications, tags — Prisma Json tipidan)
         return NextResponse.json(products.map(parseProduct));
     } catch (error) {
+        if (error instanceof RequestValidationError) {
+            return NextResponse.json({ error: error.message }, { status: error.status });
+        }
         console.error('[GET /api/products]', error);
         return NextResponse.json({ error: 'Server xatosi' }, { status: 500 });
     }
@@ -64,13 +68,16 @@ export async function POST(request: NextRequest) {
                 specifications: body.specifications ?? {},
                 tags:           Array.isArray(body.tags) ? body.tags : [],
                 minQuantity:    body.minQuantity    ? parseInt(body.minQuantity) : 1,
-                status:         (body.status as ProductStatus) || ProductStatus.draft,
+                status:         readOptionalEnum(body.status, 'status', Object.values(ProductStatus)) || ProductStatus.draft,
                 inStock:        body.inStock        !== false,
             },
         });
 
         return NextResponse.json(parseProduct(newProduct), { status: 201 });
     } catch (error: unknown) {
+        if (error instanceof RequestValidationError) {
+            return NextResponse.json({ error: error.message }, { status: error.status });
+        }
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[POST /api/products]', msg);
         return NextResponse.json({ error: 'Server xatosi: ' + msg }, { status: 500 });

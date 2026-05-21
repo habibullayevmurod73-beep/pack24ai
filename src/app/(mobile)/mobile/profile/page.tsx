@@ -1,17 +1,82 @@
 'use client';
 
 import Link from 'next/link';
-import { User, LogOut, Phone, Instagram, Send, MapPin, Globe, Settings, Info, Youtube, Bot, Headset } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { User, LogOut, Phone, Instagram, Send, MapPin, Globe, Settings, Info, Youtube, Bot, Headset, Leaf } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import EcoStatusCard from '@/components/eco/EcoStatusCard';
+import AchievementGrid from '@/components/eco/AchievementGrid';
+
+interface EcoProfile {
+    ecoPoints: number;
+    ecoLevel: string;
+    totalRecycledWeight: number;
+    totalCO2Saved: number;
+    treesEquivalent: number;
+    ecoStreak: number;
+    achievements: Array<{ badgeKey: string; earnedAt: string }>;
+}
 
 export default function MobileProfilePage() {
     const router = useRouter();
+    const [eco, setEco] = useState<EcoProfile | null>(null);
+    const [ecoLoading, setEcoLoading] = useState(true);
+
+    useEffect(() => {
+        // Try to get userId from Telegram WebApp or session
+        const tg = (window as any).Telegram?.WebApp;
+        const tgUserId = tg?.initDataUnsafe?.user?.id;
+
+        if (tgUserId) {
+            fetch(`/api/user/eco-progress?userId=${tgUserId}`)
+                .then(r => r.ok ? r.json() : null)
+                .then(data => { if (data) setEco(data); })
+                .catch(() => {})
+                .finally(() => setEcoLoading(false));
+        } else {
+            setEcoLoading(false);
+        }
+    }, []);
+
     return (
         <div className="bg-[#F9FAFB] min-h-screen flex flex-col">
             {/* Header */}
             <div className="bg-white p-4 flex items-center justify-between shadow-sm sticky top-0 z-10">
                 <h1 className="text-lg font-bold text-gray-900">Profil</h1>
             </div>
+
+            {/* Eco Gamification Section */}
+            {!ecoLoading && eco && (
+                <div className="mt-4 px-4 space-y-3">
+                    <EcoStatusCard
+                        ecoLevel={eco.ecoLevel}
+                        ecoPoints={eco.ecoPoints}
+                        totalKg={eco.totalRecycledWeight}
+                        language="uz"
+                    />
+                    {eco.achievements && eco.achievements.length > 0 && (
+                        <AchievementGrid
+                            earnedBadges={eco.achievements}
+                            language="uz"
+                        />
+                    )}
+                </div>
+            )}
+
+            {/* Eco CTA (when no eco data) */}
+            {!ecoLoading && !eco && (
+                <div className="mt-4 px-4">
+                    <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-3">
+                        <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
+                            <Leaf className="w-5 h-5 text-emerald-600" />
+                        </div>
+                        <div>
+                            <p className="text-sm font-bold text-emerald-800">Eko dasturga qo'shiling!</p>
+                            <p className="text-xs text-emerald-600 mt-0.5">Makulatura topshiring va ball yig'ing</p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Support Section */}
             <div className="mt-4 px-4">

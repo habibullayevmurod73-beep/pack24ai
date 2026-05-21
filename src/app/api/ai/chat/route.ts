@@ -8,6 +8,11 @@
 import { NextResponse } from 'next/server';
 import { KNOWLEDGE_BASE, FALLBACK_RESPONSES } from '@/lib/ai-knowledge';
 
+// ─── HTML Strip Helper ───────────────────────────────────────
+function stripHtml(str: string): string {
+    return str.replace(/<[^>]*>/g, '').trim();
+}
+
 // ─── Types ────────────────────────────────────────────────────
 interface ChatMessage {
     role: 'user' | 'assistant';
@@ -317,6 +322,15 @@ export async function POST(req: Request) {
         // Sanitize & limit message length
         const sanitizedMessage = message.trim().slice(0, 500);
 
+        // Sanitize context fields — strip HTML from user-provided strings
+        if (context) {
+            if (context.modelName) context.modelName = stripHtml(context.modelName).slice(0, 200);
+            if (context.material) context.material = stripHtml(context.material).slice(0, 200);
+        }
+
+        // Cap history to max 10 entries server-side (don't trust client)
+        const safeHistory = Array.isArray(history) ? history.slice(-10) : [];
+
         let responseText: string;
         let engine: 'gemini' | 'legacy' = 'legacy';
 
@@ -324,7 +338,7 @@ export async function POST(req: Request) {
         const geminiKey = process.env.GEMINI_API_KEY?.trim();
         if (geminiKey && geminiKey.length > 10) {
             try {
-                responseText = await geminiResponse(sanitizedMessage, language, history, context);
+                responseText = await geminiResponse(sanitizedMessage, language, safeHistory, context);
                 engine = 'gemini';
             } catch (err) {
                 console.warn('[AI Chat] Gemini failed, using legacy fallback:', err);

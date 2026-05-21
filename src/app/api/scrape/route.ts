@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 import { verifyAdminAuth } from '@/lib/adminAuth';
+import { aiLimiter, getClientIp, getRateLimitResponse } from '@/lib/rateLimit';
 
 export async function POST(request: NextRequest) {
     const authError = await verifyAdminAuth(request);
     if (authError) return authError;
 
+    // Rate limiting: 10 so'rov/daqiqa
+    const ip = getClientIp(request);
+    const rl = aiLimiter.check(`scrape:${ip}`);
+    if (!rl.allowed) return getRateLimitResponse(rl.retryAfterMs);
     try {
         const { url } = await request.json();
 

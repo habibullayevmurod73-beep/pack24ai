@@ -4,6 +4,7 @@ import {
     ADMIN_AUTH_COOKIE,
     ADMIN_TOKEN_MAX_AGE_MS,
 } from '@/lib/adminAuthShared';
+import { authLimiter, getClientIp, getRateLimitResponse } from '@/lib/rateLimit';
 
 /**
  * HMAC-SHA256 imzoli token yaratish
@@ -20,6 +21,10 @@ function createAdminToken(secret: string): string {
 
 export async function POST(req: NextRequest) {
     try {
+        // Rate limiting: 5 urinish/daqiqa
+        const ip = getClientIp(req);
+        const rl = authLimiter.check(`admin-login:${ip}`);
+        if (!rl.allowed) return getRateLimitResponse(rl.retryAfterMs);
         const body = await req.json();
         const { username, password } = body as { username?: string; password?: string };
 

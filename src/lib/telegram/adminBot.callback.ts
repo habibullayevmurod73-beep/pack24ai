@@ -1,8 +1,11 @@
 import { Context, Telegraf } from 'telegraf';
 import { prisma } from '@/lib/prisma';
 import { Lang, formatText, getText } from './i18n';
-import { createBotEvent } from './botEvents';
 import { notifyCustomer, notifyDriver } from './notifier';
+import { createBotEvent } from './botEvents';
+import { generateSupervisorReport, ReportPeriod } from '@/lib/domain/recycling/supervisorReports';
+import { assignDriverToRequest } from '@/lib/domain/recycling/driverAssignment';
+import { approveCollectionPayment } from '@/lib/domain/recycling/paymentService';
 import {
     assignDriverKeyboard,
     backKeyboard,
@@ -186,46 +189,13 @@ export function registerAdminCallbackHandler(bot: Telegraf) {
                 const driverId = parseInt(parts[0], 10);
                 const reqId = parseInt(parts[1], 10);
 
-                const driver = await prisma.driver.findUnique({ where: { id: driverId } });
-                const request = await prisma.recycleRequest.findUnique({
-                    where: { id: reqId },
-                    include: { point: true },
-                });
-
-                if (!driver || !request) {
+                const result = await assignDriverToRequest(reqId, driverId, sup.id, sup.name);
+                if (!result) {
                     await ctx.answerCbQuery('❌ Topilmadi');
                     return;
                 }
 
-                await prisma.recycleRequest.update({
-                    where: { id: reqId },
-                    data: {
-                        assignedDriverId: driverId,
-                        assignedAt: new Date(),
-                        status: 'assigned',
-                        supervisorId: sup.id,
-                        dispatchedAt: new Date(),
-                    },
-                });
-
-                await prisma.driver.update({
-                    where: { id: driverId },
-                    data: { status: 'busy' },
-                });
-
-                await createBotEvent({
-                    sourceBot: 'supervisor',
-                    eventType: 'request.assigned',
-                    entityType: 'recycle_request',
-                    entityId: reqId,
-                    severity: 'success',
-                    title: 'Haydovchi tayinlandi',
-                    message: `${sup.name} ariza #${reqId} uchun ${driver.name} ni tayinladi.`,
-                    requestId: reqId,
-                    driverId,
-                    supervisorId: sup.id,
-                    pointId: request.point?.id ?? request.regionId,
-                });
+                const { request, driver } = result;
 
                 await ctx.answerCbQuery('✅');
                 await ctx.editMessageText(
@@ -276,52 +246,14 @@ export function registerAdminCallbackHandler(bot: Telegraf) {
 
             if (data.startsWith('approve_payment_')) {
                 const collId = parseInt(data.replace('approve_payment_', ''), 10);
-                const collection = await prisma.recycleCollection.findUnique({
-                    where: { id: collId },
-                    include: { request: true, driver: true },
-                });
 
-                if (!collection) {
+                const result = await approveCollectionPayment(collId, sup.name, sup.id);
+                if (!result) {
                     await ctx.answerCbQuery('❌ Topilmadi');
                     return;
                 }
 
-                await prisma.recycleCollection.update({
-                    where: { id: collId },
-                    data: {
-                        paymentStatus: 'completed',
-                        paidAt: new Date(),
-                        paidBy: sup.name,
-                    },
-                });
-
-                await prisma.recycleRequest.update({
-                    where: { id: collection.requestId },
-                    data: { status: 'completed', completedAt: new Date() },
-                });
-
-                if (collection.driverId) {
-                    await prisma.driver.update({
-                        where: { id: collection.driverId },
-                        data: { status: 'active' },
-                    });
-                }
-
-                await createBotEvent({
-                    sourceBot: 'supervisor',
-                    eventType: 'payment.completed',
-                    entityType: 'recycle_collection',
-                    entityId: collId,
-                    severity: 'success',
-                    title: 'To\'lov tasdiqlandi',
-                    message:
-                        `${sup.name} ariza #${collection.requestId} bo'yicha ` +
-                        `${fmtN(Math.round(collection.totalAmount))} so'm to'lovni tasdiqladi.`,
-                    requestId: collection.requestId,
-                    collectionId: collection.id,
-                    driverId: collection.driverId,
-                    supervisorId: sup.id,
-                });
+                const { collection, request } = result;
 
                 await ctx.answerCbQuery('✅');
                 await ctx.editMessageText(
@@ -329,10 +261,10 @@ export function registerAdminCallbackHandler(bot: Telegraf) {
                     { parse_mode: 'HTML' }
                 );
 
-                if (collection.request.customerTgId) {
-                    const lang = (collection.request.customerLang as Lang) || 'uz';
+                if (request.customerTgId) {
+                    const lang = (request.customerLang as Lang) || 'uz';
                     await notifyCustomer(
-                        collection.request.customerTgId,
+                        request.customerTgId,
                         lang === 'uz'
                             ? `✅ <b>Ariza #${collection.requestId} yakunlandi!</b>\n\n💰 To'lov: ${fmtN(Math.round(collection.totalAmount))} so'm\n\nRahmat! ♻️`
                             : lang === 'ru'
@@ -379,57 +311,8 @@ export function registerAdminCallbackHandler(bot: Telegraf) {
             }
 
             if (data.startsWith('report_')) {
-                const period = data.replace('report_', '');
-                const from = new Date();
-
-                if (period === 'today') {
-                    from.setHours(0, 0, 0, 0);
-                } else if (period === 'week') {
-                    from.setDate(from.getDate() - 7);
-                } else if (period === 'month') {
-                    from.setMonth(from.getMonth() - 1);
-                }
-
-                const pointFilter = sup.pointId ? { regionId: sup.pointId } : {};
-
-                const totalRequests = await prisma.recycleRequest.count({
-                    where: { ...pointFilter, createdAt: { gte: from } },
-                });
-                const completedRequests = await prisma.recycleRequest.count({
-                    where: { ...pointFilter, status: 'completed', completedAt: { gte: from } },
-                });
-                const collections = await prisma.recycleCollection.findMany({
-                    where: { createdAt: { gte: from } },
-                });
-                const intakeLogs = await prisma.recycleManualIntake.findMany({
-                    where: { supervisorId: sup.id, date: { gte: from } },
-                });
-                const pressLogs = await prisma.recyclePressLog.findMany({
-                    where: { supervisorId: sup.id, date: { gte: from } },
-                });
-                const expenseLogs = await prisma.recycleExpenseLog.findMany({
-                    where: { supervisorId: sup.id, date: { gte: from } },
-                });
-                const salesLogs = await prisma.recycleSalesLog.findMany({
-                    where: { supervisorId: sup.id, date: { gte: from } },
-                });
-                const totalWeight = collections.reduce((sum, row) => sum + row.actualWeight, 0);
-                const totalAmount = collections.reduce((sum, row) => sum + row.totalAmount, 0);
-                const activeDrivers = await prisma.driver.count({
-                    where: {
-                        isOnline: true,
-                        ...(sup.pointId ? { pointId: sup.pointId } : {}),
-                    },
-                });
-                const intakeWeight = intakeLogs.reduce((sum, row) => sum + row.weightKg, 0);
-                const intakeAmount = intakeLogs.reduce((sum, row) => sum + row.totalAmount, 0);
-                const pressedKg = pressLogs.reduce((sum, row) => sum + row.pressedKg, 0);
-                const baleCount = pressLogs.reduce((sum, row) => sum + row.baleCount, 0);
-                const expenseAmount = expenseLogs.reduce((sum, row) => sum + row.expenseAmount, 0);
-                const advanceAmount = expenseLogs.reduce((sum, row) => sum + row.advanceAmount, 0);
-                const soldWeight = salesLogs.reduce((sum, row) => sum + row.weightKg, 0);
-                const soldAmount = salesLogs.reduce((sum, row) => sum + row.totalAmount, 0);
-                const soldBaleCount = salesLogs.reduce((sum, row) => sum + row.baleCount, 0);
+                const period = data.replace('report_', '') as ReportPeriod;
+                const report = await generateSupervisorReport(sup.id, sup.pointId, period);
 
                 const periodLabel = period === 'today' ? 'Bugun' : period === 'week' ? 'Hafta' : 'Oy';
 
@@ -437,17 +320,17 @@ export function registerAdminCallbackHandler(bot: Telegraf) {
                 await ctx.editMessageText(
                     formatText('adm_report', 'uz', {
                         period: periodLabel,
-                        requests: String(totalRequests),
-                        completed: String(completedRequests),
-                        weight: String(Math.round(totalWeight * 10) / 10),
-                        amount: fmtN(Math.round(totalAmount)),
-                        drivers: String(activeDrivers),
+                        requests: String(report.totalRequests),
+                        completed: String(report.completedRequests),
+                        weight: String(Math.round(report.collectionWeight * 10) / 10),
+                        amount: fmtN(Math.round(report.collectionAmount)),
+                        drivers: String(report.activeDrivers),
                     }) +
-                    `\n\n📥 <b>Qo'lda qabul:</b> ${fmtN(Math.round(intakeWeight))} kg | ${fmtN(Math.round(intakeAmount))} so'm` +
-                    `\n🏭 <b>Press:</b> ${fmtN(Math.round(pressedKg))} kg | ${fmtN(baleCount)} toy` +
-                    `\n🚛 <b>Sotuv:</b> ${fmtN(Math.round(soldWeight))} kg | ${fmtN(soldBaleCount)} toy | ${fmtN(Math.round(soldAmount))} so'm` +
-                    `\n💸 <b>Xarajat:</b> ${fmtN(Math.round(expenseAmount))} so'm` +
-                    `\n💼 <b>Avans:</b> ${fmtN(Math.round(advanceAmount))} so'm`,
+                    `\n\n📥 <b>Qo'lda qabul:</b> ${fmtN(Math.round(report.intakeWeight))} kg | ${fmtN(Math.round(report.intakeAmount))} so'm` +
+                    `\n🏭 <b>Press:</b> ${fmtN(Math.round(report.pressedKg))} kg | ${fmtN(report.baleCount)} toy` +
+                    `\n🚛 <b>Sotuv:</b> ${fmtN(Math.round(report.soldWeight))} kg | ${fmtN(report.soldBaleCount)} toy | ${fmtN(Math.round(report.soldAmount))} so'm` +
+                    `\n💸 <b>Xarajat:</b> ${fmtN(Math.round(report.expenseAmount))} so'm` +
+                    `\n💼 <b>Avans:</b> ${fmtN(Math.round(report.advanceAmount))} so'm`,
                     { parse_mode: 'HTML' }
                 );
                 return;

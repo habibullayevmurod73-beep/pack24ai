@@ -31,6 +31,20 @@ async function isAuthorized(request: NextRequest): Promise<boolean> {
     return false;
 }
 
+/** Allowed MIME types for file upload */
+const ALLOWED_MIME_TYPES = new Set([
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+    'image/gif',
+    'image/avif',
+    'video/mp4',
+    'video/webm',
+    'video/quicktime',
+    'application/pdf',
+]);
+
 /**
  * POST /api/upload/file
  * multipart/form-data: field "file"
@@ -47,6 +61,13 @@ export async function POST(request: NextRequest) {
 
         if (!file) {
             return NextResponse.json({ error: 'Fayl yuklanmadi' }, { status: 400 });
+        }
+
+        if (!ALLOWED_MIME_TYPES.has(file.type)) {
+            return NextResponse.json(
+                { error: `Ruxsat etilmagan fayl turi: ${file.type}` },
+                { status: 415 }
+            );
         }
 
         const maxSize = file.type.startsWith('video/') ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
