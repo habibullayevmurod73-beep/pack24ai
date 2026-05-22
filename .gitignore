@@ -22,6 +22,9 @@
 /.next/
 /out/
 
+# Cursor / IDE
+.cursor/
+
 # production
 /build
 

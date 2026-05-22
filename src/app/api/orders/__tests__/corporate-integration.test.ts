@@ -39,6 +39,7 @@ async function api(path: string, options?: RequestInit & { raw?: boolean }) {
         ...options,
         headers: {
             'Content-Type': 'application/json',
+            'Origin': BASE,
             ...(adminCookie ? { 'Cookie': adminCookie } : {}),
             ...options?.headers,
         },
