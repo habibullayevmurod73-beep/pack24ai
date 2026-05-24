@@ -5,13 +5,12 @@ import { notifyCustomer, notifySalesChats } from '@/lib/telegram/notifier';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { restoreStockForOrder } from '@/lib/domain/stockValidation';
-import { cookies } from 'next/headers';
-import { validateAdminToken, ADMIN_AUTH_COOKIE } from '@/lib/adminAuthShared';
+import { requireAdmin } from '@/lib/auth/guards';
 
 async function canAccessOrder(order: {
     userId: number | null;
     contactPhone: string | null;
-}) {
+}, request: Request) {
     // 1. Check next-auth session
     const session = await getServerSession(authOptions);
     if (session?.user?.id) {
@@ -29,18 +28,9 @@ async function canAccessOrder(order: {
         }
     }
 
-    // 2. Check custom admin token (for tests and admin panel)
-    const cookieStore = await cookies();
-    const token = cookieStore.get(ADMIN_AUTH_COOKIE)?.value;
-    if (token) {
-        const adminSecret = process.env.ADMIN_SECRET;
-        if (adminSecret) {
-            const validation = await validateAdminToken(token, adminSecret);
-            if (validation.valid) {
-                return true;
-            }
-        }
-    }
+    // 2. Check admin token (cookie or header) via guard
+    const admin = await requireAdmin(request);
+    if (admin.ok) return true;
 
     return false;
 }
@@ -66,7 +56,7 @@ export async function GET(
             return NextResponse.json({ error: 'Not Found' }, { status: 404 });
         }
 
-        if (!(await canAccessOrder(order))) {
+        if (!(await canAccessOrder(order, request))) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
@@ -95,7 +85,7 @@ export async function PUT(
             return NextResponse.json({ error: 'Buyurtma topilmadi' }, { status: 404 });
         }
 
-        if (!(await canAccessOrder(existing))) {
+        if (!(await canAccessOrder(existing, request))) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
@@ -142,7 +132,7 @@ export async function PATCH(
             return NextResponse.json({ error: 'Buyurtma topilmadi' }, { status: 404 });
         }
 
-        if (!(await canAccessOrder(order))) {
+        if (!(await canAccessOrder(order, request))) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 

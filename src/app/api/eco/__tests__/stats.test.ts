@@ -30,7 +30,7 @@ describe('GET /api/eco/stats', () => {
         const response = await GET();
 
         expect(response.status).toBe(401);
-        await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+        await expect(response.json()).resolves.toMatchObject({ error: 'Tizimga kirishingiz kerak', code: 'AUTH_REQUIRED' });
     });
 
     it('session user id bilan userni topadi', async () => {

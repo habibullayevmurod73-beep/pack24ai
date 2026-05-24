@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireUser } from '@/lib/auth/guards';
 import { prisma } from '@/lib/prisma';
 import {
     generateReferralCode,
@@ -24,11 +23,9 @@ async function createUniqueReferralCode(): Promise<string> {
 
 export async function GET() {
     try {
-        const session = await getServerSession(authOptions);
-        const userId = Number(session?.user?.id);
-        if (!Number.isFinite(userId)) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
+        const guard = await requireUser();
+        if (!guard.ok) return guard.response;
+        const userId = Number(guard.user.id);
 
         let user = await prisma.user.findUnique({
             where: { id: userId },
