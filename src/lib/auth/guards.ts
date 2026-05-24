@@ -27,6 +27,10 @@ import {
 } from '@/lib/adminAuthShared';
 import { getAdminSecret, MissingSecretError } from '@/lib/auth/tokenSecrets';
 import { verifyDriverToken } from '@/lib/auth/verifyDriverToken';
+import { AUTH_ERROR_CODES } from '@/lib/auth/errorCodes';
+import { childLogger } from '@/lib/logger';
+
+const log = childLogger({ module: 'auth-guard' });
 
 export type UserGuardSuccess = {
     ok: true;
@@ -75,23 +79,23 @@ export async function requireUser(): Promise<UserGuardSuccess | GuardFailure> {
     const session = await getServerSession(authOptions);
 
     if (!session || !session.user) {
+        log.warn('requireUser: session topilmadi');
         return {
             ok: false,
             reason: 'no_session',
-            response: jsonError('Tizimga kirishingiz kerak', 401, 'AUTH_REQUIRED'),
+            response: jsonError('Tizimga kirishingiz kerak', 401, AUTH_ERROR_CODES.AUTH_REQUIRED),
         };
     }
 
-    const u = session.user as Record<string, unknown>;
     return {
         ok: true,
         session,
         user: {
-            id: String(u.id ?? ''),
-            name: (u.name as string | null) ?? null,
-            email: (u.email as string | null) ?? null,
-            role: (u.role as string | undefined) ?? 'user',
-            phone: (u.phone as string | undefined) ?? '',
+            id: session.user.id ?? '',
+            name: session.user.name ?? null,
+            email: session.user.email ?? null,
+            role: session.user.role ?? 'user',
+            phone: session.user.phone ?? '',
         },
     };
 }
@@ -107,13 +111,14 @@ export async function requireRole(
 
     const role = result.user.role ?? 'user';
     if (!allowed.includes(role)) {
+        log.warn({ role, allowed }, 'requireRole: ruxsat berilmadi');
         return {
             ok: false,
             reason: 'forbidden',
             response: jsonError(
                 "Bu amal uchun ruxsat yo'q",
                 403,
-                'FORBIDDEN'
+                AUTH_ERROR_CODES.FORBIDDEN
             ),
         };
     }
@@ -134,13 +139,14 @@ export async function requireAdmin(
         adminSecret = getAdminSecret();
     } catch (error) {
         if (error instanceof MissingSecretError) {
+            log.error('requireAdmin: ADMIN_SECRET sozlanmagan');
             return {
                 ok: false,
                 reason: 'misconfig',
                 response: jsonError(
                     'Server admin secret sozlanmagan',
                     500,
-                    'ADMIN_SECRET_MISSING'
+                    AUTH_ERROR_CODES.ADMIN_SECRET_MISSING
                 ),
             };
         }
@@ -164,25 +170,24 @@ export async function requireAdmin(
         if (v.valid) {
             return { ok: true, source: 'header' };
         }
-        return {
-            ok: false,
-            reason: 'invalid_admin_token',
-            response: jsonError('Admin token noto\'g\'ri yoki muddati o\'tgan', 401, 'ADMIN_TOKEN_INVALID'),
-        };
     }
 
-    if (!cookie) {
+    // Hech qanday token topilmadi
+    if (!cookie && !header) {
+        log.warn('requireAdmin: admin token topilmadi');
         return {
             ok: false,
             reason: 'no_admin_token',
-            response: jsonError("Admin sifatida kirishingiz kerak", 401, 'ADMIN_AUTH_REQUIRED'),
+            response: jsonError('Admin sifatida kirishingiz kerak', 401, AUTH_ERROR_CODES.ADMIN_AUTH_REQUIRED),
         };
     }
 
+    // Cookie yoki header bor, lekin yaroqsiz
+    log.warn({ source: cookie ? 'cookie' : 'header' }, 'requireAdmin: admin token yaroqsiz');
     return {
         ok: false,
         reason: 'invalid_admin_token',
-        response: jsonError('Admin token noto\'g\'ri yoki muddati o\'tgan', 401, 'ADMIN_TOKEN_INVALID'),
+        response: jsonError("Admin token noto'g'ri yoki muddati o'tgan", 401, AUTH_ERROR_CODES.ADMIN_TOKEN_INVALID),
     };
 }
 
@@ -219,14 +224,16 @@ export async function requireDriver(
     const result = await verifyDriverToken(authHeader);
 
     if (!result.ok) {
-        const code = result.error.includes('faol emas') ? 403 : 401;
+        const isInactive = result.code === 'DRIVER_INACTIVE';
+        const httpCode = isInactive ? 403 : 401;
+        log.warn({ driverErrorCode: result.code }, `requireDriver: ${result.error}`);
         return {
             ok: false,
-            reason: code === 403 ? 'inactive' : 'no_session',
+            reason: isInactive ? 'inactive' : 'no_session',
             response: jsonError(
                 result.error,
-                code,
-                code === 403 ? 'DRIVER_INACTIVE' : 'DRIVER_AUTH_REQUIRED'
+                httpCode,
+                isInactive ? AUTH_ERROR_CODES.DRIVER_INACTIVE : AUTH_ERROR_CODES.DRIVER_AUTH_REQUIRED
             ),
         };
     }
@@ -244,16 +251,21 @@ export async function requireDriver(
  */
 export async function requireAdminOrUser(
     request: NextRequest | Request
-): Promise<{ ok: true; kind: 'admin' | 'user' } | GuardFailure> {
+): Promise<
+    | { ok: true; kind: 'admin' }
+    | { ok: true; kind: 'user'; user: UserGuardSuccess['user']; session: Session }
+    | GuardFailure
+> {
     const admin = await requireAdmin(request);
     if (admin.ok) return { ok: true, kind: 'admin' };
 
     const user = await requireUser();
-    if (user.ok) return { ok: true, kind: 'user' };
+    if (user.ok) return { ok: true, kind: 'user', user: user.user, session: user.session };
 
+    log.warn('requireAdminOrUser: admin ham user ham topilmadi');
     return {
         ok: false,
         reason: 'no_session',
-        response: jsonError('Avtorizatsiya talab etiladi', 401, 'AUTH_REQUIRED'),
+        response: jsonError('Avtorizatsiya talab etiladi', 401, AUTH_ERROR_CODES.AUTH_REQUIRED),
     };
 }

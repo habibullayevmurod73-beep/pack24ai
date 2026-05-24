@@ -1,21 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-
-async function getCurrentUserId(): Promise<number | null> {
-    const session = await getServerSession(authOptions);
-    const userId = Number(session?.user?.id);
-    return Number.isFinite(userId) ? userId : null;
-}
+import { requireUser } from '@/lib/auth/guards';
 
 // PATCH /api/auth/me — Foydalanuvchi profilini yangilash
 export async function PATCH(request: NextRequest) {
     try {
-        const userId = await getCurrentUserId();
-        if (!userId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
+        const guard = await requireUser();
+        if (!guard.ok) return guard.response;
+        const userId = Number(guard.user.id);
 
         const body = await request.json();
         const { name } = body as { name?: string };
@@ -61,10 +53,9 @@ export async function GET(request: NextRequest) {
     try {
         void request;
 
-        const userId = await getCurrentUserId();
-        if (!userId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
+        const guard = await requireUser();
+        if (!guard.ok) return guard.response;
+        const userId = Number(guard.user.id);
 
         const user = await prisma.user.findUnique({
             where: { id: userId },

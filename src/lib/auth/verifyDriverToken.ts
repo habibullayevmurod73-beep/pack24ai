@@ -17,9 +17,11 @@ type DriverTokenPayload = {
     ts: number;
 };
 
+export type DriverErrorCode = 'NO_TOKEN' | 'INVALID_FORMAT' | 'INVALID_SIGNATURE' | 'DRIVER_NOT_FOUND' | 'DRIVER_INACTIVE';
+
 type VerifyResult =
     | { ok: true; driverId: number; driver: { id: number; name: string; phone: string; pointId: number | null; supervisorId: number | null } }
-    | { ok: false; error: string };
+    | { ok: false; error: string; code: DriverErrorCode };
 
 /**
  * Bearer token'dan driver olish
@@ -28,7 +30,7 @@ type VerifyResult =
  */
 export async function verifyDriverToken(authHeader: string | null): Promise<VerifyResult> {
     if (!authHeader) {
-        return { ok: false, error: 'Token kiritilmagan' };
+        return { ok: false, error: 'Token kiritilmagan', code: 'NO_TOKEN' };
     }
 
     const token = authHeader.startsWith('Bearer ')
@@ -36,12 +38,12 @@ export async function verifyDriverToken(authHeader: string | null): Promise<Veri
         : authHeader;
 
     if (!token) {
-        return { ok: false, error: 'Token bo\'sh' };
+        return { ok: false, error: 'Token bo\'sh', code: 'NO_TOKEN' };
     }
 
     const dotIndex = token.lastIndexOf('.');
     if (dotIndex === -1) {
-        return { ok: false, error: 'Token formati noto\'g\'ri' };
+        return { ok: false, error: 'Token formati noto\'g\'ri', code: 'INVALID_FORMAT' };
     }
 
     const base64Payload = token.slice(0, dotIndex);
@@ -51,7 +53,7 @@ export async function verifyDriverToken(authHeader: string | null): Promise<Veri
     try {
         payloadStr = Buffer.from(base64Payload, 'base64').toString('utf-8');
     } catch {
-        return { ok: false, error: 'Token decode xatosi' };
+        return { ok: false, error: 'Token decode xatosi', code: 'INVALID_FORMAT' };
     }
 
     const expectedHmac = crypto
@@ -65,26 +67,26 @@ export async function verifyDriverToken(authHeader: string | null): Promise<Veri
         receivedBuf = Buffer.from(receivedHmac, 'hex');
         expectedBuf = Buffer.from(expectedHmac, 'hex');
     } catch {
-        return { ok: false, error: 'Token imzosi formati noto\'g\'ri' };
+        return { ok: false, error: 'Token imzosi formati noto\'g\'ri', code: 'INVALID_SIGNATURE' };
     }
 
     if (receivedBuf.length !== expectedBuf.length) {
-        return { ok: false, error: 'Token imzosi noto\'g\'ri' };
+        return { ok: false, error: 'Token imzosi noto\'g\'ri', code: 'INVALID_SIGNATURE' };
     }
 
     if (!crypto.timingSafeEqual(receivedBuf, expectedBuf)) {
-        return { ok: false, error: 'Token imzosi noto\'g\'ri' };
+        return { ok: false, error: 'Token imzosi noto\'g\'ri', code: 'INVALID_SIGNATURE' };
     }
 
     let payload: DriverTokenPayload;
     try {
         payload = JSON.parse(payloadStr);
     } catch {
-        return { ok: false, error: 'Token payload xatosi' };
+        return { ok: false, error: 'Token payload xatosi', code: 'INVALID_FORMAT' };
     }
 
     if (!payload.driverId || !Number.isFinite(payload.driverId) || payload.role !== 'driver') {
-        return { ok: false, error: 'Token ichida driverId yo\'q yoki role notog\'ri' };
+        return { ok: false, error: 'Token ichida driverId yo\'q yoki role notog\'ri', code: 'INVALID_FORMAT' };
     }
 
     const driver = await prisma.driver.findUnique({
@@ -100,11 +102,11 @@ export async function verifyDriverToken(authHeader: string | null): Promise<Veri
     });
 
     if (!driver) {
-        return { ok: false, error: 'Haydovchi topilmadi' };
+        return { ok: false, error: 'Haydovchi topilmadi', code: 'DRIVER_NOT_FOUND' };
     }
 
     if (driver.status === 'inactive') {
-        return { ok: false, error: 'Hisob faol emas' };
+        return { ok: false, error: 'Hisob faol emas', code: 'DRIVER_INACTIVE' };
     }
 
     return {
