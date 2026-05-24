@@ -21,10 +21,29 @@ const iconMap: Record<string, LucideIcon> = {
 interface CategoryIconProps {
     name: string;
     className?: string;
+    /** Storefront uchun emoji — Lucide bundle yuklamaslik */
+    preferEmoji?: boolean;
 }
 
-export function CategoryIcon({ name, className }: CategoryIconProps) {
-    const IconComponent = iconMap[name] || Box; // Fallback to Box
+const EMOJI_MAP: Record<string, string> = {
+    Box: '📦', ShoppingBag: '🛍️', Mail: '✉️', Layers: '🔲', Lock: '🔒',
+    CircleDot: '💨', StickyNote: '🎗️', ScrollText: '🔄', Tag: '🏷️',
+    Coffee: '☕', Zap: '⚡', FileText: '📄', Shield: '🛡️', Cylinder: '🥫',
+    PenTool: '✏️', ShieldCheck: '🛡️', PackageOpen: '📦', LayoutGrid: '📦',
+    BoxSelect: '📦', Hand: '✋', Moon: '🖤', Cog: '⚙️', Sparkles: '✨',
+    Recycle: '♻️', Utensils: '🍱', Archive: '🗄️', Sliders: '🎚️',
+    Palette: '🎨', Thermometer: '🌡️', Anchor: '🧵', Trash2: '🗑️',
+    Stethoscope: '⚕️', Croissant: '🧁', Shirt: '👔', Minimize2: '📦',
+    Minimize: '📦', ChefHat: '👨‍🍳', File: '📄', Receipt: '🧾',
+    Printer: '🖨️', HardHat: '⛑️', Store: '🏪', Square: '⬜', Stamp: '🏷️',
+    Type: '✍️', Disc: '⚪', Footprints: '👟', Wind: '💨', Minus: '➖',
+};
+
+export function CategoryIcon({ name, className, preferEmoji }: CategoryIconProps) {
+    if (preferEmoji && EMOJI_MAP[name]) {
+        return <span className={className} aria-hidden>{EMOJI_MAP[name]}</span>;
+    }
+    const IconComponent = iconMap[name] || Box;
 
     return <IconComponent className={className} />;
 }

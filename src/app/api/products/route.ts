@@ -27,7 +27,9 @@ export async function GET(request: Request) {
         if (featured === '1') where.isFeatured = true;
         if (onSale === '1') where.originalPrice = { not: null };
 
-        const limit = limitRaw ? Math.min(100, Math.max(1, parseInt(limitRaw))) : undefined;
+        const limit = limitRaw
+            ? Math.min(100, Math.max(1, parseInt(limitRaw, 10) || 100))
+            : 100;
 
         let orderBy: Prisma.ProductOrderByWithRelationInput = { createdAt: 'desc' };
         if (sort === 'price-asc') orderBy = { price: 'asc' };
@@ -36,10 +38,37 @@ export async function GET(request: Request) {
         const products = await prisma.product.findMany({
             where,
             orderBy,
-            ...(limit ? { take: limit } : {}),
+            take: limit,
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                price: true,
+                originalPrice: true,
+                sku: true,
+                category: true,
+                image: true,
+                gallery: true,
+                videoUrl: true,
+                specifications: true,
+                tags: true,
+                minQuantity: true,
+                inStock: true,
+                rating: true,
+                reviews: true,
+                status: true,
+                isFeatured: true,
+                sourceUrl: true,
+                createdAt: true,
+                updatedAt: true,
+            },
         });
 
-        return NextResponse.json(products.map(parseProduct));
+        return NextResponse.json(products.map(parseProduct), {
+            headers: {
+                'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+            },
+        });
     } catch (error) {
         console.error('[GET /api/products]', error);
         return NextResponse.json({ error: 'Server xatosi' }, { status: 500 });

@@ -1,6 +1,8 @@
 # Pack24AI (customer) + Pack24 Driver — Expo ishga tushirish
 # Talab: pack24-web dev server http://localhost:3000 da ishlashi kerak
 
+$env:NODE_OPTIONS = '--max-old-space-size=8192'
+
 $LanIp = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -like '192.168.*' } | Select-Object -First 1).IPAddress
 if (-not $LanIp) { $LanIp = '192.168.0.113' }
 
@@ -28,11 +30,11 @@ if (-not (Test-Path "C:\pack24-driver\node_modules\expo-secure-store")) {
 Write-Host ""
 Write-Host "Pack24AI (customer) — port 8081" -ForegroundColor Green
 Write-Host "  Papka: C:\pack24-mobile\apps\customer"
-Write-Host "  Terminal 1: cd C:\pack24-mobile\apps\customer && npx expo start --port 8081"
+Write-Host "  Terminal 1: cd C:\pack24-mobile\apps\customer && npm run start:web -- --port 8081"
 Write-Host ""
 Write-Host "Pack24 Driver — port 8082" -ForegroundColor Green
-Write-Host "  Papka: C:\pack24-driver"
-Write-Host "  Terminal 2: cd C:\pack24-driver && npx expo start --port 8082"
+Write-Host "  Papka: C:\pack24-mobile\apps\driver"
+Write-Host "  Terminal 2: cd C:\pack24-mobile\apps\driver && npm run start:web -- --port 8082"
 Write-Host ""
 Write-Host "Telefonda (Expo Go): QR kodni skanerlang. API: http://${LanIp}:3000"
 Write-Host "Android emulyator: http://10.0.2.2:3000"

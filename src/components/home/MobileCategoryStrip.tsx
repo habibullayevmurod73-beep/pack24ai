@@ -42,7 +42,7 @@ export default function MobileCategoryStrip() {
                             className="flex flex-col items-center gap-1 min-w-[64px]"
                         >
                             <div className="w-12 h-12 bg-gray-50 hover:bg-blue-50 rounded-xl flex items-center justify-center border border-gray-100 hover:border-blue-200 transition-colors shadow-sm">
-                                <CategoryIcon name={cat.icon} className="w-5 h-5 text-gray-600" />
+                                <CategoryIcon name={cat.icon} className="w-5 h-5 text-gray-600" preferEmoji />
                             </div>
                             <span className="text-[10px] font-medium text-gray-600 text-center leading-tight line-clamp-2 max-w-[64px]">
                                 {translateCategory(cat.slug, language)}

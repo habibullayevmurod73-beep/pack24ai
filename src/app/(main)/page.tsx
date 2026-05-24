@@ -1,13 +1,28 @@
 import { unstable_cache } from 'next/cache';
+import dynamic from 'next/dynamic';
 import HomeHero from '@/components/home/HomeHero';
 import MobileCategoryStrip from '@/components/home/MobileCategoryStrip';
-import ConfiguratorSection from '@/components/home/ConfiguratorSection';
-import AISection from '@/components/home/AISection';
-import ReviewsSection from '@/components/home/ReviewsSection';
-import CTABanner from '@/components/home/CTABanner';
+import SectionSkeleton from '@/components/home/SectionSkeleton';
 import { OrganizationLd, WebSiteLd } from '@/components/seo/JsonLd';
 import { prisma } from '@/lib/prisma';
 import type { Product } from '@/lib/store/useProductStore';
+
+const ConfiguratorSection = dynamic(
+    () => import('@/components/home/ConfiguratorSection'),
+    { loading: () => <SectionSkeleton height={480} /> },
+);
+const AISection = dynamic(
+    () => import('@/components/home/AISection'),
+    { loading: () => <SectionSkeleton height={360} /> },
+);
+const ReviewsSection = dynamic(
+    () => import('@/components/home/ReviewsSection'),
+    { loading: () => <SectionSkeleton height={280} /> },
+);
+const CTABanner = dynamic(
+    () => import('@/components/home/CTABanner'),
+    { loading: () => <SectionSkeleton height={160} /> },
+);
 
 // Server Component: mahsulotlar SSR — 60s cache (Neon tarmoq kechikishini kamaytiradi)
 const getInitialProducts = unstable_cache(

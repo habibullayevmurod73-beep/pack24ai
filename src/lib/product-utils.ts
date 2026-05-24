@@ -46,15 +46,15 @@ export function parseTags(raw: unknown): string[] {
  * gallery, specifications, tags endi Prisma tomonidan
  * avtomatik parse qilinadi — faqat type assertion kerak.
  */
-export function parseProduct<T extends {
-    gallery?: unknown;
-    specifications?: unknown;
-    tags?: unknown;
-}>(raw: T) {
+export function parseProduct<T extends Record<string, unknown>>(raw: T) {
     return {
         ...raw,
         gallery:        parseGallery(raw.gallery),
         specifications: parseSpecifications(raw.specifications),
         tags:           parseTags(raw.tags),
+    } as Omit<T, 'gallery' | 'specifications' | 'tags'> & {
+        gallery: string[];
+        specifications: ProductSpecification[];
+        tags: string[];
     };
 }

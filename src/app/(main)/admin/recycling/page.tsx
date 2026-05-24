@@ -1,22 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Recycle, Download } from 'lucide-react';
-import SupervisorsTab from './_components/SupervisorsTab';
-import DriversTab from './_components/DriversTab';
-import TeamReportTab from './_components/TeamReportTab';
-import CollectionsTab from './_components/CollectionsTab';
-import ComplaintsTab from './_components/ComplaintsTab';
-import MonthlyJournalTab from './_components/MonthlyJournalTab';
-import BotEventsTab from './_components/BotEventsTab';
-import FinanceTab from './_components/FinanceTab';
-import PayoutsTab from './_components/PayoutsTab';
-import DashboardTab from './_components/DashboardTab';
-import MapTab from './_components/MapTab';
-import PointsTab from './_components/PointsTab';
-import RequestsTab from './_components/RequestsTab';
 import { removeBotEventFeedParamsFromSearchString } from '@/lib/platform/botEventFeedUrl';
 import { readInitialRecyclingFilters } from './_lib/urlFilters';
 import {
@@ -26,6 +14,24 @@ import {
     type RecycleRequest,
     type RecyclingSupervisor,
 } from './_lib/types';
+
+function TabSkeleton() {
+    return <div className="animate-pulse h-48 bg-gray-100 rounded-xl" />;
+}
+
+const DashboardTab = dynamic(() => import('./_components/DashboardTab'), { loading: () => <TabSkeleton /> });
+const MapTab = dynamic(() => import('./_components/MapTab'), { loading: () => <TabSkeleton /> });
+const PointsTab = dynamic(() => import('./_components/PointsTab'), { loading: () => <TabSkeleton /> });
+const RequestsTab = dynamic(() => import('./_components/RequestsTab'), { loading: () => <TabSkeleton /> });
+const SupervisorsTab = dynamic(() => import('./_components/SupervisorsTab'), { loading: () => <TabSkeleton /> });
+const DriversTab = dynamic(() => import('./_components/DriversTab'), { loading: () => <TabSkeleton /> });
+const TeamReportTab = dynamic(() => import('./_components/TeamReportTab'), { loading: () => <TabSkeleton /> });
+const CollectionsTab = dynamic(() => import('./_components/CollectionsTab'), { loading: () => <TabSkeleton /> });
+const FinanceTab = dynamic(() => import('./_components/FinanceTab'), { loading: () => <TabSkeleton /> });
+const PayoutsTab = dynamic(() => import('./_components/PayoutsTab'), { loading: () => <TabSkeleton /> });
+const MonthlyJournalTab = dynamic(() => import('./_components/MonthlyJournalTab'), { loading: () => <TabSkeleton /> });
+const BotEventsTab = dynamic(() => import('./_components/BotEventsTab'), { loading: () => <TabSkeleton /> });
+const ComplaintsTab = dynamic(() => import('./_components/ComplaintsTab'), { loading: () => <TabSkeleton /> });
 
 export default function AdminRecyclingPage() {
     const router = useRouter();
@@ -99,11 +105,18 @@ export default function AdminRecyclingPage() {
     }, []);
 
     useEffect(() => {
-        fetchPoints();
-        fetchRequests();
-        fetchSupervisors();
-        fetchDriverOptions();
-    }, [fetchPoints, fetchRequests, fetchSupervisors, fetchDriverOptions]);
+        if (!recyclingUrlReady) return;
+
+        const needsPoints = ['dashboard', 'points', 'requests', 'map', 'supervisors', 'drivers', 'journal'].includes(activeTab);
+        const needsRequests = ['dashboard', 'requests'].includes(activeTab);
+        const needsSupervisors = ['requests', 'supervisors', 'drivers', 'journal'].includes(activeTab);
+        const needsDriverOptions = ['requests', 'drivers'].includes(activeTab);
+
+        if (needsPoints) fetchPoints();
+        if (needsRequests) fetchRequests();
+        if (needsSupervisors) fetchSupervisors();
+        if (needsDriverOptions) fetchDriverOptions();
+    }, [activeTab, recyclingUrlReady, fetchPoints, fetchRequests, fetchSupervisors, fetchDriverOptions]);
 
     useEffect(() => {
         const f = readInitialRecyclingFilters();

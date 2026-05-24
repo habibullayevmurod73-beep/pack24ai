@@ -60,8 +60,9 @@ function AdminLoginForm() {
                     )}
 
                     <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2 uppercase">Login</label>
+                        <label htmlFor="admin-login" className="block text-sm font-bold text-gray-700 mb-2 uppercase">Login</label>
                         <input
+                            id="admin-login"
                             type="text"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
@@ -73,9 +74,10 @@ function AdminLoginForm() {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2 uppercase">Parol</label>
+                        <label htmlFor="admin-password" className="block text-sm font-bold text-gray-700 mb-2 uppercase">Parol</label>
                         <div className="relative">
                             <input
+                                id="admin-password"
                                 type={showPassword ? 'text' : 'password'}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}

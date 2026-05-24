@@ -110,7 +110,7 @@ export default function CategoryCatalogGrid() {
                                     />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center bg-gray-50 rounded-xl">
-                                        <CategoryIcon name={cat.icon} className="w-12 h-12 text-gray-300" />
+                                        <CategoryIcon name={cat.icon} className="w-12 h-12 text-gray-300" preferEmoji />
                                     </div>
                                 )}
                             </div>

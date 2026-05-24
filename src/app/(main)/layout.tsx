@@ -1,5 +1,5 @@
 import GoogleAnalytics from "@/components/GoogleAnalytics";
-import GlobalAIWrapper from "@/components/GlobalAIWrapper";
+import LazyGlobalAI from "@/components/LazyGlobalAI";
 import AuthSessionProvider from "@/components/AuthSessionProvider";
 import { LanguageProvider } from "@/lib/contexts/LanguageContext";
 import { CurrencyProvider } from "@/lib/contexts/CurrencyContext";
@@ -15,7 +15,7 @@ export default function MainLayout({ children }: Readonly<{ children: React.Reac
                 <LanguageProvider>
                     <CurrencyProvider>
                         <Navbar />
-                        <GlobalAIWrapper />
+                        <LazyGlobalAI />
                         <main className="flex-grow">
                             {children}
                         </main>

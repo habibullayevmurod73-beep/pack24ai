@@ -5,6 +5,7 @@
 import { Telegraf } from 'telegraf';
 import { prisma } from '@/lib/prisma';
 import { getCustomerBot, getDriverBot, getAdminBot, getPack24AdminBot } from './botManager';
+import { createBotEvent } from './botEvents';
 
 type SendOptions = {
     parse_mode?: 'HTML' | 'Markdown';
@@ -82,7 +83,6 @@ async function logUndeliveredDM(
     err: unknown,
 ) {
     try {
-        const { createBotEvent } = await import('./botEvents');
         await createBotEvent({
             sourceBot: 'platform',
             eventType: `${channel}.dm_undelivered`,

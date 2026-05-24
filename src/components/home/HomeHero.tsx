@@ -133,7 +133,7 @@ export default function HomeHero({ initialProducts }: Props) {
                                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                                 />
                                             ) : (
-                                                <CategoryIcon name={cat.icon} className="w-10 h-10 text-gray-300" />
+                                                <CategoryIcon name={cat.icon} className="w-10 h-10 text-gray-300" preferEmoji />
                                             )}
                                         </div>
                                         <div className="p-2">

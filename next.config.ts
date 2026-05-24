@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
     optimizePackageImports: [
       'recharts',
       'lucide-react',
+      '@radix-ui/react-icons',
       '@radix-ui/react-dialog',
       '@radix-ui/react-dropdown-menu',
       '@radix-ui/react-tabs',
@@ -103,11 +104,6 @@ const nextConfig: NextConfig = {
       process.env.NODE_ENV === 'production'
         ? { exclude: ['error', 'warn'] }
         : false,
-  },
-
-  // Bundle size + `src/instrumentation.ts` Next 15 da fayl mavjud boʻlsa avtomatik ishlaydi
-  experimental: {
-    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
   },
 
   // Trailing slash consistency
