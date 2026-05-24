@@ -19,19 +19,26 @@ test.describe('Admin login', () => {
     test('login sahifa ochiladi', async ({ page }) => {
         await page.goto('/admin/login');
         await expect(page).toHaveURL(/\/admin\/login/);
-        // input maydonlari
-        await expect(page.getByLabel(/(login|username|foydalanuvchi)/i)).toBeVisible();
-        await expect(page.getByLabel(/(parol|password)/i)).toBeVisible();
+        // ID selector — header'dagi "Login" linki bilan chalkashmaslik uchun
+        await expect(page.locator('#admin-login')).toBeVisible();
+        await expect(page.locator('#admin-password')).toBeVisible();
     });
 
     test('noto\'g\'ri parol — xato ko\'rinadi', async ({ page }) => {
         await page.goto('/admin/login');
-        await page.getByLabel(/(login|username|foydalanuvchi)/i).fill('admin');
-        await page.getByLabel(/(parol|password)/i).fill('certainly-wrong-password-xyz');
-        await page.getByRole('button', { name: /(kirish|login|войти)/i }).click();
+        await page.locator('#admin-login').fill('admin');
+        await page.locator('#admin-password').fill('certainly-wrong-password-xyz');
 
-        await expect(page.getByText(/(xato|noto'g'ri|invalid|wrong)/i)).toBeVisible({
-            timeout: 10_000,
+        const loginResponse = page.waitForResponse(
+            (r) => r.url().includes('/api/admin/login') && r.request().method() === 'POST',
+            { timeout: 30_000 },
+        );
+        await page.getByRole('button', { name: /(kirish|login|войти)/i }).click();
+        const res = await loginResponse;
+        expect(res.status()).toBe(401);
+
+        await expect(page.getByText(/Login yoki parol/i)).toBeVisible({
+            timeout: 5_000,
         });
         // URL hali login'da
         await expect(page).toHaveURL(/\/admin\/login/);
@@ -41,8 +48,8 @@ test.describe('Admin login', () => {
         test.skip(!adminPass, 'ADMIN_PASSWORD env yo\'q — bu test o\'tkazib yuborildi');
 
         await page.goto('/admin/login');
-        await page.getByLabel(/(login|username|foydalanuvchi)/i).fill(adminUser);
-        await page.getByLabel(/(parol|password)/i).fill(adminPass);
+        await page.locator('#admin-login').fill(adminUser);
+        await page.locator('#admin-password').fill(adminPass);
         await page.getByRole('button', { name: /(kirish|login|войти)/i }).click();
 
         await page.waitForURL(/\/admin(\/|$)/, { timeout: 15_000 });
