@@ -11,7 +11,11 @@ import { rateLimit } from '@/lib/rateLimit';
 
 const authHandler = NextAuth(authOptions);
 
-async function handler(req: NextRequest) {
+type NextAuthRouteContext = {
+    params: Promise<{ nextauth: string[] }>;
+};
+
+async function handler(req: NextRequest, context: NextAuthRouteContext) {
     // POST so'rovlari uchun rate limiting (login urinishlari)
     if (req.method === 'POST') {
         const limited = await rateLimit(req, {
@@ -21,7 +25,7 @@ async function handler(req: NextRequest) {
         });
         if (!limited.ok) return limited.response;
     }
-    return authHandler(req);
+    return authHandler(req, context);
 }
 
 export { handler as GET, handler as POST };

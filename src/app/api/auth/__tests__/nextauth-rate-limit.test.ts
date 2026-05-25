@@ -42,6 +42,8 @@ function makeLoginRequest(): Request {
     });
 }
 
+const routeContext = { params: Promise.resolve({ nextauth: ['callback', 'credentials'] }) };
+
 describe('NextAuth credentials rate limiting', () => {
     beforeEach(() => {
         mockAuthHandler.mockClear();
@@ -52,13 +54,13 @@ describe('NextAuth credentials rate limiting', () => {
         const { POST } = await import('../[...nextauth]/route');
 
         for (let i = 0; i < 10; i += 1) {
-            const response = await POST(makeLoginRequest() as never);
+            const response = await POST(makeLoginRequest() as never, routeContext as never);
             expect(response.status).not.toBe(429);
         }
 
-        expect(mockAuthHandler).toHaveBeenLastCalledWith(expect.any(Request));
+        expect(mockAuthHandler).toHaveBeenLastCalledWith(expect.any(Request), routeContext);
 
-        const blocked = await POST(makeLoginRequest() as never);
+        const blocked = await POST(makeLoginRequest() as never, routeContext as never);
         expect(blocked.status).toBe(429);
     });
 });
