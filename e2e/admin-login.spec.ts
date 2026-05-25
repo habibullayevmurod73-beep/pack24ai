@@ -28,13 +28,15 @@ test.describe('Admin login', () => {
         await page.goto('/admin/login');
         await page.locator('#admin-login').fill('admin');
         await page.locator('#admin-password').fill('certainly-wrong-password-xyz');
+        const loginForm = page.locator('form').filter({ has: page.locator('#admin-login') });
 
-        const loginResponse = page.waitForResponse(
-            (r) => r.url().includes('/api/admin/login') && r.request().method() === 'POST',
-            { timeout: 30_000 },
-        );
-        await page.getByRole('button', { name: /(kirish|login|войти)/i }).click();
-        const res = await loginResponse;
+        const [res] = await Promise.all([
+            page.waitForResponse(
+                (r) => r.url().includes('/api/admin/login') && r.request().method() === 'POST',
+                { timeout: 30_000 },
+            ),
+            loginForm.locator('button[type="submit"]').click(),
+        ]);
         expect(res.status()).toBe(401);
 
         await expect(page.getByText(/Login yoki parol/i)).toBeVisible({
@@ -50,7 +52,8 @@ test.describe('Admin login', () => {
         await page.goto('/admin/login');
         await page.locator('#admin-login').fill(adminUser);
         await page.locator('#admin-password').fill(adminPass);
-        await page.getByRole('button', { name: /(kirish|login|войти)/i }).click();
+        const loginForm = page.locator('form').filter({ has: page.locator('#admin-login') });
+        await loginForm.locator('button[type="submit"]').click();
 
         await page.waitForURL(/\/admin(\/|$)/, { timeout: 15_000 });
         // Auth cookie tekshiruvi
