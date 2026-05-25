@@ -19,7 +19,7 @@ import {
 interface OrderDrawerProps {
     isOpen: boolean;
     onClose: () => void;
-    order: any; // Using any for rough prototyping, will refine interface later
+    order: UnsafeAny; // Using any for rough prototyping, will refine interface later
 }
 
 export default function OrderDrawer({ isOpen, onClose, order }: OrderDrawerProps) {
@@ -142,7 +142,7 @@ export default function OrderDrawer({ isOpen, onClose, order }: OrderDrawerProps
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
-                                        {order.items.map((item: any, i: number) => (
+                                        {order.items.map((item: UnsafeAny, i: number) => (
                                             <tr key={i}>
                                                 <td className="px-4 py-3">
                                                     <p className="font-medium text-gray-900">{item.name}</p>
@@ -280,7 +280,7 @@ export default function OrderDrawer({ isOpen, onClose, order }: OrderDrawerProps
                         </tr>
                     </thead>
                     <tbody className="border-b border-black border-dashed">
-                        {order.items.map((item: any, i: number) => (
+                        {order.items.map((item: UnsafeAny, i: number) => (
                             <tr key={i}>
                                 <td className="py-2 pr-2">
                                     <div className="font-bold">{item.name}</div>

@@ -66,12 +66,12 @@ function OrdersContent() {
     const searchParams = useSearchParams();
     const initialSearch = searchParams.get('search') || searchParams.get('orderId') || '';
 
-    const [orders, setOrders] = useState<any[]>([]);
+    const [orders, setOrders] = useState<UnsafeAny[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState(initialSearch);
     const [status, setStatus] = useState(searchParams.get('status') || 'all');
     const [page, setPage] = useState(1);
-    const [selectedOrder, setSelectedOrder] = useState<any>(null);
+    const [selectedOrder, setSelectedOrder] = useState<UnsafeAny>(null);
     const [drawerOpen, setDrawerOpen] = useState(false);
 
     const fetchOrders = useCallback(async () => {

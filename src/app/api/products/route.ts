@@ -22,7 +22,7 @@ export async function GET(request: Request) {
         const where: Prisma.ProductWhereInput = {};
 
         if (category && category !== 'all') where.category = category;
-        if (status   && status   !== 'all') where.status   = status as any;
+        if (status   && status   !== 'all') where.status   = status as UnsafeAny;
         if (search)                          where.name     = { contains: search, mode: 'insensitive' };
         if (featured === '1') where.isFeatured = true;
         if (onSale === '1') where.originalPrice = { not: null };

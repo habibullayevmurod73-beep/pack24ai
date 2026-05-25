@@ -317,11 +317,11 @@ describe('useAuthStore', () => {
         });
 
         it('returns null when id is missing', () => {
-            expect(sessionUserToStoreUser({ name: 'A', phone: '+998' } as any)).toBeNull();
+            expect(sessionUserToStoreUser({ name: 'A', phone: '+998' } as UnsafeAny)).toBeNull();
         });
 
         it('returns null when phone is missing', () => {
-            expect(sessionUserToStoreUser({ id: '1', name: 'A' } as any)).toBeNull();
+            expect(sessionUserToStoreUser({ id: '1', name: 'A' } as UnsafeAny)).toBeNull();
         });
 
         it('returns null for null/undefined input', () => {

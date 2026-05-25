@@ -133,7 +133,7 @@ export default function CategoryPage() {
         return 0;
     });
 
-    const handleAdd = (product: any) => {
+    const handleAdd = (product: UnsafeAny) => {
         addToCart({ productId: Number(product.id), name: product.name, price: product.price, image: product.image, quantity: 1 });
         toast.success(t("Savatga qo'shildi! 🎉", "Добавлено в корзину! 🎉", "Added to cart! 🎉"));
     };

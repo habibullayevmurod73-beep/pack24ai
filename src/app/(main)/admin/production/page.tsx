@@ -28,7 +28,7 @@ interface ProductionOrder {
     currentStage: string;
     progress: number;
     status: string;
-    stages: any[];
+    stages: UnsafeAny[];
 }
 
 export default function ProductionDashboard() {
@@ -120,7 +120,7 @@ export default function ProductionDashboard() {
     };
 
     const getOperator = (order: ProductionOrder) => {
-        const currentStageData = order.stages?.find((s: any) => s.stage === order.currentStage);
+        const currentStageData = order.stages?.find((s: UnsafeAny) => s.stage === order.currentStage);
         return currentStageData?.operator || 'Tayinlanmagan';
     };
 

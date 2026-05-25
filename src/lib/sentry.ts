@@ -12,7 +12,7 @@
  * ishlatilsa, full-stack trace olish mumkin.
  */
 
-let sentryInstance: any = null;
+let sentryInstance: UnsafeAny = null;
 
 export function initServerSentry() {
     const dsn = process.env.SENTRY_DSN;

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 export default function OrderTrackingPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
-    const [order, setOrder] = useState<any>(null);
+    const [order, setOrder] = useState<UnsafeAny>(null);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
@@ -83,7 +83,7 @@ export default function OrderTrackingPage({ params }: { params: Promise<{ id: st
                 <div className="bg-white p-5 rounded-2xl shadow-sm">
                     <h2 className="font-bold text-gray-900 mb-3">Mahsulotlar</h2>
                     <div className="space-y-3">
-                        {order.items.map((item: any) => (
+                        {order.items.map((item: UnsafeAny) => (
                             <div key={item.id} className="flex gap-3 py-2 border-b border-gray-50 last:border-0">
                                 <div className="w-12 h-12 bg-gray-50 rounded-lg overflow-hidden shrink-0">
                                     <img src={item.product?.image} alt={item.product?.name || 'Item'} className="w-full h-full object-cover" />

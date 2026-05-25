@@ -10,7 +10,7 @@ import { ToggleLeft, ToggleRight, Info, CreditCard, Banknote, Smartphone, Wallet
 interface PaymentMethod {
     id: string;
     name: string;
-    icon: any;
+    icon: UnsafeAny;
     status: 'active' | 'inactive' | 'not_connected';
     updatedAt: string;
     type: 'cash' | 'card' | 'wallet' | 'installment';

@@ -55,7 +55,7 @@ describe('canTransitionOrderStatus', () => {
     ];
 
     it.each(allowed)('%s → %s is allowed', (from, to) => {
-        expect(canTransitionOrderStatus(from as any, to as any)).toBe(true);
+        expect(canTransitionOrderStatus(from as UnsafeAny, to as UnsafeAny)).toBe(true);
     });
 
     const forbidden: [string, string][] = [
@@ -77,7 +77,7 @@ describe('canTransitionOrderStatus', () => {
     ];
 
     it.each(forbidden)('%s → %s is forbidden', (from, to) => {
-        expect(canTransitionOrderStatus(from as any, to as any)).toBe(false);
+        expect(canTransitionOrderStatus(from as UnsafeAny, to as UnsafeAny)).toBe(false);
     });
 
     it('terminal states have no transitions', () => {
@@ -89,7 +89,7 @@ describe('canTransitionOrderStatus', () => {
 });
 
 describe('isOrderStatus', () => {
-    it.each(orderStatuses as unknown as string[])('"%s" is valid', (s) => {
+    it.each(orderStatuses as UnsafeAny as string[])('"%s" is valid', (s) => {
         expect(isOrderStatus(s)).toBe(true);
     });
 
@@ -104,7 +104,7 @@ describe('isOrderStatus', () => {
 // ─── Payment Status ──────────────────────────────────────────────────────
 
 describe('isPaymentStatus', () => {
-    it.each(paymentStatuses as unknown as string[])('"%s" is valid', (s) => {
+    it.each(paymentStatuses as UnsafeAny as string[])('"%s" is valid', (s) => {
         expect(isPaymentStatus(s)).toBe(true);
     });
 
@@ -117,7 +117,7 @@ describe('isPaymentStatus', () => {
 // ─── Product Status ──────────────────────────────────────────────────────
 
 describe('isProductStatus', () => {
-    it.each(productStatuses as unknown as string[])('"%s" is valid', (s) => {
+    it.each(productStatuses as UnsafeAny as string[])('"%s" is valid', (s) => {
         expect(isProductStatus(s)).toBe(true);
     });
 
@@ -140,7 +140,7 @@ describe('canTransitionWorkOrderStatus', () => {
     ];
 
     it.each(allowed)('%s → %s is allowed', (from, to) => {
-        expect(canTransitionWorkOrderStatus(from as any, to as any)).toBe(true);
+        expect(canTransitionWorkOrderStatus(from as UnsafeAny, to as UnsafeAny)).toBe(true);
     });
 
     const forbidden: [string, string][] = [
@@ -155,7 +155,7 @@ describe('canTransitionWorkOrderStatus', () => {
     ];
 
     it.each(forbidden)('%s → %s is forbidden', (from, to) => {
-        expect(canTransitionWorkOrderStatus(from as any, to as any)).toBe(false);
+        expect(canTransitionWorkOrderStatus(from as UnsafeAny, to as UnsafeAny)).toBe(false);
     });
 
     it('terminal states have no transitions', () => {
@@ -167,7 +167,7 @@ describe('canTransitionWorkOrderStatus', () => {
 });
 
 describe('isWorkOrderStatus', () => {
-    it.each(workOrderStatuses as unknown as string[])('"%s" is valid', (s) => {
+    it.each(workOrderStatuses as UnsafeAny as string[])('"%s" is valid', (s) => {
         expect(isWorkOrderStatus(s)).toBe(true);
     });
 
@@ -192,7 +192,7 @@ describe('recycleRequestStatuses', () => {
 });
 
 describe('isRecycleRequestStatus', () => {
-    it.each(recycleRequestStatuses as unknown as string[])('"%s" is valid', (s) => {
+    it.each(recycleRequestStatuses as UnsafeAny as string[])('"%s" is valid', (s) => {
         expect(isRecycleRequestStatus(s)).toBe(true);
     });
 

@@ -43,14 +43,14 @@ export async function GET(req: NextRequest) {
 
         try {
             // Try inventory table first
-            const inventoryItems = await (prisma as any).inventory.findMany({
+            const inventoryItems = await (prisma as UnsafeAny).inventory.findMany({
                 where: { quantity: { lte: threshold } },
                 include: { product: { select: { id: true, name: true, sku: true } } },
                 orderBy: { quantity: 'asc' },
                 take: 50,
             });
 
-            lowStockItems = inventoryItems.map((i: any) => ({
+            lowStockItems = inventoryItems.map((i: UnsafeAny) => ({
                 id: i.product?.id ?? i.id,
                 name: i.product?.name ?? 'Noma\'lum',
                 sku: i.product?.sku ?? null,

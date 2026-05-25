@@ -61,11 +61,11 @@ export default function AIDesignPage() {
         model,
         setModel,
         material,
-        _setMaterial,
+        setMaterial: _setMaterial,
         inputs,
         handleInputChange,
         dims,
-        _validation
+        validation: _validation
     } = useBoxModel({ initialModel: defaultModel });
 
     const [fold, setFold] = useState(0.5);
@@ -331,7 +331,7 @@ export default function AIDesignPage() {
                                         <input
                                             type="text"
                                             value={inputs[k as keyof typeof inputs]}
-                                            onChange={(e) => handleInputChange(k as any, e.target.value)}
+                                            onChange={(e) => handleInputChange(k as UnsafeAny, e.target.value)}
                                             className="flex-1 p-1.5 bg-white/5 border border-white/10 rounded-md text-sm font-bold text-white focus:border-cyan-500/50 outline-none"
                                             placeholder="0"
                                         />
@@ -388,7 +388,7 @@ export default function AIDesignPage() {
                             <span className="text-lg font-black text-cyan-400">{formatPrice(totalPrice)}</span>
                         </div>
                         <button
-                            onClick={() => model.downloadPDF(dims, t_local as any)}
+                            onClick={() => model.downloadPDF(dims, t_local as UnsafeAny)}
                             className="w-full py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5"
                         >
                             <Download size={14} /> {t_local('PDF chizmani yuklash', 'Скачать PDF чертеж')}
@@ -451,7 +451,7 @@ export default function AIDesignPage() {
                     <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
                         {selectedCat === 'box' ? (
                             <div className="w-full h-full max-w-[300px] max-h-[300px] border border-dashed border-white/10 rounded-xl bg-white/[0.02] p-4 flex items-center justify-center">
-                                <ActiveLayout2D dimensions={dims} material={material} foldProgress={fold} t={t_local as any} />
+                                <ActiveLayout2D dimensions={dims} material={material} foldProgress={fold} t={t_local as UnsafeAny} />
                             </div>
                         ) : selectedCat === 'pouch' ? (
                             <div className="w-full h-full flex items-center justify-center p-4">

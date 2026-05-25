@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
         const role = searchParams.get('role') || 'all';
 
         const where: Prisma.BotAccessRequestWhereInput = {};
-        if (status !== 'all') where.status = status as any;
+        if (status !== 'all') where.status = status as UnsafeAny;
         if (role !== 'all') where.role = role;
 
         const [items, summary] = await Promise.all([

@@ -15,7 +15,7 @@ interface ImportProductModalProps {
 export default function ImportProductModal({ isOpen, onClose }: ImportProductModalProps) {
     const [url, setUrl] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [previewData, setPreviewData] = useState<any>(null);
+    const [previewData, setPreviewData] = useState<UnsafeAny>(null);
     const { importProduct } = useProductStore();
 
     if (!isOpen) return null;

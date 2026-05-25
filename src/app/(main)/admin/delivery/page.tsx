@@ -21,7 +21,7 @@ interface DeliveryMethod {
     id: string;
     name: string;
     type: 'internal' | 'external';
-    icon: any;
+    icon: UnsafeAny;
     status: 'active' | 'inactive';
     details?: string;
     price?: number;

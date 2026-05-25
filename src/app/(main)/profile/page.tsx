@@ -26,7 +26,7 @@ type TabKey = 'orders' | 'cart' | 'settings';
 type OnStatsReady = (stats: { totalSpent: number; orderCount: number }) => void;
 
 export default function ProfilePage() {
-    const { user, _isAuthenticated, logout, orders } = useAuthStore();
+    const { user, logout, orders } = useAuthStore();
     const { status } = useSession();
     const cartItems = useCartStore(s => s.items);
     const { language } = useLanguage();
@@ -395,14 +395,14 @@ export default function ProfilePage() {
 }
 
 // ── Profile Orders Sub-component — DB'dan fetch qiladi ──────────
-function ProfileOrdersList({ _user, _language, format, t, onStatsReady }: {
+function ProfileOrdersList({ user: _user, language: _language, format, t, onStatsReady }: {
     user: { phone: string };
     language: string;
     format: (n: number) => string;
     t: (uz: string, ru: string) => string;
     onStatsReady?: OnStatsReady;
 }) {
-    const [dbOrders, setDbOrders] = useState<any[]>([]);
+    const [dbOrders, setDbOrders] = useState<UnsafeAny[]>([]);
     const [loading, setLoading] = useState(true);
 
     const fetchOrders = useCallback(async () => {
@@ -414,8 +414,8 @@ function ProfileOrdersList({ _user, _language, format, t, onStatsReady }: {
                 setDbOrders(data);
                 // Calculate totalSpent from delivered orders
                 const spent = data
-                    .filter((o: any) => o.status === 'delivered')
-                    .reduce((sum: number, o: any) => sum + (o.totalAmount ?? 0), 0);
+                    .filter((o: UnsafeAny) => o.status === 'delivered')
+                    .reduce((sum: number, o: UnsafeAny) => sum + (o.totalAmount ?? 0), 0);
                 onStatsReady?.({ totalSpent: spent, orderCount: data.length });
             }
         } catch (e) {
@@ -449,7 +449,7 @@ function ProfileOrdersList({ _user, _language, format, t, onStatsReady }: {
 
     return (
         <>
-            {dbOrders.slice(0, 5).map((order: any) => {
+            {dbOrders.slice(0, 5).map((order: UnsafeAny) => {
                 const s = STATUS_STYLES[order.status] ?? STATUS_STYLES.new;
                 const date = new Date(order.createdAt);
                 return (
@@ -465,7 +465,7 @@ function ProfileOrdersList({ _user, _language, format, t, onStatsReady }: {
                             <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${s.bg} ${s.text}`}>{s.label}</span>
                         </div>
                         <div className="px-5 py-3">
-                            {(order.items ?? []).slice(0, 2).map((item: any, j: number) => (
+                            {(order.items ?? []).slice(0, 2).map((item: UnsafeAny, j: number) => (
                                 <div key={j} className="flex items-center gap-3 py-1.5">
                                     <div className="w-9 h-9 rounded-xl bg-gray-50 border border-gray-100 overflow-hidden shrink-0">
                                         {item.product?.image ? <img src={item.product.image} alt="" className="w-full h-full object-contain" /> : <Package size={12} className="m-auto mt-2 text-gray-300" />}

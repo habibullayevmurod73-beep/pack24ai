@@ -12,8 +12,8 @@ export default function WarehousePage() {
     const [isTransferOpen, setIsTransferOpen] = useState(false);
 
     // Data State
-    const [inventory, setInventory] = useState<any[]>([]);
-    const [warehouses, setWarehouses] = useState<any[]>([]);
+    const [inventory, setInventory] = useState<UnsafeAny[]>([]);
+    const [warehouses, setWarehouses] = useState<UnsafeAny[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedWarehouseId, setSelectedWarehouseId] = useState('all');
 

@@ -64,7 +64,7 @@ export default function MobileProfilePage() {
     );
 }
 
-function MenuItem({ icon: Icon, label, value, badge }: any) {
+function MenuItem({ icon: Icon, label, value, badge }: UnsafeAny) {
     return (
         <div className="flex items-center justify-between p-4 active:bg-gray-50 transition-colors cursor-pointer">
             <div className="flex items-center gap-3">
@@ -84,7 +84,7 @@ function MenuItem({ icon: Icon, label, value, badge }: any) {
     )
 }
 
-function SocialButton({ icon: Icon, color, label }: any) {
+function SocialButton({ icon: Icon, color, label }: UnsafeAny) {
     return (
         <button
             className={`w-10 h-10 rounded-full ${color} text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform`}

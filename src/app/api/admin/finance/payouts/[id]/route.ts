@@ -32,7 +32,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         });
 
         return NextResponse.json(updated);
-    } catch (error: any) {
+    } catch (error: UnsafeAny) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

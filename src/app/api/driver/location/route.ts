@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
         });
 
         return NextResponse.json({ ok: true, lat, lng, ts: new Date().toISOString() });
-    } catch (error: any) {
+    } catch (error: UnsafeAny) {
         console.error('[driver/location]', error);
         return NextResponse.json({ error: 'Server xatosi' }, { status: 500 });
     }
@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
     const supervisorId = req.nextUrl.searchParams.get('supervisorId');
     const pointId = req.nextUrl.searchParams.get('pointId');
 
-    const where: any = { isOnline: true };
+    const where: UnsafeAny = { isOnline: true };
     if (supervisorId) where.supervisorId = Number(supervisorId);
     if (pointId) where.pointId = Number(pointId);
 

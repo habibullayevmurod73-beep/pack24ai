@@ -126,7 +126,7 @@ const getGreetingTime = (): Record<string, string> => {
 
 export default function AIConsultant({ model, dims, totalPrice, unitPrice, material, quantity }: AIConsultantProps) {
     const { language } = useLanguage();
-    const { generateResponse, isTyping, history: _aiHistory, _clearHistory, _abort } = useAI();
+    const { generateResponse, isTyping, history: _aiHistory, clearHistory: _clearHistory, abort: _abort } = useAI();
     const [_typingText, _setTypingText] = useState('');
 
     const [isOpen, setIsOpen] = useState(false);
@@ -193,7 +193,7 @@ export default function AIConsultant({ model, dims, totalPrice, unitPrice, mater
             dims,
             totalPrice,
             unitPrice,
-            language: language as any,
+            language: language as UnsafeAny,
             material,
             quantity,
         });

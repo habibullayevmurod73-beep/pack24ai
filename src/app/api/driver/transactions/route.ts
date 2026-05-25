@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
         });
 
         return NextResponse.json(tx);
-    } catch (err: any) {
+    } catch (err: UnsafeAny) {
         if (err.message === 'CARD_NOT_FOUND') return NextResponse.json({ error: 'Karta topilmadi' }, { status: 400 });
         if (err.message === 'INSUFFICIENT_BALANCE') return NextResponse.json({ error: 'Balans yetarli emas' }, { status: 400 });
         console.error('[transactions POST]', err);

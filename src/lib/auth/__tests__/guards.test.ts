@@ -19,8 +19,8 @@ if (typeof globalThis.Request === 'undefined') {
                 : new FakeHeaders(init?.headers as Record<string, string> | undefined);
         }
     }
-    (globalThis as any).Headers = FakeHeaders;
-    (globalThis as any).Request = FakeRequest;
+    (globalThis as UnsafeAny).Headers = FakeHeaders;
+    (globalThis as UnsafeAny).Request = FakeRequest;
 }
 
 /* NextResponse.json must be mocked before guards.ts imports next/server */

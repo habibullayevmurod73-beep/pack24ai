@@ -47,7 +47,7 @@ export async function PUT(req: NextRequest) {
 
     try {
         const body = await req.json();
-        const updateData: any = {};
+        const updateData: UnsafeAny = {};
 
         if (body.name?.trim()) updateData.name = body.name.trim();
         if (body.vehicleInfo !== undefined) updateData.vehicleInfo = body.vehicleInfo?.trim() || null;

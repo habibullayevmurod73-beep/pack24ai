@@ -47,7 +47,7 @@ export default function ProductsPage() {
 
     const categories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
 
-    const handlePriceClick = (product: any) => {
+    const handlePriceClick = (product: UnsafeAny) => {
         setEditingPriceId(product.id);
         setTempPrice(product.price.toString());
     };

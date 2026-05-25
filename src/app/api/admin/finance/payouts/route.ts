@@ -34,7 +34,7 @@ export async function GET(req: Request) {
             data: payouts,
             pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
         });
-    } catch (error: any) {
+    } catch (error: UnsafeAny) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

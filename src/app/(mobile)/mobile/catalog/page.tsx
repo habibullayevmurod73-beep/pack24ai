@@ -21,7 +21,7 @@ export default function MobileCatalogPage() {
             .then(data => {
                 // Extract unique categories from products
                 // In a real app, you might have a dedicated /api/categories endpoint
-                const cats = Array.from(new Set(data.map((p: any) => p.category).filter(Boolean))) as string[];
+                const cats = Array.from(new Set(data.map((p: UnsafeAny) => p.category).filter(Boolean))) as string[];
                 setCategories(cats);
             })
             .catch(err => console.error(err))

@@ -29,7 +29,7 @@ type SortValue = typeof SORT_OPTIONS[number]['value'];
 // Product Card - Grid view
 function ProductCardGrid({
     product, onAddToCart, format, language,
-}: { product: any; onAddToCart: (p: any) => void; format: (n: number) => string; language: string }) {
+}: { product: UnsafeAny; onAddToCart: (p: UnsafeAny) => void; format: (n: number) => string; language: string }) {
     const [liked, setLiked] = useState(false);
     const [added, setAdded] = useState(false);
     const isOnSale = product.originalPrice && product.originalPrice > product.price;
@@ -139,7 +139,7 @@ function ProductCardGrid({
 // Product Card - List view
 function ProductCardList({
     product, onAddToCart, format, language,
-}: { product: any; onAddToCart: (p: any) => void; format: (n: number) => string; language: string }) {
+}: { product: UnsafeAny; onAddToCart: (p: UnsafeAny) => void; format: (n: number) => string; language: string }) {
     const [added, setAdded] = useState(false);
     const isOnSale = product.originalPrice && product.originalPrice > product.price;
 
@@ -212,7 +212,7 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
         params.then(p => setSlug(p.slug));
     }, [params]);
 
-    const handleAddToCart = (product: any) => {
+    const handleAddToCart = (product: UnsafeAny) => {
         addToCart({ productId: product.id, name: product.name, price: product.price, image: product.image, quantity: 1 });
         toast.success(t("Savatga qo'shildi!", "Добавлено в корзину!"));
     };
@@ -230,7 +230,7 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
 
     const category = useMemo(() => {
         if (!slug) return undefined;
-        const find = (cats: any[]): any => {
+        const find = (cats: UnsafeAny[]): UnsafeAny => {
             for (const c of cats) {
                 if (c.slug === slug) return c;
                 if (c.children) { const f = find(c.children); if (f) return f; }
@@ -399,7 +399,7 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
                     {/* Sub-categories */}
                     {hasSubCategories && (
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-6 border-b border-gray-100 pb-6">
-                            {category.children.map((sub: any) => (
+                            {category.children.map((sub: UnsafeAny) => (
                                 <Link
                                     key={sub.id}
                                     href={`/catalog/${sub.slug}`}

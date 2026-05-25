@@ -132,7 +132,7 @@ export default function TasksPage() {
 
     const [showCreateDialog, setShowCreateDialog] = useState(false);
     const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
-    const [selectedTaskDetail, setSelectedTaskDetail] = useState<any>(null);
+    const [selectedTaskDetail, setSelectedTaskDetail] = useState<UnsafeAny>(null);
     const [loading, setLoading] = useState(true);
     const [activeId, setActiveId] = useState<number | null>(null);
 

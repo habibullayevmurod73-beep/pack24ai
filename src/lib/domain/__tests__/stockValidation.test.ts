@@ -9,28 +9,28 @@ import {
 } from '@/lib/domain/stockValidation';
 
 describe('stockValidation', () => {
-    let mockTx: any;
+    let mockTx: UnsafeAny;
 
     beforeEach(() => {
         mockTx = {
             inventory: {
-                aggregate: jest.fn<any>(),
-                findUnique: jest.fn<any>(),
-                update: jest.fn<any>(),
-                create: jest.fn<any>(),
+                aggregate: jest.fn<UnsafeAny>(),
+                findUnique: jest.fn<UnsafeAny>(),
+                update: jest.fn<UnsafeAny>(),
+                create: jest.fn<UnsafeAny>(),
             },
             product: {
-                findUnique: jest.fn<any>(),
+                findUnique: jest.fn<UnsafeAny>(),
             },
             warehouse: {
-                findMany: jest.fn<any>(),
-                findFirst: jest.fn<any>(),
+                findMany: jest.fn<UnsafeAny>(),
+                findFirst: jest.fn<UnsafeAny>(),
             },
             stockMovement: {
-                create: jest.fn<any>(),
+                create: jest.fn<UnsafeAny>(),
             },
             orderItem: {
-                findMany: jest.fn<any>(),
+                findMany: jest.fn<UnsafeAny>(),
             },
         };
     });

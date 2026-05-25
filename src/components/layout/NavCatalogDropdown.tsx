@@ -24,8 +24,8 @@ function getCatName(cat: Category, lang: Language): string {
 }
 
 function getIcon(iconName: string) {
-    const Icon = iconName && (LucideIcons as any)[iconName]
-        ? (LucideIcons as any)[iconName]
+    const Icon = iconName && (LucideIcons as UnsafeAny)[iconName]
+        ? (LucideIcons as UnsafeAny)[iconName]
         : LucideIcons.Box;
     return Icon;
 }

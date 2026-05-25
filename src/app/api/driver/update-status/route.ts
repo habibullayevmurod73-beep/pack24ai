@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
                 });
 
                 // Haydovchiga daromad yozish — RecyclePoint.driverRatePerKg asosida
-                const driverRate = (request.point as any)?.driverRatePerKg ?? 100;
+                const driverRate = (request.point as UnsafeAny)?.driverRatePerKg ?? 100;
                 const driverEarning = Math.round(actualWeight * driverRate);
                 await prisma.driverTransaction.create({
                     data: {
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
         }
 
         return NextResponse.json({ ok: true, status });
-    } catch (error: any) {
+    } catch (error: UnsafeAny) {
         console.error('[driver/update-status]', error);
         return NextResponse.json({ error: 'Server xatosi', detail: error.message }, { status: 500 });
     }

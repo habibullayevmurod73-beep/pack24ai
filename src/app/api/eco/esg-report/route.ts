@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
         const requests = await prisma.recycleRequest.findMany({
             where: {
                 userId,
-                status: { in: ['collected', 'completed', 'confirmed'] as any },
+                status: { in: ['collected', 'completed', 'confirmed'] as UnsafeAny },
                 completedAt: { gte: startDate, lt: endDate },
             },
             select: { material: true, volume: true, completedAt: true },

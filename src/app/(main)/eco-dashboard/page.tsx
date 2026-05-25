@@ -12,7 +12,7 @@ interface EcoStats {
   treesSaved: string;
   co2Offset: string;
   waterSaved: string;
-  recentRequests: any[];
+  recentRequests: UnsafeAny[];
 }
 
 export default function EcoDashboard() {
@@ -190,7 +190,7 @@ export default function EcoDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {stats.recentRequests.map((req: any) => (
+              {stats.recentRequests.map((req: UnsafeAny) => (
                 <div key={req.id} className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0 hover:bg-muted/50 p-2 rounded-lg transition-colors">
                   <div className="flex flex-col gap-1">
                     <span className="font-medium text-sm text-foreground">

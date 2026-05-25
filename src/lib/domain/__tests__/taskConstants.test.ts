@@ -64,7 +64,7 @@ describe('canTransitionTaskStatus', () => {
     ];
 
     it.each(allowed)('%s → %s is allowed', (from, to) => {
-        expect(canTransitionTaskStatus(from as any, to as any)).toBe(true);
+        expect(canTransitionTaskStatus(from as UnsafeAny, to as UnsafeAny)).toBe(true);
     });
 
     const forbidden: [string, string][] = [
@@ -84,7 +84,7 @@ describe('canTransitionTaskStatus', () => {
     ];
 
     it.each(forbidden)('%s → %s is forbidden', (from, to) => {
-        expect(canTransitionTaskStatus(from as any, to as any)).toBe(false);
+        expect(canTransitionTaskStatus(from as UnsafeAny, to as UnsafeAny)).toBe(false);
     });
 
     it('completed is a terminal state', () => {

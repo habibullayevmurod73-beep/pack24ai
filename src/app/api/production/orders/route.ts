@@ -7,7 +7,7 @@ export async function GET(request: Request) {
         const status = searchParams.get('status');
         const search = searchParams.get('search');
 
-        const where: any = {};
+        const where: UnsafeAny = {};
 
         if (status && status !== 'all') {
             where.status = status;

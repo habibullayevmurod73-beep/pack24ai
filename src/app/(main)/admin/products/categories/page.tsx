@@ -234,7 +234,7 @@ export default function AdminCategoriesPage() {
 
                     <div className="divide-y divide-gray-50">
                         {filteredCategories.map((cat) => {
-                            const Icon = (LucideIcons as any)[cat.icon] || LucideIcons.Box;
+                            const Icon = (LucideIcons as UnsafeAny)[cat.icon] || LucideIcons.Box;
                             const isExpanded = expandedCats.has(cat.id);
                             const hasSubs = cat.children && cat.children.length > 0;
 
@@ -290,7 +290,7 @@ export default function AdminCategoriesPage() {
                                     {isExpanded && (
                                         <div className="bg-gray-50/60 border-t border-gray-100">
                                             {cat.children && cat.children.map((sub) => {
-                                                const SubIcon = (LucideIcons as any)[sub.icon] || LucideIcons.Box;
+                                                const SubIcon = (LucideIcons as UnsafeAny)[sub.icon] || LucideIcons.Box;
                                                 return (
                                                     <div key={sub.id} className="pl-16 pr-4 py-3 flex items-center hover:bg-white/60 transition-colors group/sub border-b border-gray-100 last:border-0">
                                                         <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-500 flex items-center justify-center mr-3">
@@ -352,7 +352,7 @@ export default function AdminCategoriesPage() {
                                                                 className="h-9 text-sm w-40" />
                                                             <div className="w-9 h-9 rounded bg-white border flex items-center justify-center shrink-0">
                                                                 {(() => {
-                                                                    const P = (LucideIcons as any)[subForm.icon] || LucideIcons.Box;
+                                                                    const P = (LucideIcons as UnsafeAny)[subForm.icon] || LucideIcons.Box;
                                                                     return <P size={16} />;
                                                                 })()}
                                                             </div>
@@ -458,7 +458,7 @@ export default function AdminCategoriesPage() {
                                     />
                                     <div className="w-10 h-10 rounded bg-slate-100 flex items-center justify-center shrink-0">
                                         {(() => {
-                                            const PreviewIcon = (LucideIcons as any)[formData.icon || 'Box'] || LucideIcons.HelpCircle;
+                                            const PreviewIcon = (LucideIcons as UnsafeAny)[formData.icon || 'Box'] || LucideIcons.HelpCircle;
                                             return <PreviewIcon size={20} />;
                                         })()}
                                     </div>

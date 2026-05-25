@@ -53,7 +53,7 @@ function StatCard({
     value: string;
     sub?: string;
     growth?: number;
-    icon: any;
+    icon: UnsafeAny;
     color: string;
     loading?: boolean;
 }) {

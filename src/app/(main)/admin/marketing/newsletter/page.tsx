@@ -9,7 +9,7 @@ import Link from 'next/link';
 
 
 export default function NewsletterPage() {
-    const [campaigns, setCampaigns] = React.useState<any[]>([]);
+    const [campaigns, setCampaigns] = React.useState<UnsafeAny[]>([]);
     const [loading, setLoading] = React.useState(true);
 
     const fetchCampaigns = async () => {

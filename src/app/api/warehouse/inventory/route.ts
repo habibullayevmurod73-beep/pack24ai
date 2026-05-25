@@ -9,7 +9,7 @@ export async function GET(request: Request) {
         const warehouseId = searchParams.get('warehouseId');
         const search = searchParams.get('search');
 
-        const where: any = {};
+        const where: UnsafeAny = {};
 
         if (warehouseId && warehouseId !== 'all') {
             where.warehouseId = parseInt(warehouseId);
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
     }
 }
 
-async function upsertInventory(tx: any, productId: number, warehouseId: number, change: number) {
+async function upsertInventory(tx: UnsafeAny, productId: number, warehouseId: number, change: number) {
     const existing = await tx.inventory.findUnique({
         where: {
             productId_warehouseId: {

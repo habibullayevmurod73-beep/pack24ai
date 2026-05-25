@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function OrderHistoryPage() {
-    const [orders, setOrders] = useState<any[]>([]);
+    const [orders, setOrders] = useState<UnsafeAny[]>([]);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
@@ -80,7 +80,7 @@ export default function OrderHistoryPage() {
                             <div className="flex items-center justify-between border-t border-gray-50 pt-3">
                                 <div className="flex items-center gap-2">
                                     <div className="flex -space-x-2">
-                                        {order.items.slice(0, 3).map((item: any) => (
+                                        {order.items.slice(0, 3).map((item: UnsafeAny) => (
                                             <div key={item.id} className="w-8 h-8 rounded-full bg-gray-100 border-2 border-white overflow-hidden">
                                                 <img src={item.product?.image} alt={item.product?.name || 'Mahsulot'} className="w-full h-full object-cover" />
                                             </div>

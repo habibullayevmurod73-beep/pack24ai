@@ -17,7 +17,7 @@ interface EcoStats {
     treesSaved: string;
     co2Offset: string;
     waterSaved: string;
-    recentRequests: any[];
+    recentRequests: UnsafeAny[];
 }
 
 interface MonthlyData {
@@ -44,7 +44,7 @@ const WASTE_TYPES = [
 type TabId = 'dashboard' | 'pickup' | 'rewards';
 
 export default function PRTSPage() {
-    const { t, _language } = useLanguage();
+    const { t, language: _language } = useLanguage();
     const [activeTab, setActiveTab] = useState<TabId>('dashboard');
     const [stats, setStats] = useState<EcoStats | null>(null);
     const [chartData, setChartData] = useState<MonthlyData[]>([]);
