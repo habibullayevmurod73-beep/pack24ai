@@ -18,15 +18,15 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Token kerak' }, { status: 401 });
     }
 
-    const payload = verifyDriverToken(token);
-    if (!payload) {
-        return NextResponse.json({ error: 'Token noto\'g\'ri' }, { status: 401 });
+    const result = await verifyDriverToken(token);
+    if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: 401 });
     }
 
     try {
         // Haydovchini topish (qaysi point ga tayinlangan)
         const driver = await prisma.driver.findUnique({
-            where: { id: payload.driverId },
+            where: { id: result.driverId },
             select: { pointId: true, status: true },
         });
 
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
         // Barcha aktiv punktlarni olish (koordinatalar bilan)
         const points = await prisma.recyclePoint.findMany({
             where: {
-                isActive: true,
+                status: 'active',
             },
             select: {
                 id: true,
