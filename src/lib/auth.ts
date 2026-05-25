@@ -2,6 +2,7 @@
  * NextAuth v4 konfiguratsiyasi
  * Foydalanuvchi telefon raqami orqali kiradi.
  */
+import crypto from 'crypto';
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import type { NextAuthOptions } from 'next-auth';
@@ -77,7 +78,12 @@ export const authOptions: NextAuthOptions = {
                 if (new Date() > user.otpExpiry) return null;
                 if (user.otpAttempts >= 5) return null;
 
-                if (user.otpCode !== otp) {
+                const otpBuf = Buffer.from(user.otpCode);
+                const inputBuf = Buffer.from(otp);
+                if (
+                    otpBuf.length !== inputBuf.length ||
+                    !crypto.timingSafeEqual(otpBuf, inputBuf)
+                ) {
                     // Noto'g'ri urinish — hisoblagichni oshirish
                     await prisma.user.update({
                         where: { id: user.id },

@@ -5,7 +5,6 @@ import {
     ADMIN_AUTH_HEADER,
     validateAdminToken,
 } from '@/lib/adminAuthShared';
-import { WEBVIEW_SOURCE_HEADER, WEBVIEW_SOURCE_VALUE } from '@/lib/webview';
 
 const ADMIN_LOGIN_PATH = '/admin/login';
 const ADMIN_PATHS = ['/admin'];
@@ -105,7 +104,7 @@ export async function middleware(request: NextRequest) {
     // POST/PUT/PATCH/DELETE so'rovlarida Origin yoki Referer tekshirish
     const CSRF_EXEMPT_PATHS = [
         '/api/telegram/',       // Telegram webhook (server-to-server)
-        '/api/bot',             // Bot webhook
+        '/api/bot/',            // Bot webhook (trailing slash — aniq prefix)
         '/api/payment/click',   // Click callback
         '/api/payment/payme',   // Payme callback
         '/api/push/',           // Push notification callbacks
@@ -126,13 +125,15 @@ export async function middleware(request: NextRequest) {
 
         // Bearer token bilan kelgan API so'rovlari (mobile/driver) — CSRF exempt
         const hasAuthToken = request.headers.get('authorization')?.startsWith('Bearer ');
-        // Admin token bilan kelgan so'rovlar — CSRF exempt
-        const hasAdminToken = request.headers.get(ADMIN_AUTH_HEADER) ||
-                              request.cookies.get(ADMIN_AUTH_COOKIE)?.value;
-        // Pack24 native app (WebView) so'rovlari — CSRF exempt
-        const isFromApp = request.headers.get(WEBVIEW_SOURCE_HEADER) === WEBVIEW_SOURCE_VALUE;
 
-        if (!originValid && !refererValid && !hasAuthToken && !hasAdminToken && !isFromApp) {
+        // Admin token — CSRF exempt FAQAT HMAC validatsiyadan o'tgandan keyin
+        const rawAdminToken = request.headers.get(ADMIN_AUTH_HEADER) ||
+                              request.cookies.get(ADMIN_AUTH_COOKIE)?.value;
+        const hasValidatedAdminToken = rawAdminToken
+            ? await isValidAdminToken(rawAdminToken)
+            : false;
+
+        if (!originValid && !refererValid && !hasAuthToken && !hasValidatedAdminToken) {
             const denied = NextResponse.json(
                 { error: 'CSRF: Origin tekshiruvidan o\'tmadi' },
                 { status: 403 }

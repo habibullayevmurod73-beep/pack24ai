@@ -278,6 +278,7 @@ model PushSubscription {
 
   @@index([driverId])
   @@index([appType, isActive])
+  @@index([userId])
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -423,17 +424,22 @@ model Product {
 
   @@index([status, createdAt])
   @@index([category, status])
+  @@index([categoryId])
 }
 
 model Category {
-  id        Int       @id @default(autoincrement())
+  id        Int        @id @default(autoincrement())
   name      String
-  slug      String    @unique
+  slug      String     @unique
   image     String?
   parentId  Int?
-  products  Product[] // Yangi: Product relation
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children  Category[] @relation("CategoryTree")
+  products  Product[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([parentId])
 }
 
 model Order {
@@ -470,6 +476,8 @@ model Order {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model OrderItem {
@@ -480,6 +488,9 @@ model OrderItem {
   product   Product @relation(fields: [productId], references: [id])
   quantity  Int
   price     Float // Snapshot of price
+
+  @@index([orderId])
+  @@index([productId])
 }
 
 model Warehouse {
@@ -654,6 +665,8 @@ model Supervisor {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([pointId])
 }
 
 // Mas'ul jurnal yozuvlarini tahrirlash — HQ admin tasdig'i bilan
@@ -726,6 +739,9 @@ model Driver {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([supervisorId])
+  @@index([pointId])
 }
 
 // Haydovchi plastik kartasi
@@ -819,6 +835,10 @@ model RecycleRequest {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([supervisorId])
+  @@index([assignedDriverId])
 }
 
 // Yig'ish hisob-kitobi
@@ -860,6 +880,9 @@ model RecycleCollection {
   collectedAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  @@index([requestId])
+  @@index([driverId])
 }
 
 // Masul tomonidan qo'lda kiritiladigan qabul jurnali
@@ -987,6 +1010,8 @@ model RecycleComplaint {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([requestId])
 }
 
 // ─── Ekologik yutuqlar (Gamification Badges) ─────────────────────────────────
