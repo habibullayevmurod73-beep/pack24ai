@@ -1,15 +1,28 @@
 import { unstable_cache } from 'next/cache';
 import dynamic from 'next/dynamic';
 import HomeHero from '@/components/home/HomeHero';
+import MobileCategoryStrip from '@/components/home/MobileCategoryStrip';
 import SectionSkeleton from '@/components/home/SectionSkeleton';
 import { OrganizationLd, WebSiteLd } from '@/components/seo/JsonLd';
 import { prisma } from '@/lib/prisma';
 import type { Product } from '@/lib/store/useProductStore';
 import { toNumber } from '@/lib/money';
 
-const PackagingShowcase = dynamic(
-    () => import('@/components/home/PackagingShowcase'),
-    { loading: () => <SectionSkeleton height={600} /> },
+const ConfiguratorSection = dynamic(
+    () => import('@/components/home/ConfiguratorSection'),
+    { loading: () => <SectionSkeleton height={480} /> },
+);
+const AISection = dynamic(
+    () => import('@/components/home/AISection'),
+    { loading: () => <SectionSkeleton height={360} /> },
+);
+const ReviewsSection = dynamic(
+    () => import('@/components/home/ReviewsSection'),
+    { loading: () => <SectionSkeleton height={280} /> },
+);
+const CTABanner = dynamic(
+    () => import('@/components/home/CTABanner'),
+    { loading: () => <SectionSkeleton height={160} /> },
 );
 
 // Server Component: mahsulotlar SSR — 60s cache (Neon tarmoq kechikishini kamaytiradi)
@@ -78,11 +91,25 @@ export default async function Home() {
             <OrganizationLd />
             <WebSiteLd />
 
-            {/* Banner + Mashhur mahsulotlar */}
+            {/* Slider + Category Showcase
+                initialProducts → Zustand store ni birinchi render da seed qiladi
+                shuning uchun kategoriya kartalari darhol ko'rinadi */}
             <HomeHero initialProducts={initialProducts} />
 
-            {/* Pacdora AI hamkorlik showcase */}
-            <PackagingShowcase />
+            {/* Mobil kategoriyalar */}
+            <MobileCategoryStrip />
+
+            {/* 3D konfigurator + B2B + Stats + Features (barchasi birlashtirildi) */}
+            <ConfiguratorSection />
+
+            {/* Pack24 AI Section */}
+            <AISection />
+
+            {/* Sharhlar */}
+            <ReviewsSection />
+
+            {/* CTA */}
+            <CTABanner />
         </div>
     );
 }

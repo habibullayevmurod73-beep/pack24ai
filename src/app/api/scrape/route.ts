@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        const mainImage = images[0] || '/images/no-image.svg';
+        const mainImage = images[0] || 'https://placehold.co/400x400?text=No+Image';
 
         // Deep Extract Specifications
         const specifications: Record<string, string> = {};
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
             name: 'Imported Product (Fallback)',
             price: 100,
             description: 'Could not scrape live site. Check console.',
-            image: '/images/no-image.svg',
+            image: 'https://placehold.co/400x400?text=Error',
             specifications: {}
         });
     }
