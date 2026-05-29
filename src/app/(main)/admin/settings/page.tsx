@@ -5,9 +5,7 @@ import Image from 'next/image';
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
-import { Upload, RefreshCcw, Globe, Phone, Instagram, Send, Facebook, Youtube, Clock, MapPin, Info, Check } from 'lucide-react';
-import BoxCalculatorSettings from '@/components/admin/BoxCalculatorSettings';
+import { Input } from '@/components/ui/Input';import { Upload, RefreshCcw, Globe, Phone, Instagram, Send, Facebook, Youtube, Clock, MapPin, Info, Check } from 'lucide-react';
 
 const WEEKDAYS = [
     { id: 'mon', name: 'Dushanba' },
@@ -39,8 +37,6 @@ export default function SettingsPage() {
                 <h1 className="text-2xl font-bold text-gray-900">Do&apos;kon Sozlamalari</h1>
                 <p className="text-sm text-gray-500 mt-1">Asosiy ma&apos;lumotlar, ish tartibi va aloqa kanallari</p>
             </div>
-
-            <BoxCalculatorSettings />
 
             {/* 1. General Info & Logo */}
             <Card className="p-6 border border-gray-200 shadow-sm rounded-[12px] bg-white">
