@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useState, useMemo } from 'react';
 import {
     ChevronRight, Search, ThumbsUp, ChevronDown,
-    MessageSquarePlus, ChevronLeft, ChevronRight as ChevronRightIcon
+    MessageSquarePlus, ChevronLeft, ChevronRight as ChevronRightIcon, Loader2
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const QUESTIONS = [
     {
@@ -233,6 +234,9 @@ export default function FAQPage() {
     const [expanded, setExpanded] = useState<number[]>([]);
     const [showForm, setShowForm] = useState(false);
     const [formText, setFormText] = useState('');
+    const [formName, setFormName] = useState('');
+    const [formSubmitting, setFormSubmitting] = useState(false);
+    const [formSuccess, setFormSuccess] = useState(false);
 
     const filtered = useMemo(() => {
         const q = search.toLowerCase();
@@ -283,27 +287,70 @@ export default function FAQPage() {
                 {showForm && (
                     <div className="bg-white rounded-2xl border border-blue-100 p-5 mb-6 shadow-sm">
                         <h3 className="font-bold text-gray-900 mb-3 text-sm">{t("Savolingizni yozing", "Напишите ваш вопрос")}</h3>
-                        <textarea
-                            value={formText}
-                            onChange={e => setFormText(e.target.value)}
-                            rows={3}
-                            placeholder={t("Savolingizni kiriting...", "Введите ваш вопрос...")}
-                            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300 text-gray-700"
-                        />
-                        <div className="flex gap-2 mt-3 justify-end">
-                            <button
-                                onClick={() => setShowForm(false)}
-                                className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl"
-                            >
-                                {t("Bekor qilish", "Отмена")}
-                            </button>
-                            <button
-                                onClick={() => { setShowForm(false); setFormText(''); }}
-                                className="px-4 py-2 text-sm font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
-                            >
-                                {t("Yuborish", "Отправить")}
-                            </button>
-                        </div>
+                        {formSuccess ? (
+                            <div className="text-center py-6">
+                                <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <span className="text-emerald-600 text-xl">✓</span>
+                                </div>
+                                <p className="text-sm font-bold text-emerald-700 mb-1">{t("Savolingiz yuborildi!", "Ваш вопрос отправлен!")}</p>
+                                <p className="text-xs text-gray-400">{t("Tez orada javob beramiz.", "Мы ответим в ближайшее время.")}</p>
+                            </div>
+                        ) : (
+                            <>
+                                <input
+                                    type="text"
+                                    value={formName}
+                                    onChange={e => setFormName(e.target.value)}
+                                    placeholder={t("Ismingiz", "Ваше имя")}
+                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-gray-700 mb-3"
+                                />
+                                <textarea
+                                    value={formText}
+                                    onChange={e => setFormText(e.target.value)}
+                                    rows={3}
+                                    placeholder={t("Savolingizni kiriting...", "Введите ваш вопрос...")}
+                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300 text-gray-700"
+                                />
+                                <div className="flex gap-2 mt-3 justify-end">
+                                    <button
+                                        onClick={() => { setShowForm(false); setFormSuccess(false); }}
+                                        className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl"
+                                    >
+                                        {t("Bekor qilish", "Отмена")}
+                                    </button>
+                                    <button
+                                        disabled={formSubmitting}
+                                        onClick={async () => {
+                                            if (!formName.trim() || !formText.trim()) {
+                                                toast.error(t("Ism va savolni to'ldiring", "Заполните имя и вопрос"));
+                                                return;
+                                            }
+                                            setFormSubmitting(true);
+                                            try {
+                                                const res = await fetch('/api/faq', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ name: formName, question: formText }),
+                                                });
+                                                if (!res.ok) throw new Error();
+                                                toast.success(t("Savol yuborildi!", "Вопрос отправлен!"));
+                                                setFormSuccess(true);
+                                                setFormName('');
+                                                setFormText('');
+                                            } catch {
+                                                toast.error(t("Xatolik yuz berdi", "Произошла ошибка"));
+                                            } finally {
+                                                setFormSubmitting(false);
+                                            }
+                                        }}
+                                        className="px-4 py-2 text-sm font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-60 flex items-center gap-2"
+                                    >
+                                        {formSubmitting && <Loader2 size={14} className="animate-spin" />}
+                                        {t("Yuborish", "Отправить")}
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
 

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Paperclip, X } from 'lucide-react';
 import { useLanguage } from '../lib/contexts/LanguageContext';
 import { useAI } from '../lib/hooks/useAI';
 import { BoxModel, BoxDimensions, Material } from '../lib/types';
@@ -10,6 +11,7 @@ type Message = {
     text: string;
     sender: 'user' | 'ai';
     timestamp: Date;
+    inlineData?: { data: string; mimeType: string };
 };
 
 interface AIConsultantProps {
@@ -124,6 +126,42 @@ const getGreetingTime = (): Record<string, string> => {
     return { uz: 'Xayrli kech', ru: 'Добрый вечер', en: 'Good evening', qr: 'Xayrli kesh', zh: '晚上好', tr: 'İyi akşamlar', tg: 'Шаби хуш', kk: 'Қайырлы кеш', tk: 'Agşamyňyz haýyrly', fa: 'عصر بخیر' };
 };
 
+const renderMessageText = (text: string) => {
+    // Remove markdown bold characters
+    let cleanText = text.replace(/\*\*/g, '');
+    // Replace markdown bullet points with a standard dash
+    cleanText = cleanText.replace(/(^|\n)\s*\*\s/g, '$1- ');
+
+    const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = linkRegex.exec(cleanText)) !== null) {
+        if (match.index > lastIndex) {
+            parts.push(cleanText.substring(lastIndex, match.index));
+        }
+        parts.push(
+            <a 
+                key={match.index} 
+                href={match[2]} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-300 hover:text-blue-100 underline decoration-blue-300/50 underline-offset-2 font-bold transition-colors"
+                onClick={e => e.stopPropagation()}
+            >
+                {match[1]}
+            </a>
+        );
+        lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < cleanText.length) {
+        parts.push(cleanText.substring(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : cleanText;
+};
+
 export default function AIConsultant({ model, dims, totalPrice, unitPrice, material, quantity }: AIConsultantProps) {
     const { language } = useLanguage();
     const { generateResponse, isTyping, history: _aiHistory, clearHistory: _clearHistory, abort: _abort } = useAI();
@@ -133,6 +171,8 @@ export default function AIConsultant({ model, dims, totalPrice, unitPrice, mater
     const [unreadCount, setUnreadCount] = useState(0);
     const [hasOpened, setHasOpened] = useState(false);
     const [input, setInput] = useState('');
+    const [selectedFile, setSelectedFile] = useState<{ data: string, mimeType: string } | null>(null);
+    const [filePreview, setFilePreview] = useState<string | null>(null);
     const [messages, setMessages] = useState<Message[]>([
         {
             id: 1,
@@ -144,6 +184,7 @@ export default function AIConsultant({ model, dims, totalPrice, unitPrice, mater
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const scrollToBottom = useCallback(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -174,19 +215,47 @@ export default function AIConsultant({ model, dims, totalPrice, unitPrice, mater
         setUnreadCount(0);
     };
 
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 5 * 1024 * 1024) {
+            alert(language === 'uz' ? 'Fayl hajmi 5MB dan kichik bo\'lishi kerak' : 'File must be under 5MB');
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const base64String = reader.result as string;
+            setFilePreview(base64String);
+            
+            // Extract mime and pure base64
+            const mimeType = file.type;
+            const data = base64String.split(',')[1];
+            setSelectedFile({ data, mimeType });
+        };
+        reader.readAsDataURL(file);
+    };
+
     const handleSend = async (textArg?: string) => {
         const textToSend = (textArg ?? input).trim().slice(0, 500);
-        if (!textToSend || isTyping) return;
+        if ((!textToSend && !selectedFile) || isTyping) return;
 
+        const currentFile = selectedFile;
         const userMsg: Message = {
             id: Date.now(),
-            text: textToSend,
+            text: textToSend || (language === 'uz' ? '📷 Rasm yuborildi' : '📷 Image sent'),
             sender: 'user',
             timestamp: new Date(),
+            inlineData: currentFile || undefined,
         };
 
         setMessages(prev => [...prev, userMsg]);
         setInput('');
+        setSelectedFile(null);
+        setFilePreview(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
 
         const aiResponseText = await generateResponse(userMsg.text, {
             model,
@@ -196,7 +265,7 @@ export default function AIConsultant({ model, dims, totalPrice, unitPrice, mater
             language,
             material,
             quantity,
-        });
+        }, currentFile || undefined);
 
         if (!aiResponseText) return;
 
@@ -340,7 +409,18 @@ export default function AIConsultant({ model, dims, totalPrice, unitPrice, mater
                                         }`}
                                     style={msg.sender === 'ai' ? { background: 'rgba(255,255,255,0.07)' } : {}}
                                 >
-                                    {msg.text}
+                                    {msg.inlineData && (
+                                        <div className="mb-2 max-w-xs overflow-hidden rounded-lg bg-black/20">
+                                            {msg.inlineData.mimeType.startsWith('image/') ? (
+                                                <img src={`data:${msg.inlineData.mimeType};base64,${msg.inlineData.data}`} alt="Upload" className="w-full h-auto object-cover opacity-90 hover:opacity-100 transition-opacity" />
+                                            ) : (
+                                                <div className="flex items-center gap-2 p-2 text-xs font-bold text-blue-200">
+                                                    <Paperclip size={14} /> {msg.inlineData.mimeType.split('/')[1].toUpperCase()} Hujjat
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                    {msg.text && renderMessageText(msg.text)}
                                     <div className={`text-[10px] mt-1.5 opacity-50 flex ${msg.sender === 'user' ? 'justify-end text-blue-100' : 'justify-start text-gray-400'}`}>
                                         {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </div>
@@ -398,11 +478,49 @@ export default function AIConsultant({ model, dims, totalPrice, unitPrice, mater
                         </div>
                     )}
 
+                    {/* ── File Preview ── */}
+                    {filePreview && (
+                        <div className="px-4 pb-2 flex shrink-0">
+                            <div className="relative w-16 h-16 rounded-xl overflow-hidden border-2 border-blue-500/50 shadow-md">
+                                {selectedFile?.mimeType.startsWith('image/') ? (
+                                    <img src={filePreview} alt="Preview" className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="w-full h-full flex flex-col items-center justify-center bg-blue-500/20 text-blue-200">
+                                        <Paperclip size={20} />
+                                        <span className="text-[9px] font-bold mt-1">DOC</span>
+                                    </div>
+                                )}
+                                <button 
+                                    onClick={() => { setFilePreview(null); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }} 
+                                    className="absolute top-1 right-1 w-5 h-5 bg-black/70 rounded-full flex items-center justify-center text-white hover:bg-black transition-colors"
+                                >
+                                    <X size={12} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {/* ── Input Area ── */}
                     <div
                         className="px-4 pb-5 pt-3 flex gap-3 shrink-0 border-t border-white/8"
                         style={{ background: 'rgba(15,23,42,0.6)' }}
                     >
+                        <input
+                            type="file"
+                            accept="image/*,application/pdf"
+                            ref={fileInputRef}
+                            className="hidden"
+                            onChange={handleFileSelect}
+                        />
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isTyping}
+                            aria-label="Attach file"
+                            className="w-11 h-11 flex items-center justify-center rounded-xl transition-all hover:bg-white/10 text-white/70 hover:text-white disabled:opacity-40 shrink-0"
+                            style={{ background: 'rgba(255,255,255,0.05)' }}
+                        >
+                            <Paperclip size={18} />
+                        </button>
                         <input
                             ref={inputRef}
                             type="text"
@@ -426,7 +544,7 @@ export default function AIConsultant({ model, dims, totalPrice, unitPrice, mater
                         />
                         <button
                             onClick={() => handleSend()}
-                            disabled={!input.trim() || isTyping}
+                            disabled={(!input.trim() && !selectedFile) || isTyping}
                             aria-label="Send message"
                             className="w-11 h-11 flex items-center justify-center rounded-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                             style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', boxShadow: '0 4px 15px rgba(79,70,229,0.4)' }}

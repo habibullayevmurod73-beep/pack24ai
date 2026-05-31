@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useState } from 'react';
 import {
     ChevronRight, MapPin, Clock, Briefcase,
-    Banknote, Calendar, ChevronDown, Send, User, Phone, Mail
+    Banknote, Calendar, ChevronDown, Send, User, Phone, Mail, Loader2
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const VACANCIES = [
     {
@@ -172,6 +173,8 @@ export default function VacanciesPage() {
     const [openId,    setOpenId]    = useState<number | null>(null);
     const [applyId,   setApplyId]   = useState<number | null>(null);
     const [form, setForm] = useState({ name: '', phone: '', email: '', message: '' });
+    const [formSubmitting, setFormSubmitting] = useState(false);
+    const [formSuccess, setFormSuccess] = useState(false);
 
     const toggle = (id: number) => setOpenId(prev => prev === id ? null : id);
 
@@ -312,48 +315,83 @@ export default function VacanciesPage() {
                                                 <h4 className="font-bold text-gray-900 text-sm mb-4">
                                                     {t(`«${title}» vakansiyasiga ariza`, `Заявка на вакансию «${title}»`)}
                                                 </h4>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                    {[
-                                                        { id: 'name',  icon: User,  type: 'text', label: t("Ism Familiya", "Имя Фамилия"), key: 'name' as const },
-                                                        { id: 'phone', icon: Phone, type: 'tel',  label: t("Telefon", "Телефон"),      key: 'phone' as const },
-                                                        { id: 'email', icon: Mail,  type: 'email',label: "Email",                        key: 'email' as const },
-                                                    ].map(({ id, icon: Icon, type, label, key }) => (
-                                                        <div key={id} className="relative">
-                                                            <Icon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                                            <input
-                                                                id={id}
-                                                                type={type}
-                                                                placeholder={label}
-                                                                value={form[key]}
-                                                                onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                                                                className="w-full pl-8 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
-                                                            />
+                                                {formSuccess ? (
+                                                    <div className="text-center py-6">
+                                                        <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                            <span className="text-emerald-600 text-xl">✓</span>
                                                         </div>
-                                                    ))}
-                                                    <div className="sm:col-span-2 relative">
-                                                        <textarea
-                                                            rows={3}
-                                                            placeholder={t("Qo'shimcha ma'lumot (ixtiyoriy)", "Дополнительная информация (необязательно)")}
-                                                            value={form.message}
-                                                            onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
-                                                            className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
-                                                        />
+                                                        <p className="text-sm font-bold text-emerald-700 mb-1">{t("Arizangiz yuborildi!", "Ваша заявка отправлена!")}</p>
+                                                        <p className="text-xs text-gray-400">{t("Tez orada siz bilan bog'lanamiz.", "Мы свяжемся с вами в ближайшее время.")}</p>
                                                     </div>
-                                                </div>
-                                                <div className="flex gap-2 mt-3 justify-end">
-                                                    <button
-                                                        onClick={() => setApplyId(null)}
-                                                        className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl hover:bg-white"
-                                                    >
-                                                        {t("Bekor qilish", "Отмена")}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => { setApplyId(null); setForm({ name:'', phone:'', email:'', message:'' }); }}
-                                                        className="px-5 py-2 text-sm font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
-                                                    >
-                                                        {t("Yuborish", "Отправить")}
-                                                    </button>
-                                                </div>
+                                                ) : (
+                                                    <>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                            {[
+                                                                { id: 'name',  icon: User,  type: 'text', label: t("Ism Familiya", "Имя Фамилия"), key: 'name' as const },
+                                                                { id: 'phone', icon: Phone, type: 'tel',  label: t("Telefon", "Телефон"),      key: 'phone' as const },
+                                                                { id: 'email', icon: Mail,  type: 'email',label: "Email",                        key: 'email' as const },
+                                                            ].map(({ id, icon: Icon, type, label, key }) => (
+                                                                <div key={id} className="relative">
+                                                                    <Icon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                                                    <input
+                                                                        id={id}
+                                                                        type={type}
+                                                                        placeholder={label}
+                                                                        value={form[key]}
+                                                                        onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                                                                        className="w-full pl-8 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+                                                                    />
+                                                                </div>
+                                                            ))}
+                                                            <div className="sm:col-span-2 relative">
+                                                                <textarea
+                                                                    rows={3}
+                                                                    placeholder={t("Qo'shimcha ma'lumot (ixtiyoriy)", "Дополнительная информация (необязательно)")}
+                                                                    value={form.message}
+                                                                    onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
+                                                                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex gap-2 mt-3 justify-end">
+                                                            <button
+                                                                onClick={() => { setApplyId(null); setFormSuccess(false); }}
+                                                                className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl hover:bg-white"
+                                                            >
+                                                                {t("Bekor qilish", "Отмена")}
+                                                            </button>
+                                                            <button
+                                                                disabled={formSubmitting}
+                                                                onClick={async () => {
+                                                                    if (!form.name.trim() || !form.phone.trim()) {
+                                                                        toast.error(t("Ism va telefonni to'ldiring", "Заполните имя и телефон"));
+                                                                        return;
+                                                                    }
+                                                                    setFormSubmitting(true);
+                                                                    try {
+                                                                        const res = await fetch('/api/vacancies/apply', {
+                                                                            method: 'POST',
+                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                            body: JSON.stringify({ ...form, vacancyTitle: title }),
+                                                                        });
+                                                                        if (!res.ok) throw new Error();
+                                                                        toast.success(t("Ariza yuborildi!", "Заявка отправлена!"));
+                                                                        setFormSuccess(true);
+                                                                        setForm({ name: '', phone: '', email: '', message: '' });
+                                                                    } catch {
+                                                                        toast.error(t("Xatolik yuz berdi", "Произошла ошибка"));
+                                                                    } finally {
+                                                                        setFormSubmitting(false);
+                                                                    }
+                                                                }}
+                                                                className="px-5 py-2 text-sm font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-60 flex items-center gap-2"
+                                                            >
+                                                                {formSubmitting && <Loader2 size={14} className="animate-spin" />}
+                                                                {t("Yuborish", "Отправить")}
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                )}
                                             </div>
                                         )}
                                     </div>

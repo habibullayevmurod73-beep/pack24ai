@@ -193,6 +193,156 @@ enum CampaignType {
   email
 }
 
+// ─── P3 audit: string → enum o'tkazish ──────────────────────────────────────
+
+enum StockMovementType {
+  IN
+  OUT
+  TRANSFER
+}
+
+enum DriverTransactionType {
+  earning
+  withdrawal
+  bonus
+}
+
+enum DriverTransactionStatus {
+  pending
+  completed
+  failed
+}
+
+enum CardType {
+  uzcard
+  humo
+  visa
+  mastercard
+  other
+}
+
+enum EcoLevel {
+  seed
+  sprout
+  sapling
+  tree
+  forest
+  guardian
+  legend
+}
+
+enum PickupType {
+  base
+  pickup
+}
+
+enum VolumeSize {
+  small
+  medium
+  large
+}
+
+enum AssignmentType {
+  individual
+  group
+}
+
+enum TaskDepartment {
+  warehouse
+  logistics
+  production
+  household
+  general
+}
+
+enum NotificationChannel {
+  telegram
+  sms
+  call
+}
+
+enum BotEventSource {
+  customer
+  driver
+  supervisor
+  pack24admin
+  platform
+  system
+}
+
+enum EventSeverity {
+  info
+  success
+  warning
+  error
+}
+
+enum PushPlatform {
+  web
+  ios
+  android
+}
+
+enum AppType {
+  web
+  customer
+  driver
+}
+
+enum ProductionStage {
+  gofra
+  pechat
+  yiguv
+  qc
+}
+
+enum CorrectionEntityType {
+  manual_intake
+  press_log
+  expense_log
+  daily_cash
+  sales_log
+}
+
+enum DeliveryMethod {
+  courier
+  pickup
+}
+
+enum PaymentMethod {
+  cash
+  click
+  payme
+  bank_transfer
+}
+
+enum BadgeKey {
+  first_step
+  kg_10_club     @map("10kg_club")
+  kg_50_hero     @map("50kg_hero")
+  kg_100_warrior @map("100kg_warrior")
+  streak_7
+  streak_30
+  multi_material
+  referral_first
+  tree_saver
+  co2_warrior
+  early_bird
+  eco_legend
+}
+
+enum PickupLocationMode {
+  gps
+  map
+  text
+}
+
+enum CustomerLang {
+  uz
+  ru
+  en
+}
+
 // ─── Foydalanuvchi modeli ────────────────────────────────────────────────────
 model User {
   id           Int      @id @default(autoincrement())
@@ -229,7 +379,7 @@ model User {
   // Eco & Gamification
   ecoPoints           Int              @default(0)
   totalRecycledWeight Float            @default(0)
-  ecoLevel            String           @default("seed") // seed|sprout|sapling|tree|forest|guardian|legend
+  ecoLevel            EcoLevel         @default(seed)
   ecoStreak           Int              @default(0) // Ketma-ket faol kunlar
   lastEcoActivity     DateTime? // Oxirgi faollik sanasi
   totalCO2Saved       Float            @default(0) // Tejangan CO₂ (kg)
@@ -269,8 +419,8 @@ model PushSubscription {
   userId    Int? // Autentifikatsiya qilingan foydalanuvchi
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   driverId  Int? // Haydovchi (mobil)
-  platform  String   @default("web") // web, ios, android
-  appType   String   @default("web") // web, customer, driver
+  platform  PushPlatform @default(web)
+  appType   AppType      @default(web)
   userAgent String? // Browser turi
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -362,11 +512,11 @@ model BotAccessRequest {
 
 model BotEvent {
   id           Int            @id @default(autoincrement())
-  sourceBot    String
+  sourceBot    BotEventSource
   eventType    String
   entityType   String?
   entityId     Int?
-  severity     String         @default("info")
+  severity     EventSeverity  @default(info)
   title        String
   message      String
   status       BotEventStatus @default(new_)
@@ -460,9 +610,9 @@ model Order {
   shippingAddress  String?
   shippingLocation String? // JSON or "lat,long"
   comment          String? // Buyurtma izohi
-  deliveryMethod   String? // 'courier', 'pickup'
+  deliveryMethod   DeliveryMethod?
 
-  paymentMethod String? // 'cash', 'click', 'payme'
+  paymentMethod PaymentMethod?
   paymentStatus PaymentStatus @default(pending)
 
   // Yangi: Status timestamp'lar — analytics uchun
@@ -546,7 +696,7 @@ model Inventory {
 model StockMovement {
   id Int @id @default(autoincrement())
 
-  type String // IN (Kirim), OUT (Chiqim), TRANSFER (O'tkazish)
+  type StockMovementType
 
   productId Int
   product   Product @relation(fields: [productId], references: [id])
@@ -578,7 +728,7 @@ model WorkOrder {
   priority TaskPriority    @default(normal)
 
   progress     Int    @default(0) // 0-100%
-  currentStage String @default("gofra") // gofra, pechat, yiguv, qc
+  currentStage ProductionStage @default(gofra)
 
   stages WorkOrderStage[]
 
@@ -592,7 +742,7 @@ model WorkOrderStage {
   workOrderId Int
   workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
 
-  stage  String // gofra, pechat, yiguv, qc
+  stage  ProductionStage
   status WorkOrderStageStatus @default(pending)
 
   startedAt   DateTime?
@@ -693,7 +843,7 @@ model Supervisor {
 model JournalCorrectionRequest {
   id           Int             @id @default(autoincrement())
   status       BotAccessStatus @default(pending)
-  entityType   String // manual_intake | press_log | expense_log | daily_cash | sales_log
+  entityType   CorrectionEntityType
   entityId     Int
   supervisorId Int
   supervisor   Supervisor      @relation(fields: [supervisorId], references: [id], onDelete: Restrict)
@@ -773,7 +923,7 @@ model DriverCard {
   cardHolder  String // Karta egasi ismi
   expiryMonth Int // Amal qilish muddati — oy
   expiryYear  Int // Amal qilish muddati — yil
-  cardType    String  @default("uzcard") // uzcard, humo, visa, mastercard
+  cardType    CardType @default(uzcard)
   isDefault   Boolean @default(false) // Asosiy karta
   isActive    Boolean @default(true)
 
@@ -790,10 +940,10 @@ model DriverTransaction {
   id           Int         @id @default(autoincrement())
   driverId     Int
   driver       Driver      @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  type         String // earning | withdrawal | bonus
+  type         DriverTransactionType
   amount       Decimal     @db.Decimal(18, 2) // Summa (so'm)
   description  String? // Tavsif
-  status       String      @default("completed") // pending | completed | failed
+  status       DriverTransactionStatus @default(completed)
   cardId       Int? // Qaysi kartaga (FK)
   card         DriverCard? @relation(fields: [cardId], references: [id], onDelete: SetNull)
   collectionId Int? // Qaysi yig'ish uchun
@@ -815,15 +965,15 @@ model RecycleRequest {
   point              RecyclePoint @relation(fields: [pointId], references: [id])
   material           String? // qog'oz, karton, gazeta, jurnal, ofis, kitob, aralash
   volume             Int? // Taxminiy hajm (kg)
-  volumeSize         String? // small, medium, large (mashina chaqirishda)
+  volumeSize         VolumeSize?
   photoUrl           String? // Makulatura rasmi URL
-  pickupType         String       @default("base") // base, pickup
-  pickupLocationMode String? // gps | map | text
+  pickupType         PickupType   @default(base)
+  pickupLocationMode PickupLocationMode?
   address            String? // Mijoz manzili (pickup uchun) — matn
   pickupLat          Float? // Pickup nuqtasi kenglik
   pickupLng          Float? // Pickup nuqtasi uzunlik
   customerTgId       String? // Mijoz Telegram ID (ixtiyoriy)
-  customerLang       String       @default("uz") // Mijoz tili (uz/ru/en)
+  customerLang       CustomerLang @default(uz)
 
   // Dashboard & Gamification
   userId Int? // Sayt/B2B foydalanuvchisi
@@ -1039,7 +1189,7 @@ model EcoAchievement {
   id       Int      @id @default(autoincrement())
   userId   Int
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  badgeKey String // first_step|10kg_club|50kg_hero|streak_7|streak_30|multi_material|referral_first|tree_saver|co2_warrior|early_bird|b2b_champion|eco_legend
+  badgeKey BadgeKey
   earnedAt DateTime @default(now())
 
   @@unique([userId, badgeKey])
@@ -1056,9 +1206,9 @@ model Task {
 
   title       String
   description String @default("")
-  department  String @default("general")
+  department  TaskDepartment @default(general)
 
-  assignmentType String       @default("individual")
+  assignmentType AssignmentType @default(individual)
   status         TaskStatus   @default(pending)
   priority       TaskPriority @default(normal)
 
@@ -1178,7 +1328,7 @@ model TaskNotification {
   userId Int
   user   User @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
 
-  channel String // "telegram" | "sms" | "call"
+  channel NotificationChannel
   status  NotificationStatus @default(sent)
 
   sentAt      DateTime  @default(now())

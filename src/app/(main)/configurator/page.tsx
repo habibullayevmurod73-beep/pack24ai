@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useLanguage } from '@/lib/contexts/LanguageContext';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import BoxConfigurator from '@/components/BoxConfigurator';
 import {
     Box, ShoppingBag, Coffee, Package, Layers,
@@ -36,6 +37,7 @@ export default function ConfiguratorPage() {
     const [selectedCat, setSelectedCat] = useState('box');
     const [selectedItem, setSelectedItem] = useState<number | null>(null);
     const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+    const [previewOpen, setPreviewOpen] = useState(false);
 
     const t = (uz: string, ru: string, en?: string) =>
         language === 'uz' ? uz : language === 'en' ? (en ?? ru) : ru;
@@ -219,6 +221,47 @@ export default function ConfiguratorPage() {
                                     <div className="flex gap-2">
                                         <button
                                             disabled={selectedItem === null}
+                                            onClick={() => {
+                                                if (selectedItem === null) return;
+                                                const item = items[selectedItem];
+                                                // Create a simple canvas-based mockup download
+                                                const canvas = document.createElement('canvas');
+                                                canvas.width = 800;
+                                                canvas.height = 600;
+                                                const ctx = canvas.getContext('2d');
+                                                if (ctx) {
+                                                    // Background
+                                                    const grad = ctx.createLinearGradient(0, 0, 800, 600);
+                                                    grad.addColorStop(0, '#f9fafb');
+                                                    grad.addColorStop(1, '#e5e7eb');
+                                                    ctx.fillStyle = grad;
+                                                    ctx.fillRect(0, 0, 800, 600);
+                                                    // Text
+                                                    ctx.font = '120px serif';
+                                                    ctx.textAlign = 'center';
+                                                    ctx.fillText(item.emoji, 400, 280);
+                                                    ctx.font = 'bold 24px system-ui';
+                                                    ctx.fillStyle = '#111827';
+                                                    ctx.fillText(item.name, 400, 360);
+                                                    ctx.font = '16px system-ui';
+                                                    ctx.fillStyle = '#6b7280';
+                                                    ctx.fillText('Pack24 Mockup Generator', 400, 400);
+                                                    if (uploadedFile) {
+                                                        ctx.fillText(`Design: ${uploadedFile.name}`, 400, 430);
+                                                    }
+                                                }
+                                                canvas.toBlob((blob) => {
+                                                    if (blob) {
+                                                        const url = URL.createObjectURL(blob);
+                                                        const a = document.createElement('a');
+                                                        a.href = url;
+                                                        a.download = `pack24-mockup-${item.name.toLowerCase().replace(/\s+/g, '-')}.png`;
+                                                        a.click();
+                                                        URL.revokeObjectURL(url);
+                                                    }
+                                                });
+                                                toast.success(t('Mockup yuklab olindi!', 'Мокап скачан!', 'Mockup downloaded!'));
+                                            }}
                                             className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 disabled:bg-gray-100 disabled:text-gray-400 text-white text-xs font-bold py-2.5 rounded-xl hover:bg-blue-700 transition-colors"
                                         >
                                             <Download size={13} />
@@ -226,6 +269,7 @@ export default function ConfiguratorPage() {
                                         </button>
                                         <button
                                             disabled={selectedItem === null}
+                                            onClick={() => setPreviewOpen(true)}
                                             className="border border-gray-200 disabled:opacity-40 text-gray-600 text-xs font-semibold px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors"
                                             aria-label={t("Ko'rish", "Просмотр", "View")}
                                         >
@@ -386,6 +430,25 @@ export default function ConfiguratorPage() {
                 </div>
             </section>
 
+            {previewOpen && selectedItem !== null && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPreviewOpen(false)}>
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="bg-gradient-to-br from-gray-50 to-gray-100 h-64 flex items-center justify-center">
+                            <span className="text-[120px]">{items[selectedItem]?.emoji}</span>
+                        </div>
+                        <div className="p-6">
+                            <h3 className="text-xl font-extrabold text-gray-900 mb-1">{items[selectedItem]?.name}</h3>
+                            <p className="text-sm text-gray-400 mb-4">{t('Pack24 mockup preview', 'Предпросмотр мокапа Pack24', 'Pack24 mockup preview')}</p>
+                            {uploadedFile && <p className="text-sm text-emerald-600 font-medium mb-4">✓ {t("Dizayn qo'llanildi", "Дизайн применён", "Design applied")}: {uploadedFile.name}</p>}
+                            <div className="flex gap-3">
+                                <button onClick={() => setPreviewOpen(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50">
+                                    {t('Yopish', 'Закрыть', 'Close')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

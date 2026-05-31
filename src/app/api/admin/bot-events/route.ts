@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { BotEventStatus } from '@prisma/client';
+import { BotEventStatus, BotEventSource, EventSeverity } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
 
 function readPositiveIntegerParam(value: string | null, fieldName: string) {
@@ -57,11 +57,11 @@ export async function GET(req: NextRequest) {
             if (from) where.createdAt.gte = from;
             if (to) where.createdAt.lte = to;
         }
-        if (sourceBot && sourceBot !== 'all') where.sourceBot = sourceBot;
+        if (sourceBot && sourceBot !== 'all') where.sourceBot = sourceBot as BotEventSource;
         if (eventType && eventType !== 'all') where.eventType = eventType;
         if (entityType && entityType !== 'all') where.entityType = entityType;
         if (entityId) where.entityId = entityId;
-        if (severity && severity !== 'all') where.severity = severity;
+        if (severity && severity !== 'all') where.severity = severity as EventSeverity;
         if (status && status !== 'all') where.status = status as BotEventStatus;
         if (q) {
             where.OR = [

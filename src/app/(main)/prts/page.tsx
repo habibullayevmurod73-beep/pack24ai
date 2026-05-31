@@ -91,10 +91,27 @@ export default function PRTSPage() {
         if (!pickupForm.address.trim()) { toast.error('Manzilni kiriting'); return; }
 
         setPickupSubmitting(true);
-        await new Promise(r => setTimeout(r, 1500));
+        try {
+            const res = await fetch('/api/prts/pickup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    material: pickupForm.type,
+                    weight: Number(pickupForm.weight),
+                    address: pickupForm.address,
+                }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setPickupDone(true);
+                toast.success('Buyurtma muvaffaqiyatli qabul qilindi! 🎉');
+            } else {
+                toast.error(data.error || 'Xatolik yuz berdi');
+            }
+        } catch {
+            toast.error('Server bilan aloqa yo\'q');
+        }
         setPickupSubmitting(false);
-        setPickupDone(true);
-        toast.success('Buyurtma muvaffaqiyatli qabul qilindi! 🎉');
     };
 
     const handleRedeem = async (rewardId: string) => {

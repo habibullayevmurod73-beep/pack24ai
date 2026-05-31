@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireDriver } from '@/lib/auth/guards';
+import { CardType } from '@prisma/client';
 
 function maskCard(num: string): string {
     const clean = num.replace(/\D/g, '');
@@ -14,13 +15,13 @@ function maskCard(num: string): string {
     return `**** **** **** ${clean.slice(-4)}`;
 }
 
-function detectCardType(num: string): string {
+function detectCardType(num: string): CardType {
     const clean = num.replace(/\D/g, '');
-    if (clean.startsWith('8600')) return 'uzcard';
-    if (clean.startsWith('9860')) return 'humo';
-    if (clean.startsWith('4')) return 'visa';
-    if (clean.startsWith('5')) return 'mastercard';
-    return 'other';
+    if (clean.startsWith('8600')) return CardType.uzcard;
+    if (clean.startsWith('9860')) return CardType.humo;
+    if (clean.startsWith('4')) return CardType.visa;
+    if (clean.startsWith('5')) return CardType.mastercard;
+    return CardType.other;
 }
 
 // GET — barcha kartalarni olish

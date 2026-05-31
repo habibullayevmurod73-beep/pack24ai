@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { ProductionStage, WorkOrderStageStatus } from '@prisma/client';
+
+const STAGES: ProductionStage[] = [ProductionStage.gofra, ProductionStage.pechat, ProductionStage.yiguv, ProductionStage.qc];
 
 export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string; stage: string }> }
 ) {
     try {
-        const { id, stage } = await params; // id is workOrderId
+        const { id, stage: stageParam } = await params; // id is workOrderId
         const body = await request.json();
         const { status, operator, progress } = body; // status: pending, in_progress, completed
+        const stage = stageParam as ProductionStage;
 
         const workOrderId = parseInt(id);
 
@@ -37,17 +41,16 @@ export async function PUT(
 
         // Update Parent Work Order
         let newProgress = 0;
-        let newCurrentStage = stage;
+        let newCurrentStage: ProductionStage = stage;
         let newStatus = 'in_progress';
 
         // Calculate simplified progress based on completed stages
-        const stages = ['gofra', 'pechat', 'yiguv', 'qc'];
-        const stageIndex = stages.indexOf(stage);
+        const stageIndex = STAGES.indexOf(stage);
 
         if (status === 'completed') {
             // Move to next stage if available
-            if (stageIndex < stages.length - 1) {
-                newCurrentStage = stages[stageIndex + 1];
+            if (stageIndex < STAGES.length - 1) {
+                newCurrentStage = STAGES[stageIndex + 1];
             } else {
                 newStatus = 'completed';
             }
@@ -56,9 +59,9 @@ export async function PUT(
         // Calculate overall progress (Rough estimate: each stage is 25%)
         // Real app would sum up actual progress
         const completedStages = await prisma.workOrderStage.count({
-            where: { workOrderId, status: 'completed' }
+            where: { workOrderId, status: WorkOrderStageStatus.completed }
         });
-        newProgress = (completedStages / stages.length) * 100;
+        newProgress = (completedStages / STAGES.length) * 100;
         if (progress) newProgress = parseInt(progress); // Manual override if provided
 
         const updatedOrder = await prisma.workOrder.update({

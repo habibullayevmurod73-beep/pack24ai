@@ -1,6 +1,6 @@
 import type { Context, Telegraf } from 'telegraf';
 import { prisma } from '@/lib/prisma';
-import { RecyclePointStatus, RecycleRequestStatus } from '@prisma/client';
+import { RecyclePointStatus, RecycleRequestStatus, VolumeSize } from '@prisma/client';
 
 import { getText } from '../../i18n';
 import { haversineDistance } from '../../geo';
@@ -55,7 +55,7 @@ export async function submitTruckRequest(
             pickupLng: ses.lng || null,
             customerTgId: tgId,
             customerLang: lang,
-            volumeSize: ses.volumeSize || null,
+            volumeSize: (ses.volumeSize as VolumeSize) || null,
             photoUrl: photoUrl || null,
             status: supervisorForPoint ? RecycleRequestStatus.dispatched : RecycleRequestStatus.new_,
             supervisorId: supervisorForPoint?.id ?? null,

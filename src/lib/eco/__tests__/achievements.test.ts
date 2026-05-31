@@ -8,7 +8,8 @@ jest.mock('@/lib/prisma', () => ({
     prisma: {},
 }));
 
-import { getBadgeInfo, BADGE_DEFINITIONS, type BadgeKey } from '../achievements';
+import { getBadgeInfo, BADGE_DEFINITIONS } from '../achievements';
+import { BadgeKey } from '@prisma/client';
 
 describe('BADGE_DEFINITIONS', () => {
     it('has exactly 12 badges', () => {
@@ -33,9 +34,9 @@ describe('BADGE_DEFINITIONS', () => {
 
     it('contains all expected badge keys', () => {
         const expectedKeys: BadgeKey[] = [
-            'first_step', '10kg_club', '50kg_hero', '100kg_warrior',
-            'streak_7', 'streak_30', 'multi_material', 'referral_first',
-            'tree_saver', 'co2_warrior', 'early_bird', 'eco_legend',
+            BadgeKey.first_step, BadgeKey.kg_10_club, BadgeKey.kg_50_hero, BadgeKey.kg_100_warrior,
+            BadgeKey.streak_7, BadgeKey.streak_30, BadgeKey.multi_material, BadgeKey.referral_first,
+            BadgeKey.tree_saver, BadgeKey.co2_warrior, BadgeKey.early_bird, BadgeKey.eco_legend,
         ];
         const actualKeys = BADGE_DEFINITIONS.map(b => b.key);
         for (const key of expectedKeys) {
@@ -54,18 +55,18 @@ describe('getBadgeInfo', () => {
 
     it('returns correct data for each badge key', () => {
         const testCases: { key: BadgeKey; emoji: string }[] = [
-            { key: 'first_step', emoji: '🎯' },
-            { key: '10kg_club', emoji: '💪' },
-            { key: '50kg_hero', emoji: '🦸' },
-            { key: '100kg_warrior', emoji: '🏅' },
-            { key: 'streak_7', emoji: '🔥' },
-            { key: 'streak_30', emoji: '🌋' },
-            { key: 'multi_material', emoji: '🎨' },
-            { key: 'referral_first', emoji: '👥' },
-            { key: 'tree_saver', emoji: '🌳' },
-            { key: 'co2_warrior', emoji: '💨' },
-            { key: 'early_bird', emoji: '🐦' },
-            { key: 'eco_legend', emoji: '⭐' },
+            { key: BadgeKey.first_step, emoji: '🎯' },
+            { key: BadgeKey.kg_10_club, emoji: '💪' },
+            { key: BadgeKey.kg_50_hero, emoji: '🦸' },
+            { key: BadgeKey.kg_100_warrior, emoji: '🏅' },
+            { key: BadgeKey.streak_7, emoji: '🔥' },
+            { key: BadgeKey.streak_30, emoji: '🌋' },
+            { key: BadgeKey.multi_material, emoji: '🎨' },
+            { key: BadgeKey.referral_first, emoji: '👥' },
+            { key: BadgeKey.tree_saver, emoji: '🌳' },
+            { key: BadgeKey.co2_warrior, emoji: '💨' },
+            { key: BadgeKey.early_bird, emoji: '🐦' },
+            { key: BadgeKey.eco_legend, emoji: '⭐' },
         ];
 
         for (const { key, emoji } of testCases) {

@@ -17,10 +17,11 @@ interface AIContext {
 export interface ChatMessage {
     role: 'user' | 'assistant';
     text: string;
+    inlineData?: { data: string; mimeType: string };
 }
 
 interface UseAIReturn {
-    generateResponse: (userMessage: string, context: AIContext) => Promise<string>;
+    generateResponse: (userMessage: string, context: AIContext, inlineData?: { data: string; mimeType: string }) => Promise<string>;
     isTyping: boolean;
     error: string | null;
     history: ChatMessage[];
@@ -90,7 +91,7 @@ export function useAI(): UseAIReturn {
     }, []);
 
     const generateResponse = useCallback(
-        async (userMessage: string, context: AIContext): Promise<string> => {
+        async (userMessage: string, context: AIContext, inlineData?: { data: string; mimeType: string }): Promise<string> => {
             // Abort any in-flight request
             if (abortRef.current) abortRef.current.abort();
 
@@ -102,13 +103,13 @@ export function useAI(): UseAIReturn {
 
             // Sanitize input
             const sanitized = userMessage.trim().slice(0, 500);
-            if (!sanitized) {
+            if (!sanitized && !inlineData) {
                 setIsTyping(false);
                 return '';
             }
 
             // Add user message to history immediately
-            const userMsg: ChatMessage = { role: 'user', text: sanitized };
+            const userMsg: ChatMessage = { role: 'user', text: sanitized, inlineData };
             const currentHistory = [...history, userMsg];
 
             let lastError: string = '';
@@ -128,6 +129,7 @@ export function useAI(): UseAIReturn {
                         signal: controller.signal,
                         body: JSON.stringify({
                             message: sanitized,
+                            inlineData,
                             language: context.language,
                             history: history.slice(-10), // send last 10 for context
                             context: {
