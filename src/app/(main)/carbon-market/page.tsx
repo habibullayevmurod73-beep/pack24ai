@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState, useCallback } from 'react';
 import { useLanguage } from '@/lib/contexts/LanguageContext';
 import { useCurrencySafe } from '@/lib/contexts/CurrencyContext';
@@ -722,13 +723,13 @@ export default function CarbonMarketPage() {
                         <div className="bg-gradient-to-br from-gray-50 to-emerald-50/30 dark:from-gray-900 dark:to-emerald-950/10 rounded-2xl border border-gray-200 dark:border-gray-800 p-8 text-center max-w-xl">
                             <ShieldCheck className="w-12 h-12 text-emerald-300 mx-auto mb-4" />
                             <p className="text-gray-600 dark:text-gray-400 mb-4">{t('loginToSell', lang)}</p>
-                            <a
+                            <Link
                                 href="/login"
                                 className="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-full transition-colors"
                             >
                                 {lang === 'ru' ? 'Войти' : lang === 'en' ? 'Login' : 'Kirish'}
                                 <ArrowRight className="w-4 h-4" />
-                            </a>
+                            </Link>
                         </div>
                     )}
                 </section>

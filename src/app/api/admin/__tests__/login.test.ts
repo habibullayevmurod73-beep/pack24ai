@@ -29,6 +29,7 @@ jest.mock('@/lib/rateLimit', () => ({
 import { NextRequest } from 'next/server';
 import { POST } from '../login/route';
 import { ADMIN_AUTH_COOKIE } from '@/lib/adminAuthShared';
+import { rateLimit } from '@/lib/rateLimit';
 
 function makeAdminRequest(body: Record<string, unknown>): NextRequest {
   return new NextRequest('http://localhost:3000/api/admin/login', {
@@ -102,13 +103,12 @@ describe('POST /api/admin/login', () => {
   });
 
   it('429 - rate limit oshganda rad etilishi', async () => {
-    const { rateLimit } = require('@/lib/rateLimit');
-    (rateLimit as jest.Mock).mockResolvedValueOnce({
+    jest.mocked(rateLimit).mockResolvedValueOnce({
       ok: false,
       response: new Response(JSON.stringify({ error: 'Too many requests' }), {
         status: 429,
       }),
-    });
+    } as never);
 
     const res = await POST(makeAdminRequest({
       username: 'admin',

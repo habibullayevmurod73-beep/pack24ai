@@ -93,7 +93,7 @@ describe('POST /api/auth/register', () => {
       passwordHash: '$2b$10$hashed', referralCode: 'REF123',
       role: 'user', isActive: true,
     };
-    (prisma.$transaction as jest.Mock).mockImplementation(async (cb: Function) => {
+    (prisma.$transaction as jest.Mock).mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
       const tx = {
         user: {
           create: jest.fn().mockResolvedValue(createdUser),
@@ -140,7 +140,7 @@ describe('POST /api/auth/register', () => {
       passwordHash: '$2b$10$hashed', referralCode: 'NEW123',
       role: 'user', isActive: true, referredById: 2,
     };
-    (prisma.$transaction as jest.Mock).mockImplementation(async (cb: Function) => {
+    (prisma.$transaction as jest.Mock).mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
       const tx = {
         user: {
           create: jest.fn().mockResolvedValue(createdUser),
