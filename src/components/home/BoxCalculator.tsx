@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import Link from 'next/link';
 import {
     Calculator, Box, Ruler, Layers, RotateCcw, Package, Palette, FileText,
     type LucideIcon,
@@ -70,6 +71,7 @@ const T: Record<string, Record<string, string>> = {
         ru: 'Цена ориентировочная. Точная сумма подтверждается при заказе.',
         en: 'Price is estimated. Final amount confirmed on order.',
     },
+    createOrder: { uz: 'Buyurtma berish', ru: 'Заказать', en: 'Create Order' },
 };
 const t = (key: string, lang: string) => T[key]?.[lang] || T[key]?.uz || '';
 
@@ -307,6 +309,13 @@ export default function BoxCalculator() {
                                 {priceLoading ? '…' : fmtMoney(Q > 0 ? estimate.orderGrandTotal : estimate.roundedPrice)}
                             </p>
                         </div>
+
+                        <Link 
+                            href={`/contacts?calc=1&l=${L}&w=${W}&h=${H}&pt=${printType}&qty=${Q}`}
+                            className="flex items-center justify-center gap-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow-sm transition-colors mt-3"
+                        >
+                            <Package size={16} /> {t('createOrder', language)}
+                        </Link>
                     </div>
                 ) : calc ? (
                     <p className="text-[10px] text-gray-400 text-center py-2 italic">{priceLoading ? '…' : t('hint', language)}</p>

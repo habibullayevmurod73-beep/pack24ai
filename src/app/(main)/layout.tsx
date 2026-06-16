@@ -1,4 +1,4 @@
-import GoogleAnalytics from "@/components/GoogleAnalytics";
+import Analytics from "@/components/Analytics";
 import LazyGlobalAI from "@/components/LazyGlobalAI";
 import AuthSessionProvider from "@/components/AuthSessionProvider";
 import { LanguageProvider } from "@/lib/contexts/LanguageContext";
@@ -7,11 +7,12 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Toaster } from "sonner";
 import VoiceOrderButtonWrapper from '@/components/VoiceOrderButtonWrapper';
+import FloatingTelegram from '@/components/FloatingTelegram';
 
 export default function MainLayout({ children }: Readonly<{ children: React.ReactNode }>) {
     return (
         <>
-            <GoogleAnalytics />
+            <Analytics />
             <AuthSessionProvider>
                 <LanguageProvider>
                     <CurrencyProvider>
@@ -22,6 +23,7 @@ export default function MainLayout({ children }: Readonly<{ children: React.Reac
                         </main>
                         <Footer />
                         <VoiceOrderButtonWrapper />
+                        <FloatingTelegram />
                     </CurrencyProvider>
                 </LanguageProvider>
             </AuthSessionProvider>

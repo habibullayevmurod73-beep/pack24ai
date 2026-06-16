@@ -1,6 +1,7 @@
 import { unstable_cache } from 'next/cache';
 import dynamic from 'next/dynamic';
 import HomeHero from '@/components/home/HomeHero';
+import HomeSeoText from '@/components/home/HomeSeoText';
 import SectionSkeleton from '@/components/home/SectionSkeleton';
 import { OrganizationLd, WebSiteLd } from '@/components/seo/JsonLd';
 import { prisma } from '@/lib/prisma';
@@ -83,6 +84,9 @@ export default async function Home() {
 
             {/* Pacdora AI hamkorlik showcase */}
             <PackagingShowcase />
+
+            {/* SEO matni */}
+            <HomeSeoText />
         </div>
     );
 }
